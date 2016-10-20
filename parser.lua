@@ -49,11 +49,11 @@ local keyword = P "let" + P "in"
 -- Parser
 
 local function rule(name, pattern)
-	return Ct( Cc(name) * pattern )
+	return Ct( pattern ) / function(t) t.kind = name return t end
 end
 
 local function foldApplication(acc, val)
-	return {"application", acc, val}	
+	return {kind = "application", acc, val}
 end
 
 local function commaSeparated(rule, ctx)
@@ -64,7 +64,7 @@ local function handleParensExprList(list)
 
 	if #list == 0 then
 		-- empty tuple
-		return { "tuple" }
+		return { kind = "tuple" }
 
 	elseif #list == 1 then
 		-- expression in (), just get the expression
@@ -72,16 +72,16 @@ local function handleParensExprList(list)
 
 	else
 		-- non empty tuple
-		table.insert(list, 1, "tuple")
+		list.kind = "tuple"
 		return list
 	end
 end
 
 local function handleTuplePattern(list)
 
-	if #list == 2 then
-		-- {"tuple", pattern} -> just get the pattern
-		return list[2]
+	if #list == 1 then
+		-- {kind = "tuple", pattern} -> just get the pattern
+		return list[1]
 	else
 		-- actual empty or >= 2-tuple
 		return list
