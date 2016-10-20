@@ -1,5 +1,10 @@
 -- Prelude is loaded!
 
-let fact = n -> product (range 1 n) in
+let
+	fact = n -> product (range 1 n),
 
-fact 10
+	fibs = cons 1 (cons 1 (zipWith add fibs (tail fibs))),
+	isPrime = n -> and (gt n 1) (all (k -> neq (div n k) 0) (range 2 (sqrt n)))
+in
+
+head (drop 10 fibs)
