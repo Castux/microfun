@@ -38,7 +38,7 @@ local function expect(patt, ctx)
 
 	return patt + function(s, i)
 		local line, col = loc(s, i)
-		error(string.format("Microfun parsing error: expected %s at %d:%d", ctx, line, col))
+		error(string.format("microfun parsing error: expected %s (%d:%d)", ctx, line, col))
 	end
 end
 

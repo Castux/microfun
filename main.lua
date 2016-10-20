@@ -11,5 +11,3 @@ if not success then
 else
 	print(serpent.block(result))
 end
-
---print(transpiler.execute(m))
