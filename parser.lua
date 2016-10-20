@@ -17,6 +17,35 @@ local ws = (comment + S(" \t\n\r\f")) ^ 0
 
 local keyword = P "let" + P "in"
 
+-- Error handling
+
+local function loc (str, where)
+	local line, pos, linepos = 1, 1, 1
+	while true do
+		pos = str:find("\n", pos, true)
+		if pos and pos < where then
+			line = line + 1
+			linepos = pos
+			pos = pos + 1
+		else
+			break
+		end
+	end
+	return line, where - linepos
+end
+
+local function expect(patt, ctx)
+
+	return patt + function(s, i)
+		local line, col = loc(s, i)
+		error(string.format("Microfun parsing error: expected %s at %d:%d", ctx, line, col))
+	end
+end
+
+local function expectP(str)
+	return expect(P(str), "'" .. str .. "'")
+end
+
 -- Parser
 
 local function rule(name, pattern)
@@ -27,45 +56,81 @@ local function foldApplication(acc, val)
 	return {"application", acc, val}	
 end
 
-local function commaSeparated(rule)
-	return rule * ws * (P "," * ws * rule * ws) ^ 0
+local function commaSeparated(rule, ctx)
+	return rule * ws * (P "," * ws * expect(rule, ctx) * ws) ^ 0
 end
+
+local function handleParensExprList(list)
+
+	if #list == 0 then
+		return { "tuple" }
+	elseif #list == 1 then
+		return list[1]
+	else
+		table.insert(list, 1, "tuple")
+		return list
+	end
+
+end
+
 
 local Grammar = lpeg.P {
 	"Program",
-	
+
 	Name = C(identifier) - keyword,
 	Constant = number / tonumber,
-	
+
 	Program = ws * V "Expr" * ws * P(-1),
-	
+
 	Expr = V "Let"
-		+ V "Application"
-		+ V "Lambda"
-		+ V "AtomicExpr",
-	
-	Let = rule("let", P "let" * ws * commaSeparated(V "Binding") * ws * P "in" * ws * V "Expr"),
-	Binding = rule ("binding", V "Name" * ws * P "=" * ws * V "Expr"),
-	
-	Lambda = rule("lambda", V "Pattern" * ws * P "->" * ws * V "Expr"),
-	Application = Cf((V "AtomicExpr" * ws) ^ 2, foldApplication),
-	AtomicExpr = V "Name"
-		+ V "Constant"
-		+ P "(" * ws * V "Expr" * ws * ")"
-		+ V "Tuple" + V "EmptyTuple"
-		+ V "Matcher",
-	
-	Tuple = rule("tuple", P "(" * ws * commaSeparated(V "Expr") * ws * ")"),
-	EmptyTuple = rule("tuple", P "(" * ws * P ")"),
-	
+	+ V "Application"
+	+ V "Lambda"
+	+ V "AtomicExpr",
+
+	Let = rule("let",
+		P "let" * ws *
+		expect( commaSeparated(V "Binding", "binding"), "bindings after 'let'" ) * ws *
+		expectP "in" * ws *
+		expect( V "Expr", "expression after 'in'" )
+	),
+
+	Binding = rule("binding",
+		expect( V "Name", "identifier in binding" ) * ws *
+		expectP "=" * ws *
+		expect( V "Expr", "expression in binding" )
+	),
+
+	Lambda = rule("lambda",
+		V "Pattern" * ws *
+		P "->" * ws *
+		expect( V "Expr", "expression in lambda" )
+	),
+
 	Pattern = V "Name"
-		+ V "Constant"
-		+ V "EmptyTuple"
-		+ V "TuplePattern",
-	
-	TuplePattern = rule("tuple", P "(" * ws * commaSeparated(V "Pattern") * ws * ")"),
-	
-	Matcher = rule("matcher", P "[" * ws * commaSeparated(V "Lambda") * ws * P "]")
+	+ V "Constant"
+	+ V "TuplePattern",
+
+	Application = Cf( (V "AtomicExpr" * ws) ^ 2, foldApplication ),
+
+	AtomicExpr = V "Name"
+	+ V "Constant"
+	+ V "ParensExprList"
+	+ V "Matcher",
+
+	ParensExprList = Ct (
+		"(" * ws *
+		commaSeparated(V "Expr", "expression") ^ -1 * ws *
+		")"
+		) / handleParensExprList,
+
+	TuplePattern = rule("tuple",
+		"(" * ws *
+		commaSeparated(V "Pattern", "pattern") ^ -1 * ws *
+		")"
+	),
+
+	Matcher = rule("matcher", P "[" * ws * commaSeparated(V "Lambda", "lambda") * ws * expectP "]"),
+
 }
 
 return Grammar
