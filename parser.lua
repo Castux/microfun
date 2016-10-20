@@ -76,8 +76,8 @@ end
 local Grammar = lpeg.P {
 	"Program",
 
-	Name = C(identifier) - keyword,
-	Constant = number / tonumber,
+	Name = rule("identifier", C(identifier) - keyword),
+	Constant = rule("number", number / tonumber),
 
 	Program = ws * V "Expr" * ws * P(-1),
 
@@ -114,7 +114,7 @@ local Grammar = lpeg.P {
 	AtomicExpr = V "Name"
 		+ V "Constant"
 		+ V "ParensExprList"
-		+ V "Matcher",
+		+ V "MultiLambda",
 
 	ParensExprList = Ct (
 		"(" * ws *
@@ -128,7 +128,7 @@ local Grammar = lpeg.P {
 		")"
 	),
 
-	Matcher = rule("matcher", P "[" * ws * commaSeparated(V "Lambda", "lambda") * ws * expectP "]"),
+	MultiLambda = rule("multilambda", P "[" * ws * commaSeparated(V "Lambda", "lambda") * ws * expectP "]"),
 }
 
 return Grammar
