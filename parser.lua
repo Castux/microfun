@@ -73,7 +73,6 @@ local function handleParensExprList(list)
 
 end
 
-
 local Grammar = lpeg.P {
 	"Program",
 
@@ -83,9 +82,9 @@ local Grammar = lpeg.P {
 	Program = ws * V "Expr" * ws * P(-1),
 
 	Expr = V "Let"
-	+ V "Application"
-	+ V "Lambda"
-	+ V "AtomicExpr",
+		+ V "Application"
+		+ V "Lambda"
+		+ V "AtomicExpr",
 
 	Let = rule("let",
 		P "let" * ws *
@@ -107,15 +106,15 @@ local Grammar = lpeg.P {
 	),
 
 	Pattern = V "Name"
-	+ V "Constant"
-	+ V "TuplePattern",
+		+ V "Constant"
+		+ V "TuplePattern",
 
 	Application = Cf( (V "AtomicExpr" * ws) ^ 2, foldApplication ),
 
 	AtomicExpr = V "Name"
-	+ V "Constant"
-	+ V "ParensExprList"
-	+ V "Matcher",
+		+ V "Constant"
+		+ V "ParensExprList"
+		+ V "Matcher",
 
 	ParensExprList = Ct (
 		"(" * ws *
@@ -130,7 +129,6 @@ local Grammar = lpeg.P {
 	),
 
 	Matcher = rule("matcher", P "[" * ws * commaSeparated(V "Lambda", "lambda") * ws * expectP "]"),
-
 }
 
 return Grammar
