@@ -1,3 +1,5 @@
+let
+
 -- Functions
 
 id = x -> x,
@@ -45,7 +47,7 @@ empty = [ () -> true, l -> false ],
 
 concat = [
 	() -> v -> v,
-	(h,t) -> v -> (h, (concat t v))
+	(h,t) -> v -> (h, concat t v)
 ],
 
 reverse = [
@@ -118,3 +120,5 @@ range = a -> b ->
 		(),
 
 repeat = x -> (x, repeat x)
+
+in

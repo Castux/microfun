@@ -1,3 +1,5 @@
 -- Prelude is loaded!
 
-repeat 1
+let fact = n -> product (range 1 n) in
+
+fact 10
