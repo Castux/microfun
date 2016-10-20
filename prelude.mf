@@ -1,0 +1,120 @@
+-- Functions
+
+id = x -> x,
+compose = f -> g -> x -> f (g x),
+flip = f -> x -> y -> f y x,
+
+-- Numbers
+-- builtin: add, mul, sub, div, mod
+
+succ = add 1,
+pred = (flip sub) 1,
+
+-- Booleans
+
+false = 0,
+true = 1,
+
+if = cond -> t -> f -> [ true -> t, false -> f ] cond,
+
+and = a -> b -> if a b false,
+or = a -> b -> if a true b,
+not = [ false -> true, true -> false ],
+
+-- Comparisons
+-- builtin: eq, lt
+
+neq = a -> b -> not (eq a b),
+gte = a -> b -> not (lt a b),
+gt = a -> b -> not (lte a b),
+lte = a -> b -> or (lt a b) (eq a b),
+
+-- Lists
+
+cons = h -> t -> (h,t),
+
+length = [
+	() -> 0,
+	(h,t) -> add 1 (length t)
+],
+
+head = (h,t) -> h,
+tail = (h,t) -> t,
+
+empty = [ () -> true, l -> false ],
+
+concat = [
+	() -> v -> v,
+	(h,t) -> v -> (h, (concat t v))
+],
+
+reverse = [
+	() -> (),
+	(h,t) -> concat (reverse t) (h,())
+],
+
+reverse2 = l ->
+	let helper = [
+		() -> res -> res,
+		(h,t) -> res -> helper t (h,res)
+	]
+	in helper l (),
+
+map = f -> [
+	() -> (),
+	(h,t) -> (f h, map f t)
+],
+
+filter = f -> [
+	() -> (),
+	(h,t) -> if (f h) (h, filter f t) (filter f t)
+],
+
+foldr = f -> acc -> [
+	() -> acc,
+	(h,t) -> f h (foldr f acc t)
+],
+
+foldl = f -> acc -> [
+	() -> acc,
+	(h,t) -> foldl f (f acc h) t
+],
+
+sum = foldr add 0,
+product = foldr mul 1,
+
+orList = foldr or 0,
+andList = foldr and 1,
+
+any = f -> orList (map f),
+all = f -> andList (map f),
+
+zipWith = f -> [
+	()		-> b -> (),
+	(a,as)	-> [
+		()		-> (),
+		(b,bs)	-> (f a b, zipWith f as bs)
+	]
+],
+
+zip = zipWith cons,
+
+take = n -> [
+	() -> (),
+	(h,t) -> cons h (take (pred n) t)
+],
+
+drop = [
+	0 -> l -> l,
+	n -> [
+		() -> (),
+		(h,t) -> drop (pred n) t
+	]
+],
+
+range = a -> b ->
+	if (lt a b)
+		(a, range (succ a) b)
+		(),
+
+repeat = x -> (x, repeat x)
