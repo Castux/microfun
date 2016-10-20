@@ -57,20 +57,35 @@ local function foldApplication(acc, val)
 end
 
 local function commaSeparated(rule, ctx)
-	return rule * ws * (P "," * ws * expect(rule, ctx) * ws) ^ 0
+	return rule * ws * ("," * ws * expect(rule, ctx) * ws) ^ 0
 end
 
 local function handleParensExprList(list)
 
 	if #list == 0 then
+		-- empty tuple
 		return { "tuple" }
+
 	elseif #list == 1 then
+		-- expression in (), just get the expression
 		return list[1]
+
 	else
+		-- non empty tuple
 		table.insert(list, 1, "tuple")
 		return list
 	end
+end
 
+local function handleTuplePattern(list)
+
+	if #list == 2 then
+		-- {"tuple", pattern} -> just get the pattern
+		return list[2]
+	else
+		-- actual empty or >= 2-tuple
+		return list
+	end
 end
 
 local Grammar = lpeg.P {
@@ -126,9 +141,13 @@ local Grammar = lpeg.P {
 		"(" * ws *
 		commaSeparated(V "Pattern", "pattern") ^ -1 * ws *
 		")"
-	),
+	) / handleTuplePattern,
 
-	MultiLambda = rule("multilambda", P "[" * ws * commaSeparated(V "Lambda", "lambda") * ws * expectP "]"),
+	MultiLambda = rule("multilambda",
+		"[" * ws *
+		commaSeparated(V "Lambda", "lambda") * ws *
+		expectP "]"
+	),
 }
 
 return Grammar
