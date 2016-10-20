@@ -9,5 +9,5 @@ local success, result = pcall(parser.match, parser, (prelude .. source))
 if not success then
 	print(result)
 else
-	print(serpent.block(result))
+	print(serpent.block(result, {comment = false}))
 end
