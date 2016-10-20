@@ -3,19 +3,6 @@ local lpeg = require "lpeg"
 local R,P,S,V = lpeg.R, lpeg.P, lpeg.S, lpeg.V
 local C, Ct, Cc, Cf = lpeg.C, lpeg.Ct, lpeg.Cc, lpeg.Cf
 
--- Lexer
-
-local digit = R "09"
-local alpha = R("az","AZ")
-local underscore = P "_"
-local identifier = (alpha + underscore) * (alpha + underscore + digit) ^ 0
-
-local number = digit ^ 1
-
-local comment = P "--" * (P(1) - S "\n\r") ^ 0 * S "\n\r" ^ 1
-local ws = (comment + S(" \t\n\r\f")) ^ 0
-
-local keyword = P "let" + P "in"
 
 -- Error handling
 
@@ -45,6 +32,19 @@ end
 local function expectP(str)
 	return expect(P(str), "'" .. str .. "'")
 end
+
+-- Lexer
+
+local digit = R "09"
+local alpha = R("az","AZ")
+local underscore = P "_"
+local identifier = (alpha + underscore) * (alpha + underscore + digit) ^ 0
+
+local number = digit ^ 1 * expect( -(alpha + underscore), "digit")
+local comment = P "--" * (P(1) - S "\n\r") ^ 0 * S "\n\r" ^ 1
+local ws = (comment + S(" \t\n\r\f")) ^ 0
+
+local keyword = P "let" + P "in"
 
 -- Parser
 
