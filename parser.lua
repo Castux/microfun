@@ -95,7 +95,7 @@ local Grammar = lpeg.P {
 	Name = rule("identifier", C(identifier) - keyword),
 	Constant = rule("number", number / tonumber),
 
-	Program = ws * V "Expr" * ws * P(-1),
+	Program = ws * V "Expr" * ws * expect( P(-1), "end of file"),
 
 	Expr = V "Let"
 		+ V "Application"
