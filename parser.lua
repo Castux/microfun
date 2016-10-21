@@ -138,7 +138,7 @@ local Grammar = lpeg.P {
 		"(" * ws *
 		commaSeparated(V "Expr", "expression") ^ -1 * ws *
 		")"
-		) / handleParensExprList,
+	) / handleParensExprList,
 
 	TuplePattern = rule("tuple",
 		"(" * ws *
