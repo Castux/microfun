@@ -91,24 +91,29 @@ local function resolveScope(ast)
 
 				local id = node[1]
 
-				-- If we're in a "lvalue" (in a lambda pattern or a left side of a let binding),
-				-- we populate the current scope (the lambda or the let)
-
 				if inPattern then
+
+					-- In a pattern, we check if the name is bound (in which case we link its definition),
+					-- or free, in which case we add it to the lambda's scope
 
 					local lambda = scope[#scope]
 					assert(lambda.kind == "lambda")
 
-					lambda.names[id] = node
+					local found = lookup(id)
+					if found then
+						node.definition = found
+					else
+						lambda.names[id] = node
+					end
 
 				elseif inBindingLValue then
 
-					-- ignore it, it's been done already in the handler for let
-
-				-- Otherwise it's a rvalue: lookup the current scope stack to bind the identifier
-				-- to its definition
+					-- In a binding, we ignore it, as it's been done already in the handler for let
 
 				else
+
+					-- Otherwise it's a rvalue: lookup the current scope stack to bind the identifier
+					-- to its definition
 
 					local found = lookup(id)
 					if found then
