@@ -26,7 +26,7 @@ not = [ false -> true, true -> false ],
 -- Comparisons
 -- builtin: lt
 
-eq = a -> [ a -> true, else -> false ]
+eq = a -> [ a -> true, else -> false ],
 neq = a -> b -> not (eq a b),
 gte = a -> b -> not (lt a b),
 gt = a -> b -> not (lte a b),
