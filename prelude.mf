@@ -24,8 +24,9 @@ or = a -> b -> if a true b,
 not = [ false -> true, true -> false ],
 
 -- Comparisons
--- builtin: eq, lt
+-- builtin: lt
 
+eq = a -> [ a -> true, else -> false ]
 neq = a -> b -> not (eq a b),
 gte = a -> b -> not (lt a b),
 gt = a -> b -> not (lte a b),
