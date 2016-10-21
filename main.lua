@@ -6,8 +6,6 @@ local analyzer = require "analyzer"
 local prelude = io.open("prelude.mf"):read("*a")
 local source = io.open("test.mf"):read("*a")
 
---prelude = ""
-
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
 if not success then
@@ -15,8 +13,5 @@ if not success then
 	return
 end
 
---utils.printAST(result)
-
+utils.printAST(result)
 analyzer.resolveScope(result)
-
---print(serpent.block(result, {comment = false}))

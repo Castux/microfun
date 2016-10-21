@@ -1,2 +1,8 @@
 
-(x -> add x x) 10
+let
+
+ones = (1, ones)
+
+in
+
+head ones

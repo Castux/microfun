@@ -109,7 +109,7 @@ local Grammar = lpeg.P {
 	),
 
 	Binding = rule("binding",
-		expect( V "Name", "identifier in binding" ) * ws *
+		expect( rule("bindinglvalue", V "Name"), "identifier in binding" ) * ws *
 		expectP "=" * ws *
 		expect( V "Expr", "expression in binding" )
 	),
