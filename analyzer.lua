@@ -2,6 +2,12 @@ local utils = require "utils"
 
 local function resolveScope(ast)
 	
+	-- TODO: clarify what does a name point to in the scope stack. Now:
+	-- * "builtin" for a builtin
+	-- * the whole binding node for a let lvalue
+	-- * the identifier node for a lambda's pattern identifier
+	-- Must decide what is most useful for interpretation/compiling later
+	
 	-- analyzer state
 	
 	local scope = {}

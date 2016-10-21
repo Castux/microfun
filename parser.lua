@@ -1,7 +1,7 @@
 local lpeg = require "lpeg"
 
 local R,P,S,V = lpeg.R, lpeg.P, lpeg.S, lpeg.V
-local C, Ct, Cc, Cf = lpeg.C, lpeg.Ct, lpeg.Cc, lpeg.Cf
+local C, Ct, Cc, Cf, Cp = lpeg.C, lpeg.Ct, lpeg.Cc, lpeg.Cf, lpeg.Cp
 
 
 -- Error handling
@@ -49,11 +49,16 @@ local keyword = P "let" + P "in"
 -- Parser
 
 local function rule(name, pattern)
-	return Ct( pattern ) / function(t) t.kind = name return t end
+	return Ct( Cp() * pattern ) / function(t)
+		t.kind = name
+		t.pos = t[1]
+		table.remove(t, 1)
+		return t
+	end
 end
 
 local function foldApplication(acc, val)
-	return {kind = "application", acc, val}
+	return {kind = "application", pos = acc.pos, acc, val}
 end
 
 local function commaSeparated(rule, ctx)
@@ -62,16 +67,12 @@ end
 
 local function handleParensExprList(list)
 
-	if #list == 0 then
-		-- empty tuple
-		return { kind = "tuple" }
-
-	elseif #list == 1 then
+	if #list == 1 then
 		-- expression in (), just get the expression
 		return list[1]
 
 	else
-		-- non empty tuple
+		-- tuple
 		list.kind = "tuple"
 		return list
 	end
@@ -133,7 +134,7 @@ local Grammar = lpeg.P {
 		+ V "ParensExprList"
 		+ V "MultiLambda",
 
-	ParensExprList = Ct (
+	ParensExprList = rule("parensexprlist",
 		"(" * ws *
 		commaSeparated(V "Expr", "expression") ^ -1 * ws *
 		")"
