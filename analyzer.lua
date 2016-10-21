@@ -1,37 +1,46 @@
 local utils = require "utils"
 
-
-local function findNames(ast)
+local function resolveScope(ast)
+	
+	local scope = {}
+	local inPattern = false
 	
 	local funcTable =
 	{
 		pre =
 		{
-			identifier = function(node)
-				print("identifier: " .. node[1])
-				return false
-			end
-		}
-	}
-	
-	utils.traverse(ast, funcTable)
-end
-
-
-local function linkParents(ast)
-	
-	local funcTable =
-	{
-		pre =
-		{
-			default = function(node)
-				for i,v in ipairs(node) do
-					if type(v) == "table" then
-						v.parent = node
-					end
-				end
-				
+			lambda = function(node)
+				table.insert(scope, node)
 				return true
+			end,
+			
+			let = function(node)
+				table.insert(scope, node)
+				return true
+			end,			
+			
+			pattern = function(node)
+				inPattern = true
+				return true
+			end,
+			
+			identifier = function(node)
+				print("Identifier: " .. node[1] .. ", scope: " .. scope[#scope].kind .. ", in pattern: " .. tostring(inPattern))
+			end
+		},
+		
+		post =
+		{
+			lambda = function(node)
+				table.remove(scope)
+			end,
+			
+			let = function(node)
+				table.remove(scope)
+			end,
+			
+			pattern = function(node)
+				inPattern = false
 			end
 		}
 	}
@@ -41,6 +50,5 @@ end
 
 return
 {
-	findNames = findNames,
-	linkParents = linkParents
+	resolveScope = resolveScope
 }

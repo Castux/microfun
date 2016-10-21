@@ -6,7 +6,7 @@ local analyzer = require "analyzer"
 local prelude = io.open("prelude.mf"):read("*a")
 local source = io.open("test.mf"):read("*a")
 
-prelude = ""
+--prelude = ""
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -17,6 +17,6 @@ end
 
 --utils.printAST(result)
 
-analyzer.linkParents(result)
+analyzer.resolveScope(result)
 
-print(serpent.block(result, {comment = false}))
+--print(serpent.block(result, {comment = false}))

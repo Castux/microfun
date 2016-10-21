@@ -25,6 +25,21 @@ local function traverse(ast, funcTable)
 	post(ast)
 end
 
+local function clone(node)
+
+	local new = {}
+	
+	for k,v in pairs(node) do
+		if type(v) == "table" then
+			new[k] = clone(v)
+		else
+			new[k] = v
+		end
+	end
+	
+	return new
+end
+
 local function printAST(ast)
 	
 	local ident = 0
@@ -67,5 +82,6 @@ end
 return
 {
 	traverse = traverse,
-	printAST = printAST
+	printAST = printAST,
+	clone = clone
 }

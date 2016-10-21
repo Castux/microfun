@@ -120,9 +120,11 @@ local Grammar = lpeg.P {
 		expect( V "Expr", "expression in lambda" )
 	),
 
-	Pattern = V "Name"
+	Pattern = rule("pattern",
+		V "Name"
 		+ V "Constant"
-		+ V "TuplePattern",
+		+ V "TuplePattern"
+	),
 
 	Application = Cf( (V "AtomicExpr" * ws) ^ 2, foldApplication ),
 

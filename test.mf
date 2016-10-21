@@ -1,3 +1,2 @@
--- Prelude is loaded!
 
-()
+(x -> add x x) 10
