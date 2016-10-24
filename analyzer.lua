@@ -25,6 +25,7 @@ local function resolveScope(ast)
 			sub = "builtin",
 			div = "builtin",
 			mod = "builtin",
+			eq = "builtin",
 			lt = "builtin"
 		}
 	}

@@ -14,19 +14,15 @@ pred = (flip sub) 1,
 
 -- Booleans
 
-false = 0,
-true = 1,
+if = cond -> t -> f -> [ 1 -> t, 0 -> f ] cond,
 
-if = cond -> t -> f -> [ true -> t, false -> f ] cond,
-
-and = a -> b -> if a b false,
-or = a -> b -> if a true b,
-not = [ false -> true, true -> false ],
+and = a -> b -> if a b 0,
+or = a -> b -> if a 1 b,
+not = [ 0 -> 1, 1 -> 0 ],
 
 -- Comparisons
--- builtin: lt
+-- builtin: eq, lt
 
-eq = a -> [ a -> true, else -> false ],
 neq = a -> b -> not (eq a b),
 gte = a -> b -> not (lt a b),
 gt = a -> b -> not (lte a b),
@@ -38,13 +34,13 @@ cons = h -> t -> (h,t),
 
 length = [
 	() -> 0,
-	(h,t) -> add 1 (length t)
+	(h,t) -> succ (length t)
 ],
 
 head = (h,t) -> h,
 tail = (h,t) -> t,
 
-empty = [ () -> true, l -> false ],
+empty = [ () -> 1, l -> 0 ],
 
 concat = [
 	() -> v -> v,
