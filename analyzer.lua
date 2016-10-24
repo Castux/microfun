@@ -92,18 +92,12 @@ local function resolveScope(ast)
 
 				if inPattern then
 
-					-- In a pattern, we check if the name is bound (in which case we link its definition),
-					-- or free, in which case we add it to the lambda's scope
+					-- In a pattern, we add it to the lambda's scope
 
 					local lambda = scope[#scope]
 					assert(lambda.kind == "lambda")
 
-					local found = lookup(id)
-					if found then
-						node.definition = found
-					else
-						lambda.names[id] = node
-					end
+					lambda.names[id] = node
 
 				elseif inBindingLValue then
 
