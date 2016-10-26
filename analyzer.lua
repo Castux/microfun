@@ -89,7 +89,6 @@ local function resolveScope(ast)
 			lambda = function(node)
 				local names = {}
 				table.insert(scope, names)
-
 				table.insert(lambdaStack, node)
 
 				return true
@@ -113,7 +112,7 @@ local function resolveScope(ast)
 					-- In a pattern, we add it to the lambda's scope
 
 					local names = scope[#scope]
-					names[id] = lambdaStack[#lambdaStack]
+					names[id] = {lambdaparam = true, lambdaStack[#lambdaStack]}
 
 				elseif inBindingLValue then
 
@@ -126,7 +125,13 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
-						node.value = found
+						if found == "builtin" then
+							node.builtin = true
+						elseif found.lambdaparam then
+							node.lambda = found[1]
+						else
+							node.value = found
+						end
 					else
 						error("Could not find definition for: " .. id)
 					end
@@ -159,6 +164,12 @@ local function resolveScope(ast)
 	utils.traverse(ast, funcTable)
 end
 
+local function apply(node)
+	
+	
+	
+end
+
 local function reduce(expr)
 
 	funcTable =
@@ -186,9 +197,7 @@ local function reduce(expr)
 			application = function(node)
 
 				if node[1].kind == "lambda" then
-
-
-
+					apply(node)
 					return false
 
 				elseif node[1].kind == "multilambda" then

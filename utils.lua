@@ -144,12 +144,12 @@ local function printExpr(ast)
 		{
 			identifier = function(node)
 				add(node[1])
-				if node.value then
-					if node.value.kind == "lambda" then
-						add "?"
-					else
-						add "!"
-					end
+				if node.builtin then
+					add "*"
+				elseif node.lambda then
+					add "?"
+				elseif node.value then
+					add "!"
 				end
 			end,
 			number = function(node) add(node[1]) end,
