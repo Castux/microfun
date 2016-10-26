@@ -211,33 +211,30 @@ local function cloneAndApply(expr, lambda, value)
 	return rec(expr)
 end
 
-local function apply(node)
-
-	local lambda = node[1]
-	local expr = node[2]
+local function apply(lambda, expr)
 
 	local pattern = lambda[1][1]
 
 	-- Simplest case:
 
 	if pattern.kind == "number" then
-		
+
 		if expr.kind == "number" then
 			if pattern[1] == expr[1] then
-				unwrap(node, lambda[2])
-				return true
+				return lambda[2]
 			end
+		elseif expr.kind == "tuple" then
+			return nil
 		else
-			return false
+			return "reduce rvalue"
 		end
 
 	elseif pattern.kind == "identifier" then
 
 		-- Clone the rvalue
 		local newexpr = cloneAndApply(lambda[2], lambda, expr)
-		unwrap(node, newexpr)
-		
-		return true
+
+		return newexpr
 
 	else
 		error("Unsupported pattern: " .. utils.printExpr(pattern))
@@ -252,7 +249,7 @@ local function reduce(expr)
 	{
 		pre =
 		{
-			default = function(node) node.irreducible = true
+			default = function(node)
 				return false
 			end,
 
@@ -264,10 +261,6 @@ local function reduce(expr)
 			identifier = function(node)
 				if type(node.value) == "table" then
 					unwrap(node, node.value)
-				
-				elseif node.builtin then
-					node.irreducible = true
-
 				end
 
 				return false
@@ -275,19 +268,40 @@ local function reduce(expr)
 
 			application = function(node)
 
-				if node[1].kind == "lambda" then
-					local success = apply(node)
-					
-					if success then
-						return false
+				if node[1].builtin then
+					node.builtin = true
+					return true
+
+				elseif node[1].kind == "lambda" or node[1].kind == "multilambda" then
+
+					local lambdas
+
+					if node[1].kind == "lambda" then
+						lambdas = {node[1]}
 					else
-						error("Could not match pattern in lambda: " ..
-							utils.printExpr(node[1]) .. " to value " ..
-							utils.printExpr(node[2]))
+						lambdas = node[1]
 					end
 
-				elseif node[1].kind == "multilambda" then
+					-- Apply
 
+					local result = false
+
+					for i,lambda in ipairs(lambdas) do
+						result = apply(lambda, node[2])
+
+						if result == "reduce rvalue" then
+							node.needReduction = true
+							return true
+
+						elseif result then
+							unwrap(node, result)
+							return false
+						end
+					end
+
+					error("Could not match any pattern in lambda: " ..
+						utils.printExpr(node[1]) .. " to value " ..
+						utils.printExpr(node[2]))
 				else
 					-- reduce the terms
 
@@ -302,13 +316,14 @@ local function reduce(expr)
 			application = function(node)
 				-- don't reduce the rhand term in an application
 				-- it will be done later within the applied expression
-				
-				-- unless lhand term is irreducible, like a builtin
-				if node[1].irreducible then
-					node.irreducible = true
+
+				-- unless: left has a constant or tuple pattern, that need matching,
+				-- or a builtin
+
+				if node.needReduction or node[1].builtin then
 					return true
 				end
-				
+
 				return false
 			end
 		}
