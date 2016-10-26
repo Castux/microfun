@@ -15,21 +15,17 @@ if not success then
 	return
 end
 
-local prev = utils.printExpr(result)
-print(0, prev)
+print(0, utils.printExpr(result))
 
 for step = 1,math.huge do
 
-	analyzer.reduce(result)
-	local nextStep = utils.printExpr(result)
+	local acted = analyzer.reduce(result)
 
-	if nextStep == prev then
+	if not acted then
 		break
 	else
-		print(step, nextStep)
+		print(step, utils.printExpr(result))
 	end
-
-	prev = nextStep
 end
 
 print("Done")

@@ -244,6 +244,7 @@ end
 local function reduce(expr)
 
 	resolveScope(expr)
+	local acted = false
 
 	funcTable =
 	{
@@ -255,12 +256,14 @@ local function reduce(expr)
 
 			let = function(node)
 				unwrap(node, node[#node])
+				acted = true
 				return false
 			end,
 
 			identifier = function(node)
 				if type(node.value) == "table" then
 					unwrap(node, node.value)
+					acted = true
 				end
 
 				return false
@@ -277,9 +280,10 @@ local function reduce(expr)
 						local fun = node[1][1][1]
 						local a = node[1][2][1]
 						local b = node[2][1]
-						
+
 						local new = {kind = "number", builtins[fun](a,b)}
 						unwrap(node, new)
+						acted = true
 
 						return false
 
@@ -312,6 +316,8 @@ local function reduce(expr)
 
 						elseif result then
 							unwrap(node, result)
+							acted = true
+
 							return false
 						end
 					end
@@ -347,6 +353,8 @@ local function reduce(expr)
 	}
 
 	utils.traverse(expr, funcTable)
+
+	return acted
 end
 
 return
