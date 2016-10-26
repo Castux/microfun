@@ -13,6 +13,17 @@ local function unwrap(expr, inner)
 	end
 end
 
+local builtins =
+{
+	add = function(x,y) return x + y end,
+	mul = function(x,y) return x * y end,
+	sub = function(x,y) return x - y end,
+	div = function(x,y) return math.floor(x / y) end,
+	mod = function(x,y) return x % y end,
+	eq = function(x,y) return x == y and 1 or 0 end,
+	lt = function(x,y) return x < y and 1 or 0 end
+}
+
 local function resolveScope(ast)
 
 	-- The identifiers get a .value field to point to their definition:
@@ -29,17 +40,6 @@ local function resolveScope(ast)
 	local lambdaStack = {}
 
 	-- add builtins
-
-	local builtins =
-	{
-		add = "builtin",
-		mul = "builtin",
-		sub = "builtin",
-		div = "builtin",
-		mod = "builtin",
-		eq = "builtin",
-		lt = "builtin"
-	}
 
 	table.insert(scope, builtins)
 
@@ -125,7 +125,7 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
-						if found == "builtin" then
+						if type(found) == "function" then
 							node.builtin = true
 						elseif found.lambdaparam then
 							node.lambda = found[1]
@@ -269,8 +269,25 @@ local function reduce(expr)
 			application = function(node)
 
 				if node[1].builtin then
-					node.builtin = true
-					return true
+
+					if node[1].kind == "application" and
+					node[1][2].kind == "number" and
+					node[2].kind == "number" then
+
+						local fun = node[1][1][1]
+						local a = node[1][2][1]
+						local b = node[2][1]
+						
+						local new = {kind = "number", builtins[fun](a,b)}
+						unwrap(node, new)
+
+						return false
+
+					else
+
+						node.builtin = true
+						return true
+					end
 
 				elseif node[1].kind == "lambda" or node[1].kind == "multilambda" then
 
