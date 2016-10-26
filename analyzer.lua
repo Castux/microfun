@@ -112,6 +112,10 @@ local function resolveScope(ast)
 					-- In a pattern, we add it to the lambda's scope
 
 					local names = scope[#scope]
+					
+					if names[id] then
+						error("Multiple definitions for " .. id .. " in pattern")
+					end
 					names[id] = {lambdaparam = true, lambdaStack[#lambdaStack]}
 
 				elseif inBindingLValue then
@@ -235,7 +239,29 @@ local function apply(lambda, expr)
 		local newexpr = cloneAndApply(lambda[2], lambda, expr)
 
 		return newexpr
-
+	
+	elseif pattern.kind == "tuple" then
+		
+		if expr.kind == "tuple" then
+			
+			if #pattern ~= #expr then
+				return nil
+			end
+			
+			-- TODO: separate the matching from the application
+			-- match(pattern, expr) can be a "simple" recursive function
+			-- that returns a table of ident to value on a successful match,
+			-- "reduce rvalue" if needed, or a nil for fail.
+			-- Then we can happily apply by cloning the lambda's rside and substituting
+			-- all the matches
+			
+		elseif expr.kind == "number" then
+			return nil
+		
+		else
+			return "reduce rvalue"
+		end
+	
 	else
 		error("Unsupported pattern: " .. utils.printExpr(pattern))
 	end
@@ -331,7 +357,7 @@ local function reduce(expr)
 					return true
 				end
 
-			end
+			end			
 		},
 
 		mid =
