@@ -239,7 +239,9 @@ local function reduce(expr)
 	{
 		pre =
 		{
-			default = function(node) return false end,
+			default = function(node) node.irreducible = true
+				return false
+			end,
 
 			let = function(node)
 				unwrap(node, node[#node])
@@ -249,8 +251,10 @@ local function reduce(expr)
 			identifier = function(node)
 				if type(node.value) == "table" then
 					unwrap(node, node.value)
-				else
-					-- handle builtins
+				
+				elseif node.builtin then
+					node.irreducible = true
+
 				end
 
 				return false
@@ -278,6 +282,13 @@ local function reduce(expr)
 			application = function(node)
 				-- don't reduce the rhand term in an application
 				-- it will be done later within the applied expression
+				
+				-- unless lhand term is irreducible, like a builtin
+				if node[1].irreducible then
+					node.irreducible = true
+					return true
+				end
+				
 				return false
 			end
 		}
