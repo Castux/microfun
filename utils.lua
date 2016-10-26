@@ -18,14 +18,15 @@ local function traverse(ast, funcTable)
 	local mid = funcTable.mid[ast.kind] or funcTable.mid.default
 	local post = funcTable.post[ast.kind] or funcTable.post.default
 
-	local continue = pre(ast)
+	local recurse = pre(ast)
 
-	if continue then
+	if recurse then
 		for i,v in ipairs(ast) do
 			traverse(v, funcTable)
 
 			if i < #ast then
-				mid(ast, i)
+				local continue = mid(ast, i)
+				if not continue then break end
 			end
 		end
 	end
@@ -143,7 +144,13 @@ local function printExpr(ast)
 		{
 			identifier = function(node)
 				add(node[1])
-				if node.value then add "!" end
+				if node.value then
+					if node.value.kind == "lambda" then
+						add "?"
+					else
+						add "!"
+					end
+				end
 			end,
 			number = function(node) add(node[1]) end,
 
@@ -160,6 +167,7 @@ local function printExpr(ast)
 			multilambda = wrap ", ",
 			let = function(node, index)
 				add(index == #node - 1 and " in " or ", ")
+				return true
 			end,
 			binding = wrap " = "
 		},

@@ -15,17 +15,18 @@ end
 
 local function resolveScope(ast)
 
-	-- TODO: clarify what does a name point to in the scope stack. Now:
+	-- The identifiers get a .value field to point to their definition:
 	-- * "builtin" for a builtin
-	-- * the whole binding node for a let lvalue
-	-- * the identifier node for a lambda's pattern identifier
-	-- Must decide what is most useful for interpretation/compiling later
+	-- * the rvalue for a let lvalue
+	-- * the lambda node for a lambda's pattern identifier
 
 	-- analyzer state
 
 	local scope = {}
 	local inPattern = false
 	local inBindingLValue = false
+
+	local lambdaStack = {}
 
 	-- add builtins
 
@@ -89,6 +90,8 @@ local function resolveScope(ast)
 				local names = {}
 				table.insert(scope, names)
 
+				table.insert(lambdaStack, node)
+
 				return true
 			end,
 
@@ -110,8 +113,7 @@ local function resolveScope(ast)
 					-- In a pattern, we add it to the lambda's scope
 
 					local names = scope[#scope]
-
-					names[id] = "lambdaparam"
+					names[id] = lambdaStack[#lambdaStack]
 
 				elseif inBindingLValue then
 
@@ -144,6 +146,7 @@ local function resolveScope(ast)
 			end,
 
 			lambda = function(node)
+				table.remove(lambdaStack)
 				table.remove(scope)
 			end,
 
@@ -158,19 +161,17 @@ end
 
 local function reduce(expr)
 
-	-- First bind all the things
-
-	resolveScope(expr)
-
-	-- Then simplify all the things
-
 	funcTable =
 	{
 		pre =
 		{
 			default = function(node) return false end,
 
-			let = function(node) unwrap(node, node[#node]) return false end,
+			let = function(node)
+				resolveScope(node)
+				unwrap(node, node[#node])
+				return false
+			end,
 
 			identifier = function(node)
 				if type(node.value) == "table" then
@@ -179,6 +180,33 @@ local function reduce(expr)
 					-- handle builtins
 				end
 
+				return false
+			end,
+
+			application = function(node)
+
+				if node[1].kind == "lambda" then
+
+
+
+					return false
+
+				elseif node[1].kind == "multilambda" then
+
+				else
+					-- reduce the terms
+
+					return true
+				end
+
+			end
+		},
+
+		mid =
+		{
+			application = function(node)
+				-- don't reduce the rhand term in an application
+				-- it will be done later within the applied expression
 				return false
 			end
 		}
