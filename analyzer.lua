@@ -164,13 +164,76 @@ local function resolveScope(ast)
 	utils.traverse(ast, funcTable)
 end
 
+local function cloneAndApply(expr, lambda, value)
+
+	local newLambdas = {}
+
+	local function rec(node)
+
+		local new = {}
+
+		if node.kind == "lambda" then
+			newLambdas[node] = new
+		end
+
+		for k,v in pairs(node) do
+			if k ~= "lambda" and k ~= "value" then
+				if type(v) == "table" then
+					new[k] = rec(v)
+				else
+					new[k] = v
+				end
+			end
+		end
+
+		if node.kind == "identifier" then
+
+			if node.lambda == lambda then
+
+				-- We reached an identifier which refers to the lambda's parameter
+				new.value = value
+
+			elseif node.lambda then
+
+				-- This is an identifier to an inner lambda, bind to the cloned lambda
+				new.lambda = newLambdas[node.lambda]
+
+			elseif node.value then
+
+				-- This is prebound identifier, shallow copy
+				new.value = node.value
+			end
+		end
+
+		return new
+	end
+
+	return rec(expr)
+end
+
 local function apply(node)
-	
-	
-	
+
+	local lambda = node[1]
+	local expr = node[2]
+
+	local pattern = lambda[1][1]
+
+	-- Simplest case:
+
+	if pattern.kind == "identifier" then
+
+		-- Clone the rvalue
+		local newexpr = cloneAndApply(lambda[2], lambda, expr)
+		unwrap(node, newexpr)
+
+	else
+		error("Unsupported pattern: " .. utils.printExpr(pattern))
+	end
 end
 
 local function reduce(expr)
+
+	resolveScope(expr)
 
 	funcTable =
 	{
@@ -179,7 +242,6 @@ local function reduce(expr)
 			default = function(node) return false end,
 
 			let = function(node)
-				resolveScope(node)
 				unwrap(node, node[#node])
 				return false
 			end,

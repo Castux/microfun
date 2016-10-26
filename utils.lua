@@ -121,7 +121,7 @@ local function printExpr(ast)
 
 		table.insert(tmp, " ")
 
-		local rapp = node[2].kind == "application"
+		local rapp = node[2].kind == "application" or node[2].kind == "lambda"
 
 		if rapp then
 			table.insert(tmp, "(")
