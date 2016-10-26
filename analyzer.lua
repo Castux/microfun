@@ -220,11 +220,24 @@ local function apply(node)
 
 	-- Simplest case:
 
-	if pattern.kind == "identifier" then
+	if pattern.kind == "number" then
+		
+		if expr.kind == "number" then
+			if pattern[1] == expr[1] then
+				unwrap(node, lambda[2])
+				return true
+			end
+		else
+			return false
+		end
+
+	elseif pattern.kind == "identifier" then
 
 		-- Clone the rvalue
 		local newexpr = cloneAndApply(lambda[2], lambda, expr)
 		unwrap(node, newexpr)
+		
+		return true
 
 	else
 		error("Unsupported pattern: " .. utils.printExpr(pattern))
@@ -263,8 +276,15 @@ local function reduce(expr)
 			application = function(node)
 
 				if node[1].kind == "lambda" then
-					apply(node)
-					return false
+					local success = apply(node)
+					
+					if success then
+						return false
+					else
+						error("Could not match pattern in lambda: " ..
+							utils.printExpr(node[1]) .. " to value " ..
+							utils.printExpr(node[2]))
+					end
 
 				elseif node[1].kind == "multilambda" then
 
