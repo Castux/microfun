@@ -106,7 +106,18 @@ local function printExpr(ast)
 
 		local tmp = {}
 
+		local llambda = node[1].kind == "lambda"
+
+		if llambda then
+			table.insert(tmp, "(")
+		end
+
 		table.insert(tmp, printExpr(node[1]))
+
+		if llambda then
+			table.insert(tmp, ")")
+		end
+
 		table.insert(tmp, " ")
 
 		local rapp = node[2].kind == "application"
@@ -130,7 +141,10 @@ local function printExpr(ast)
 	{
 		pre =
 		{
-			identifier = function(node) add(node[1]) end,
+			identifier = function(node)
+				add(node[1])
+				if node.value then add "!" end
+			end,
 			number = function(node) add(node[1]) end,
 
 			tuple = wrap "(",

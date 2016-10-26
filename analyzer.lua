@@ -1,5 +1,18 @@
 local utils = require "utils"
 
+local function unwrap(expr, inner)
+
+	-- Remove the node
+
+	for k,v in pairs(expr) do
+		expr[k] = nil
+	end
+
+	for k,v in pairs(inner) do
+		expr[k] = v
+	end
+end
+
 local function resolveScope(ast)
 
 	-- TODO: clarify what does a name point to in the scope stack. Now:
@@ -18,16 +31,13 @@ local function resolveScope(ast)
 
 	local builtins =
 	{
-		names =
-		{
-			add = "builtin",
-			mul = "builtin",
-			sub = "builtin",
-			div = "builtin",
-			mod = "builtin",
-			eq = "builtin",
-			lt = "builtin"
-		}
+		add = "builtin",
+		mul = "builtin",
+		sub = "builtin",
+		div = "builtin",
+		mod = "builtin",
+		eq = "builtin",
+		lt = "builtin"
 	}
 
 	table.insert(scope, builtins)
@@ -37,8 +47,8 @@ local function resolveScope(ast)
 	local function lookup(id)
 
 		for i = #scope,1,-1 do
-			if scope[i].names[id] then
-				return scope[i].names[id]
+			if scope[i][id] then
+				return scope[i][id]
 			end
 		end
 
@@ -50,8 +60,8 @@ local function resolveScope(ast)
 		pre =
 		{	
 			let = function(node)
-				table.insert(scope, node)
-				node.names = {}
+				local names = {}
+				table.insert(scope, names)
 
 				-- Gather all names already to allow recursion
 
@@ -60,11 +70,11 @@ local function resolveScope(ast)
 					local binding = node[i]
 					local id = binding[1][1][1]
 
-					if node.names[id] then
+					if names[id] then
 						error("Multiple definitions for " .. id .. " in let")
 					end
 
-					node.names[id] = binding
+					names[id] = binding[2]
 				end
 
 				return true
@@ -76,8 +86,8 @@ local function resolveScope(ast)
 			end,
 
 			lambda = function(node)
-				table.insert(scope, node)
-				node.names = {}
+				local names = {}
+				table.insert(scope, names)
 
 				return true
 			end,
@@ -89,16 +99,19 @@ local function resolveScope(ast)
 
 			identifier = function(node)
 
+				if node.value then
+					return
+				end
+
 				local id = node[1]
 
 				if inPattern then
 
 					-- In a pattern, we add it to the lambda's scope
 
-					local lambda = scope[#scope]
-					assert(lambda.kind == "lambda")
+					local names = scope[#scope]
 
-					lambda.names[id] = node
+					names[id] = "lambdaparam"
 
 				elseif inBindingLValue then
 
@@ -111,7 +124,7 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
-						node.definition = found
+						node.value = found
 					else
 						error("Could not find definition for: " .. id)
 					end
@@ -143,7 +156,39 @@ local function resolveScope(ast)
 	utils.traverse(ast, funcTable)
 end
 
+local function reduce(expr)
+
+	-- First bind all the things
+
+	resolveScope(expr)
+
+	-- Then simplify all the things
+
+	funcTable =
+	{
+		pre =
+		{
+			default = function(node) return false end,
+
+			let = function(node) unwrap(node, node[#node]) return false end,
+
+			identifier = function(node)
+				if type(node.value) == "table" then
+					unwrap(node, node.value)
+				else
+					-- handle builtins
+				end
+
+				return false
+			end
+		}
+	}
+
+	utils.traverse(expr, funcTable)
+end
+
 return
 {
-	resolveScope = resolveScope
+	resolveScope = resolveScope,
+	reduce = reduce
 }
