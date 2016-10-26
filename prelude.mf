@@ -112,7 +112,7 @@ drop = [
 ],
 
 range = a -> b ->
-	if (lt a b)
+	if (lte a b)
 		(a, range (succ a) b)
 		(),
 
