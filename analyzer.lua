@@ -26,10 +26,10 @@ local builtins =
 
 local function resolveScope(ast)
 
-	-- The identifiers get a .value field to point to their definition:
-	-- * "builtin" for a builtin
-	-- * the rvalue for a let lvalue
-	-- * the lambda node for a lambda's pattern identifier
+	-- The identifiers get a field to point to their definition:
+	-- * .builtin = true for a builtin
+	-- * .value pointing to a let rvalue for a let lvalue
+	-- * .lambda to a lambda for a lambda's pattern identifier
 
 	-- analyzer state
 
