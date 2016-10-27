@@ -41,7 +41,7 @@ local underscore = P "_"
 local identifier = (alpha + underscore) * (alpha + underscore + digit) ^ 0
 
 local number = digit ^ 1 * expect( -(alpha + underscore), "digit")
-local comment = P "--" * (P(1) - S "\n\r") ^ 0 * S "\n\r" ^ 1
+local comment = P "--" * (P(1) - S "\n\r") ^ 0
 local ws = (comment + S(" \t\n\r\f")) ^ 0
 
 local keyword = P "let" + P "in"
