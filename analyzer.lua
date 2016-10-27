@@ -102,7 +102,7 @@ local function resolveScope(ast)
 			identifier = function(node)
 
 				if node.value then
-					return
+					error("Internal error: shouldn't visit identifier twice during binding")
 				end
 
 				local id = node[1]
@@ -116,7 +116,7 @@ local function resolveScope(ast)
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
-					names[id] = {lambdaparam = true, lambdaStack[#lambdaStack]}
+					names[id] = {lambdaparam = true, lambda = lambdaStack[#lambdaStack]}
 
 				elseif inBindingLValue then
 
@@ -132,7 +132,7 @@ local function resolveScope(ast)
 						if type(found) == "function" then
 							node.builtin = true
 						elseif found.lambdaparam then
-							node.lambda = found[1]
+							node.lambda = found.lambda
 						else
 							node.value = found
 						end
@@ -168,108 +168,22 @@ local function resolveScope(ast)
 	utils.traverse(ast, funcTable)
 end
 
-local function cloneAndApply(expr, lambda, value)
-
-	local newLambdas = {}
-
-	local function rec(node)
-
-		local new = {}
-
-		if node.kind == "lambda" then
-			newLambdas[node] = new
-		end
-
-		for k,v in pairs(node) do
-			if k ~= "lambda" and k ~= "value" then
-				if type(v) == "table" then
-					new[k] = rec(v)
-				else
-					new[k] = v
-				end
-			end
-		end
-
-		if node.kind == "identifier" then
-
-			if node.lambda == lambda then
-
-				-- We reached an identifier which refers to the lambda's parameter
-				new.value = value
-
-			elseif node.lambda then
-
-				-- This is an identifier to an inner lambda, bind to the cloned lambda
-				new.lambda = newLambdas[node.lambda]
-
-			elseif node.value then
-
-				-- This is prebound identifier, shallow copy
-				new.value = node.value
-			end
-		end
-
-		return new
-	end
-
-	return rec(expr)
-end
-
 local function apply(lambda, expr)
 
 	local pattern = lambda[1][1]
 
-	-- Simplest case:
+	-- TODO: separate the matching from the application
+	-- match(pattern, expr) can be a "simple" recursive function
+	-- that returns a table of ident to value on a successful match,
+	-- "reduce rvalue" if needed, or a nil for fail.
+	-- Then we can happily apply by cloning the lambda's rside and substituting
+	-- all the matches
 
-	if pattern.kind == "number" then
-
-		if expr.kind == "number" then
-			if pattern[1] == expr[1] then
-				return lambda[2]
-			end
-		elseif expr.kind == "tuple" then
-			return nil
-		else
-			return "reduce rvalue"
-		end
-
-	elseif pattern.kind == "identifier" then
-
-		-- Clone the rvalue
-		local newexpr = cloneAndApply(lambda[2], lambda, expr)
-
-		return newexpr
-	
-	elseif pattern.kind == "tuple" then
-		
-		if expr.kind == "tuple" then
-			
-			if #pattern ~= #expr then
-				return nil
-			end
-			
-			-- TODO: separate the matching from the application
-			-- match(pattern, expr) can be a "simple" recursive function
-			-- that returns a table of ident to value on a successful match,
-			-- "reduce rvalue" if needed, or a nil for fail.
-			-- Then we can happily apply by cloning the lambda's rside and substituting
-			-- all the matches
-			
-		elseif expr.kind == "number" then
-			return nil
-		
-		else
-			return "reduce rvalue"
-		end
-	
-	else
-		error("Unsupported pattern: " .. utils.printExpr(pattern))
-	end
+	error("Unsupported pattern: " .. utils.dumpExpr(pattern))
 end
 
 local function reduce(expr)
 
-	resolveScope(expr)
 	local acted = false
 
 	funcTable =

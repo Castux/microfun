@@ -15,17 +15,17 @@ if not success then
 	return
 end
 
+analyzer.resolveScope(result)
+
 for step = 0,math.huge do
 
-	print(step, utils.printExpr(result))
+	print(step, utils.dumpExpr(result))
 	local acted = analyzer.reduce(result)
 
 	if not acted then
-		print(step, utils.printExpr(result))
+		print(step, utils.dumpExpr(result))
 		break
 	end
 end
-
-
 
 print("Done")
