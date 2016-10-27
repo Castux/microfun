@@ -76,13 +76,17 @@ local function deepClone(graph)
 	return rec(graph)
 end
 
-local function printAST(ast)
+local function dumpAST(ast)
 
+	local res = {}
+	
+	local function add(str) table.insert(res, str .. "\n") end
+	
 	local ident = 0
 	local identChar = "  "
 
 	local terminal = function(node)
-		print(identChar:rep(ident) .. node.kind .. ": " .. node[1])
+		add(identChar:rep(ident) .. node.kind .. ": " .. node[1])
 		return false
 	end
 
@@ -91,7 +95,7 @@ local function printAST(ast)
 		pre =
 		{
 			default = function(node)
-				print(identChar:rep(ident) .. node.kind .. " (")
+				add(identChar:rep(ident) .. node.kind .. " (")
 				ident = ident + 1
 				return true
 			end,
@@ -104,7 +108,7 @@ local function printAST(ast)
 		{
 			default = function(node)
 				ident = ident - 1
-				print(identChar:rep(ident) .. ")")
+				add(identChar:rep(ident) .. ")")
 			end,
 
 			identifier = function() end,
@@ -113,9 +117,11 @@ local function printAST(ast)
 	}
 
 	traverse(ast, funcTable)
+	
+	return table.concat(res)
 end
 
-local function printExpr(ast)
+local function dumpExpr(ast)
 
 	local res = {}
 
@@ -140,7 +146,7 @@ local function printExpr(ast)
 			table.insert(tmp, "(")
 		end
 
-		table.insert(tmp, printExpr(node[1]))
+		table.insert(tmp,dumpExpr(node[1]))
 
 		if llambda then
 			table.insert(tmp, ")")
@@ -154,7 +160,7 @@ local function printExpr(ast)
 			table.insert(tmp, "(")
 		end
 
-		table.insert(tmp, printExpr(node[2]))
+		table.insert(tmp, dumpExpr(node[2]))
 
 		if rapp then
 			table.insert(tmp, ")")
@@ -214,8 +220,8 @@ end
 return
 {
 	traverse = traverse,
-	printAST = printAST,
-	printExpr = printExpr,
+	dumpAST = dumpAST,
+	dumpExpr = dumpExpr,
 	clone = clone,
 	deepClone = deepClone
 }
