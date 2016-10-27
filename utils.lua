@@ -49,6 +49,33 @@ local function clone(node)
 	return new
 end
 
+local function deepClone(graph)
+
+	local clones = {}
+
+	local function rec(node)
+
+		if clones[node] then
+			return clones[node]
+		end
+
+		local new = {}
+		clones[node] = new
+
+		for k,v in pairs(node) do
+			if type(v) == "table" then
+				new[k] = rec(v)
+			else
+				new[k] = v
+			end
+		end
+
+		return new
+	end
+	
+	return rec(graph)
+end
+
 local function printAST(ast)
 
 	local ident = 0
@@ -189,5 +216,6 @@ return
 	traverse = traverse,
 	printAST = printAST,
 	printExpr = printExpr,
-	clone = clone
+	clone = clone,
+	deepClone = deepClone
 }
