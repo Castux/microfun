@@ -1,7 +1,9 @@
 local utils = require "utils"
 
 local function unwrap(expr, inner)
-
+	
+	error("Unwrap is evil because it changes object identities")
+	
 	-- Remove the node
 
 	for k,v in pairs(expr) do
@@ -112,7 +114,7 @@ local function resolveScope(ast)
 					-- In a pattern, we add it to the lambda's scope
 
 					local names = scope[#scope]
-					
+
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
@@ -168,18 +170,62 @@ local function resolveScope(ast)
 	utils.traverse(ast, funcTable)
 end
 
+-- Check if the expression matches the pattern
+-- If yes, return a table of names to expressions
+-- If need further rhand reducing, do it.
+
+local function match(pattern, expr)
+
+	local bindings = {}
+	
+	if pattern.kind == "identifier" then
+
+		local id = pattern[1]
+
+		-- Automatic match
+
+		bindings[id] = expr
+		return bindings
+
+	else
+		error("Unsupported pattern: " .. utils.dumpExpr(pattern))
+	end
+
+end
+
+local function substitute(expr, lambda, tab)
+
+	funcTable =
+	{
+		pre =
+		{
+			identifier = function(node)
+				local id = node[1]
+				if node.lambda == lambda then
+					node.lambda = nil
+					node.value = tab[id]
+				end
+			end
+		}
+	}
+
+	utils.traverse(expr, funcTable)
+end
+
 local function apply(lambda, expr)
 
+	local lambda = utils.deepClone(lambda)
+
 	local pattern = lambda[1][1]
+	local rvalue = lambda[2]
 
-	-- TODO: separate the matching from the application
-	-- match(pattern, expr) can be a "simple" recursive function
-	-- that returns a table of ident to value on a successful match,
-	-- "reduce rvalue" if needed, or a nil for fail.
-	-- Then we can happily apply by cloning the lambda's rside and substituting
-	-- all the matches
+	local bindings = match(pattern, expr)
 
-	error("Unsupported pattern: " .. utils.dumpExpr(pattern))
+	if bindings then
+		substitute(rvalue, lambda, bindings)
+		return rvalue
+	end
+
 end
 
 local function reduce(expr)
@@ -245,10 +291,8 @@ local function reduce(expr)
 
 					-- Apply
 
-					local result = false
-
 					for i,lambda in ipairs(lambdas) do
-						result = apply(lambda, node[2])
+						local result = apply(lambda, node[2])
 
 						if result == "reduce rvalue" then
 							node.needReduction = true
