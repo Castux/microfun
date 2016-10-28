@@ -1,20 +1,5 @@
 local utils = require "utils"
 
-local function unwrap(expr, inner)
-	
-	error("Unwrap is evil because it changes object identities")
-	
-	-- Remove the node
-
-	for k,v in pairs(expr) do
-		expr[k] = nil
-	end
-
-	for k,v in pairs(inner) do
-		expr[k] = v
-	end
-end
-
 local builtins =
 {
 	add = function(x,y) return x + y end,
@@ -177,7 +162,7 @@ end
 local function match(pattern, expr)
 
 	local bindings = {}
-	
+
 	if pattern.kind == "identifier" then
 
 		local id = pattern[1]
@@ -186,6 +171,24 @@ local function match(pattern, expr)
 
 		bindings[id] = expr
 		return bindings
+
+	elseif pattern.kind == "number" then
+
+		local num = pattern[1]
+
+		if expr.kind == "number" then
+			if pattern[1] == expr[1] then
+				return bindings		-- it matches, but there's no bidings, we'll use the full rvalue
+			else
+				return nil			-- no match
+			end
+
+		elseif expr.kind == "tuple" then
+			return nil				-- no match	
+
+		else
+			return "reduce rvalue"	-- we can't decide yet
+		end
 
 	else
 		error("Unsupported pattern: " .. utils.dumpExpr(pattern))
@@ -221,7 +224,10 @@ local function apply(lambda, expr)
 
 	local bindings = match(pattern, expr)
 
-	if bindings then
+	if bindings == "reduce rvalue" then
+		return bindings
+	
+	elseif bindings then
 		substitute(rvalue, lambda, bindings)
 		return rvalue
 	end
@@ -304,8 +310,8 @@ local function reduce(expr)
 					end
 
 					error("Could not match any pattern in lambda: " ..
-						utils.printExpr(node[1]) .. " to value " ..
-						utils.printExpr(node[2]))
+						utils.dumpExpr(node[1]) .. " to value " ..
+						utils.dumpExpr(node[2]))
 				else
 					-- reduce the terms
 
