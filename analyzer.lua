@@ -241,15 +241,14 @@ local function reduce(expr)
 			end,
 
 			let = function(node)
-				unwrap(node, node[#node])
 				acted = true
-				return false
+				return false, node[#node] -- replace this node with the subexpression
 			end,
 
 			identifier = function(node)
 				if type(node.value) == "table" then
-					unwrap(node, node.value)
 					acted = true
+					return false, node.value  -- replace this node with its value
 				end
 
 				return false
@@ -268,10 +267,9 @@ local function reduce(expr)
 						local b = node[2][1]
 
 						local new = {kind = "number", builtins[fun](a,b)}
-						unwrap(node, new)
 						acted = true
 
-						return false
+						return false, new -- replace this with the new result node
 
 					else
 
@@ -299,10 +297,9 @@ local function reduce(expr)
 							return true
 
 						elseif result then
-							unwrap(node, result)
 							acted = true
 
-							return false
+							return false, result -- replace with result
 						end
 					end
 
@@ -336,9 +333,9 @@ local function reduce(expr)
 		}
 	}
 
-	utils.traverse(expr, funcTable)
+	local newExpr = utils.traverse(expr, funcTable)
 
-	return acted
+	return acted, newExpr
 end
 
 return
