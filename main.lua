@@ -7,7 +7,7 @@ local dot = require "dot"
 local prelude = io.open("prelude.mf"):read("*a")
 local source = io.open("test.mf"):read("*a")
 
---prelude = ""
+prelude = ""
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -17,7 +17,7 @@ if not success then
 end
 
 --print(utils.dumpAST(result))
---dot.viewAst(result)
+--dot.viewAst(result, "ast")
 
 local expr = analyzer.resolveScope(result)
 

@@ -81,6 +81,43 @@ local function resolveScope(ast)
 			pattern = function(node)
 				inPattern = true
 				return true
+			end,
+
+			identifier = function(node)
+
+				local id = node[1]
+
+				if inPattern then
+
+					-- In a pattern, we add it to the lambda's scope
+
+					local names = scope[#scope]
+
+					if names[id] then
+						error("Multiple definitions for " .. id .. " in pattern")
+					end
+					names[id] = {kind = "named", name = id}
+
+					-- and replace
+
+					return false, names[id]
+
+				elseif inBindingLValue then
+
+					-- In a binding, we ignore it, as it's been done already in the handler for let
+
+				else
+
+					-- Otherwise it's a rvalue: lookup the current scope stack to bind the identifier
+					-- to its definition
+
+					local found = lookup(id)
+					if found then
+						return false, found		-- replace with the found named expression
+					else
+						error("Could not find definition for: " .. id)
+					end
+				end
 			end
 		},
 
@@ -101,44 +138,6 @@ local function resolveScope(ast)
 
 			pattern = function(node)
 				inPattern = false
-			end,
-
-			identifier = function(node)
-
-				local id = node[1]
-
-				if inPattern then
-
-					-- In a pattern, we add it to the lambda's scope
-
-					local names = scope[#scope]
-
-					if names[id] then
-						error("Multiple definitions for " .. id .. " in pattern")
-					end
-					names[id] = {kind = "named", name = id}
-
-					-- and replace
-
-					return names[id]
-
-				elseif inBindingLValue then
-
-					-- In a binding, we ignore it, as it's been done already in the handler for let
-
-				else
-
-					-- Otherwise it's a rvalue: lookup the current scope stack to bind the identifier
-					-- to its definition
-
-					local found = lookup(id)
-					if found then
-						return found		-- replace with the found named expression
-					else
-						error("Could not find definition for: " .. id)
-					end
-				end
-
 			end
 		}
 	}
@@ -167,16 +166,16 @@ local function reduce(expr)
 
 			named = function(node)
 				if node.irreducible then return false end
-				
+
 				if node.builtin then
 					node.irreducible = true
 					return false
 				end
-				
+
 				if node[1] and node[1].irreducible then
 					return false, node[1]
 				end
-				
+
 				return true
 			end,
 
@@ -193,8 +192,8 @@ local function reduce(expr)
 					local right = deref(node[2])
 
 					if leftleft.builtin and
-						leftright.kind == "number" and
-						right.kind == "number" then
+					leftright.kind == "number" and
+					right.kind == "number" then
 
 						local result = {kind = "number", irreducible = true, [1] = leftleft.func(leftright[1], right[1])}
 						return false, result	-- replace node!
