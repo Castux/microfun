@@ -66,15 +66,15 @@ local function astToDot(ast)
 		{
 			default = function(node)
 				local thisUID = getUID(node)
-				for i,v in ipairs(node) do
-					add(thisUID .. " -> " .. getUID(v) .. ";")
+				
+				if #node == 2 then
+					add(thisUID .. ":sw ->" .. getUID(node[1]) .. ";")
+					add(thisUID .. ":se ->" .. getUID(node[2]) .. ";")
+				else
+					for i,v in ipairs(node) do
+						add(thisUID .. " -> " .. getUID(v) .. ";")
+					end
 				end
-			end,
-			
-			application = function(node)
-				local thisUID = getUID(node)
-				add(thisUID .. ":sw ->" .. getUID(node[1]) .. ";")
-				add(thisUID .. ":se ->" .. getUID(node[2]) .. ";")
 			end,
 			
 			number = function() end,

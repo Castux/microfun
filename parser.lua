@@ -124,7 +124,7 @@ local Grammar = lpeg.P {
 	Pattern = rule("pattern",
 		V "Name"
 		+ V "Constant"
-		+ V "TuplePattern"
+		+ "(" * ws * commaSeparated(V "Name" + V "Constant", "identifier or number") ^ -1 * ws * ")"
 	),
 
 	Application = Cf( (V "AtomicExpr" * ws) ^ 2, foldApplication ),
@@ -139,12 +139,6 @@ local Grammar = lpeg.P {
 		commaSeparated(V "Expr", "expression") ^ -1 * ws *
 		")"
 	) / handleParensExprList,
-
-	TuplePattern = rule("tuple",
-		"(" * ws *
-		commaSeparated(V "Pattern", "pattern") ^ -1 * ws *
-		")"
-	) / handleTuplePattern,
 
 	MultiLambda = rule("multilambda",
 		"[" * ws *

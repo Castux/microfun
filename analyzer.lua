@@ -22,8 +22,6 @@ local function resolveScope(ast)
 	local inPattern = false
 	local inBindingLValue = false
 
-	local lambdaStack = {}
-
 	-- add builtins
 
 	table.insert(scope, builtins)
@@ -76,8 +74,7 @@ local function resolveScope(ast)
 			lambda = function(node)
 				local names = {}
 				table.insert(scope, names)
-				table.insert(lambdaStack, node)
-
+				
 				return true
 			end,
 
@@ -99,7 +96,6 @@ local function resolveScope(ast)
 			end,
 
 			lambda = function(node)
-				table.remove(lambdaStack)
 				table.remove(scope)
 			end,
 
@@ -121,6 +117,10 @@ local function resolveScope(ast)
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
 					names[id] = {kind = "named", name = id}
+					
+					-- and replace
+					
+					return names[id]
 
 				elseif inBindingLValue then
 
