@@ -7,7 +7,7 @@ local dot = require "dot"
 local prelude = io.open("prelude.mf"):read("*a")
 local source = io.open("test.mf"):read("*a")
 
---prelude = ""
+prelude = ""
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -19,8 +19,11 @@ end
 --print(utils.dumpAST(result))
 --dot.viewAst(result, "ast", true)
 
-analyzer.markLambdasChildren(result)
 local expr = analyzer.resolveScope(result)
+dot.viewAst(expr, "bound")
+
+
+--[[
 
 for step = 0,math.huge do
 
@@ -36,6 +39,8 @@ for step = 0,math.huge do
 	end
 end
 
-os.execute("step0.png")
+--]]
+
+os.execute("open *.png")
 
 print("Done")

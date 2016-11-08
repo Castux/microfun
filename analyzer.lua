@@ -1,50 +1,5 @@
 local utils = require "utils"
 
-local function markLambdasChildren(ast)
-
-	-- OVERKILL! Do that only for named nodes, which are the ones that
-	-- can "escape" scope. Everything else is purely hierarchical.
-	
-	-- When doing lambda instantiation, just do a normal graph copy, but
-	-- for named nodes, check if they belong to this lambda (in which case deep copy),
-	-- or outside (just reference the same)
-
-	local lambdas = {}
-
-	local function addNode(node)
-		for i,v in ipairs(lambdas) do
-			v.inScope[node] = true
-		end
-	end
-
-	local funcTable =
-	{
-		pre =
-		{
-			lambda = function(node)
-				addNode(node)
-				table.insert(lambdas, node)
-				node.inScope = {}
-				return true
-			end,
-
-			default = function(node)
-				addNode(node)
-				return true
-			end
-		},
-
-		post =
-		{
-			lambda = function(node)
-				table.remove(lambdas)
-			end
-		}
-	}
-
-	utils.traverse(ast, funcTable)
-end
-
 local builtins =
 {
 	add = {kind = "named", name = "add", builtin = true, func = function(x,y) return x + y end},
@@ -60,6 +15,10 @@ local function resolveScope(ast)
 
 	-- The identifiers get replaced with a "named expression", generated for
 	-- let bindings, and lambda parameters
+	
+	-- Named expression and lambda get a .lambda pointer to their closest enclosing
+	-- lambda. That will be used to determine later what is in scope and what to duplicate
+	-- when instantiating a lambda.
 
 	-- analyzer state
 
@@ -70,13 +29,26 @@ local function resolveScope(ast)
 
 	table.insert(scope, builtins)
 
-	-- scope lookup: from the top of the stack down
+	-- scope lookup: from the top of the stack down, look for value with name id
 
 	local function lookup(id)
 
 		for i = #scope,1,-1 do
 			if scope[i][id] then
 				return scope[i][id]
+			end
+		end
+
+		return nil
+	end
+	
+	-- find the closest enclosing lambda, if any
+	
+	local function lookupLambda()
+		
+		for i = #scope,1,-1 do
+			if scope[i]["@lambda"] then
+				return scope[i]["@lambda"]
 			end
 		end
 
@@ -102,7 +74,7 @@ local function resolveScope(ast)
 						error("Multiple definitions for " .. id .. " in let")
 					end
 
-					local newNode = {kind = "named", name = id}
+					local newNode = {kind = "named", name = id, lambda = lookupLambda()}
 
 					names[id] = newNode
 				end
@@ -115,7 +87,11 @@ local function resolveScope(ast)
 			end,
 
 			lambda = function(node)
+				
+				node.lambda = lookupLambda()
+				
 				local names = {}
+				names["@lambda"] = node
 				table.insert(scope, names)
 
 				return true
@@ -139,7 +115,7 @@ local function resolveScope(ast)
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
-					names[id] = {kind = "named", name = id}
+					names[id] = {kind = "named", name = id, lambda = lookupLambda()}
 
 					-- and replace
 
