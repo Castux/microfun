@@ -69,6 +69,30 @@ local function astToDot(ast)
 				local label = node.builtin and "builtin" or "named"
 				add(format(node, label .. "|" .. node.name))
 				return true
+			end,
+			
+			lambda = function(node)
+				
+				local uid,existed = getUID(node)
+				if existed then return false end
+				
+				local pattern = node[1]
+				
+				local label = "{lambda | {"
+				for i,v in ipairs(pattern) do
+					label = label .. "<arg" .. i .. "> " .. (v.kind == "named" and v.name or v[1])
+					if i < #pattern then
+						label = label .. " | "
+					end
+				end
+				label = label .. "}}"
+				
+				add(format(node, label))
+				return true
+			end,
+			
+			pattern = function(node)
+				return true
 			end
 
 		},
@@ -97,17 +121,35 @@ local function astToDot(ast)
 					add(getUID(node) .. " -> " .. getUID(node[1]) .. ";")
 				end
 				namedThatPosted[node] = true
-			end,
-
-			lambda = function(node)
-				local thisUID = getUID(node)				
-				add(thisUID .. ":sw ->" .. getUID(node[1]) .. ";")
-				add(thisUID .. ":se ->" .. getUID(node[2]) .. ";")
-
-				for k,_ in pairs(node.inScope) do
-					add(thisUID .. " -> " .. getUID(k) .. " [style=dotted];")
+				
+				if node.lambda then
+					add(getUID(node) .. " -> " .. getUID(node.lambda) .. ":w [style=dotted];")
 				end
-			end
+			end,
+			
+			lambda = function(node)
+				
+				local thisUID = getUID(node)
+				
+				-- skip the pattern node, make arrows directly from the args in the box
+				
+				local pattern = node[1]
+				for i,v in ipairs(pattern) do
+					add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. " [style=bold];")
+				end
+				
+				-- link the expression
+				
+				add(thisUID .. ":se -> " .. getUID(node[2]) .. ";")
+				
+				-- and the possible back reference
+				
+				if node.lambda then
+					add(thisUID .. " -> " .. getUID(node.lambda) .. ":w [style=dotted];")
+				end
+			end,
+			
+			pattern = function() end
 		}
 	}
 
@@ -123,7 +165,7 @@ end
 local function viewAst(ast, path, show)
 	local str = astToDot(ast)
 	utils.writeFile(path .. ".dot", str)
-	os.execute("dot -Tpng -o " .. path .. ".png " .. path .. ".dot")
+	os.execute("/usr/local/bin/dot -Tpng -o " .. path .. ".png " .. path .. ".dot")
 	if show then
 		os.execute(path .. ".png")
 	end
