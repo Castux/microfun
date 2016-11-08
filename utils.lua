@@ -3,10 +3,6 @@ local nilnop = function(node) end
 
 local function traverse(ast, funcTable)
 
-	if type(ast) ~= "table" then
-		return
-	end
-
 	funcTable.pre = funcTable.pre or {}
 	funcTable.mid = funcTable.mid or {}
 	funcTable.post = funcTable.post or {}
@@ -15,34 +11,43 @@ local function traverse(ast, funcTable)
 	funcTable.mid.default = funcTable.mid.default or truenop
 	funcTable.post.default = funcTable.post.default or nilnop
 
-	local pre = funcTable.pre[ast.kind] or funcTable.pre.default
-	local mid = funcTable.mid[ast.kind] or funcTable.mid.default
-	local post = funcTable.post[ast.kind] or funcTable.post.default
+	local function rec(ast)
 
-	local recurse, prereplace = pre(ast)
-	
-	if prereplace then
-		return prereplace
-	end
-	
-	if recurse then
-		for i,v in ipairs(ast) do
-			
-			local replacement = traverse(v, funcTable)
-			if replacement then
-				ast[i] = replacement
-			end
-
-			if i < #ast then
-				local continue = mid(ast, i)
-				if not continue then break end
-			end
+		if type(ast) ~= "table" then
+			return
 		end
-		
+
+		local pre = funcTable.pre[ast.kind] or funcTable.pre.default
+		local mid = funcTable.mid[ast.kind] or funcTable.mid.default
+		local post = funcTable.post[ast.kind] or funcTable.post.default
+
+		local recurse, prereplace = pre(ast)
+
+		if prereplace then
+			return prereplace
+		end
+
+		if recurse then
+			for i,v in ipairs(ast) do
+
+				local replacement = rec(v)
+				if replacement then
+					ast[i] = replacement
+				end
+
+				if i < #ast then
+					local continue = mid(ast, i)
+					if not continue then break end
+				end
+			end
+
+		end
+
+		local postreplace = post(ast)
+		return postreplace or ast
 	end
-	
-	local postreplace = post(ast)
-	return postreplace or ast
+
+	return rec(ast)
 end
 
 local function clone(node)
@@ -83,16 +88,16 @@ local function deepClone(graph)
 
 		return new
 	end
-	
+
 	return rec(graph)
 end
 
 local function dumpAST(ast)
 
 	local res = {}
-	
+
 	local function add(str) table.insert(res, str .. "\n") end
-	
+
 	local ident = 0
 	local identChar = "  "
 
@@ -121,14 +126,14 @@ local function dumpAST(ast)
 				ident = ident - 1
 				add(identChar:rep(ident) .. ")")
 			end,
-			
+
 			identifier = function() end,
 			number = function() end
 		}
 	}
 
 	traverse(ast, funcTable)
-	
+
 	return table.concat(res)
 end
 
@@ -146,7 +151,7 @@ local function dumpExpr(ast)
 			return true
 		end
 	end
-	
+
 	local function wrapnil(str)
 		return function(node)
 			add(str)
@@ -193,7 +198,7 @@ local function dumpExpr(ast)
 		pre =
 		{
 			number = function(node) add(node[1]) end,
-			
+
 			named = function(node)
 				add(node.name .. (node.builtin and "*" or ""))
 				return false
