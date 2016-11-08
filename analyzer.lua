@@ -173,38 +173,80 @@ local function resolveScope(ast)
 	return utils.traverse(ast, funcTable)
 end
 
-local function tryMatch(lambda, expr)
+local function matchAtomic(atom, expr, names)
+	
+	if atom.kind == "number" then
 
-	local pattern = lambda[1]
-
-	if #pattern == 1 then
-		local sub = pattern[1]
-
-		if sub.kind == "number" then
-
-			if expr.kind == "number" then
-				-- a number pattern matches a number only if they are equal
-				if expr[1] == sub[1] then
-					return true, {}
-				else
-					return false
-				end
-
-			elseif expr.kind == "application" then
-				-- an application might match, we don't know yet
-				return "reduce"
-
+		if expr.kind == "number" then
+			-- a number pattern matches a number only if they are equal
+			if expr[1] == atom[1] then
+				return true
 			else
-				-- anything else will fail
 				return false
 			end
 
-		else
-			assert(sub.kind == "named") 
-			-- a single parameter always matches
+		elseif expr.kind == "application" then
+			-- an application might match, we don't know yet
+			return "reduce"
 
-			return true, {[sub.name] = expr}			
+		else
+			-- anything else will fail
+			return false
 		end
+
+	else
+		assert(atom.kind == "named") 
+		-- a single parameter always matches
+		names[atom.name] = expr
+		return true			
+	end
+end
+
+local function tryMatch(lambda, expr)
+
+	local pattern = lambda[1]
+	local names = {}
+	
+	if #pattern == 1 then
+		
+		local res = matchAtomic(pattern[1], expr, names)
+		return res, names
+		
+	else
+		-- the tuple case
+		if expr.kind == "tuple" then
+
+			-- good. they match only if they are the same length
+
+			if #pattern ~= #expr then
+				return false
+			end
+			
+			-- and if all subs match
+			
+			for i,v in ipairs(pattern) do
+				local res = matchAtomic(pattern[i], expr[i], names)
+				
+				if res == "reduce" then
+					return "reduce"
+				elseif not res then
+					return false
+				end
+				
+			end
+			
+			-- all matched! return the combined name table
+			return true, names
+
+		elseif expr.kind == "application" then
+			-- might match
+			return "reduce"
+
+		else
+			-- fail
+			return false
+		end
+
 	end
 
 	error("Pattern " .. utils.dumpExpr(pattern) .. " is unsupported")
@@ -383,9 +425,9 @@ local function reduce(expr)
 							return true
 						end
 					end
-					
+
 					-- by now, no pattern matched
-					
+
 					if left.kind == "lambda" then
 						error("Couldn't match pattern " .. utils.dumpExpr(left[1]) .. " to " .. utils.dumpExpr(right))
 					else
@@ -397,6 +439,21 @@ local function reduce(expr)
 				end
 
 				return true
+			end,
+			
+			tuple = function(node)
+				
+				if node.irreducible then return false end
+
+				node.irreducible = true
+				for i,v in ipairs(node) do
+					print(i,v)
+					if not v.irreducible then
+						node.irreducible = nil
+					end
+				end
+				
+				return true
 			end
 		},
 
@@ -405,6 +462,10 @@ local function reduce(expr)
 			application = function(node)
 				-- continue (== reduce rhand) only if lhand is irreducible
 				return node[1].irreducible
+			end,
+			
+			tuple = function(node,i)
+				return node[i].irreducible
 			end
 		},
 
