@@ -59,9 +59,9 @@ end
 
 local function viewAst(ast)
 	local str = astToDot(ast)
-	utils.writeFile("test.dot", str)
-	os.execute("dot -Tpng -o test.png test.dot")
-	os.execute("test.png")
+	utils.writeFile("ast.dot", str)
+	os.execute("dot -Tpng -o ast.png ast.dot")
+	os.execute("ast.png")
 end
 
 return
