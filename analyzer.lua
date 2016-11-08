@@ -112,6 +112,7 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
+						return false, found		-- replace with the found named expression
 					else
 						error("Could not find definition for: " .. id)
 					end
