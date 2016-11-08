@@ -7,7 +7,7 @@ local dot = require "dot"
 local prelude = io.open("prelude.mf"):read("*a")
 local source = io.open("test.mf"):read("*a")
 
-prelude = ""
+--prelude = ""
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -20,10 +20,10 @@ end
 --dot.viewAst(result, "ast", true)
 
 local expr = analyzer.resolveScope(result)
-dot.viewAst(expr, "bound")
+--dot.viewAst(expr, "bound")
 
 
---[[
+---[[
 
 for step = 0,math.huge do
 

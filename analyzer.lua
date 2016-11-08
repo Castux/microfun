@@ -206,11 +206,71 @@ local function tryMatch(lambda, expr)
 
 end
 
+local function isInScope(lambda, node)
+	
+	if node.lambda == lambda then
+		return true
+	elseif node.lambda then
+		return isInScope(node.lambda, node)
+	else
+		return false
+	end
+	
+end
+
 local function instantiate(lambda, values)
 
-	local new = utils.deepClone(lambda[2])
+	-- We duplicate all the nodes below lambda. They are mostly a tree,
+	-- except the named expressions which back reference upwards. These are cloned
+	-- if they belong to the lambda, or just referenced if they are external
 
-	return new
+	local clones = {}
+
+	local function rec(node)
+
+		if clones[node] then
+			return clones[node]
+		end
+
+		local new = {}
+		clones[node] = new
+
+		for k,v in pairs(node) do
+			if type(v) == "table" then
+				
+				if v.kind == "named" then
+					
+					if isInScope(lambda, v) then
+						new[k] = rec(v)
+					else
+						new[k] = v
+					end
+					
+				else
+					new[k] = rec(v)
+				end			
+			else
+				new[k] = v
+			end
+		end
+
+		return new
+	end
+	
+	local clone = rec(lambda)
+	
+	-- then we substitute the lambda's named values for their argument's values
+	
+	local pattern = clone[1]
+	for i,v in ipairs(pattern) do
+		if v.kind == "named" then
+			v[1] = values[v.name]
+		end		
+	end
+	
+	-- that's it! unwrap the lambda, our expression is now fully bound
+	
+	return clone[2]
 end
 
 local function reduce(expr)
@@ -283,8 +343,7 @@ local function reduce(expr)
 					local success, values = tryMatch(left, right)
 					if success == true then
 						local new = instantiate(left, values)
-						left[3] = new
-						return false
+						return false, new
 
 					elseif success == "reduce" then
 						-- just let it happen

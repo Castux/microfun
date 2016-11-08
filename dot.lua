@@ -103,8 +103,8 @@ local function astToDot(ast)
 				local thisUID = getUID(node)
 
 				if #node == 2 then
-					add(thisUID .. ":sw ->" .. getUID(node[1]) .. ";")
-					add(thisUID .. ":se ->" .. getUID(node[2]) .. ";")
+					add(thisUID .. ":sw -> " .. getUID(node[1]) .. ";")
+					add(thisUID .. ":se -> " .. getUID(node[2]) .. ";")
 				else
 					for i,v in ipairs(node) do
 						add(thisUID .. " -> " .. getUID(v) .. ";")
