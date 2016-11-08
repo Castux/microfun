@@ -179,8 +179,11 @@ local function reduce(expr)
 					return false
 				end
 
-				if node[1] and node[1].irreducible then
+				if node[1] and node[1].kind == "number" then
 					return false, node[1]
+				elseif node[1] and node[1].irreducible then
+					node.irreducible = true
+					return false
 				end
 
 				return true
