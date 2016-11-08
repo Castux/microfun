@@ -223,11 +223,18 @@ local function dumpExpr(ast)
 	return table.concat(res)
 end
 
+local function writeFile(path, str)
+	local fp = io.open(path, "w")
+	fp:write(str)
+	fp:close()
+end
+
 return
 {
 	traverse = traverse,
 	dumpAST = dumpAST,
 	dumpExpr = dumpExpr,
 	clone = clone,
-	deepClone = deepClone
+	deepClone = deepClone,
+	writeFile = writeFile
 }
