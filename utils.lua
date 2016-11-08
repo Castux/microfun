@@ -146,6 +146,12 @@ local function dumpExpr(ast)
 			return true
 		end
 	end
+	
+	local function wrapnil(str)
+		return function(node)
+			add(str)
+		end
+	end
 
 	local function handleApp(node)
 
@@ -157,7 +163,7 @@ local function dumpExpr(ast)
 			table.insert(tmp, "(")
 		end
 
-		table.insert(tmp,dumpExpr(node[1]))
+		table.insert(tmp, dumpExpr(node[1]))
 
 		if llambda then
 			table.insert(tmp, ")")
@@ -218,8 +224,8 @@ local function dumpExpr(ast)
 
 		post =
 		{
-			tuple = wrap ")",
-			multilambda = wrap "]",
+			tuple = wrapnil ")",
+			multilambda = wrapnil "]",
 			pattern = function(node)
 				if #node ~= 1 then add ")" end
 			end
