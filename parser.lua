@@ -62,7 +62,7 @@ local function foldApplication(acc, val)
 end
 
 local function commaSeparated(rule, ctx)
-	return rule * ws * ("," * ws * expect(rule, ctx) * ws) ^ 0
+	return rule * ws * ("," * ws * rule * ws) ^ 0
 end
 
 local function handleParensExprList(list)

@@ -344,7 +344,7 @@ local function reduce(expr)
 
 	local function deref(node)
 		if node.kind == "named" and node[1] then
-			return node[1]
+			return deref(node[1])
 		else
 			return node
 		end
@@ -368,6 +368,8 @@ local function reduce(expr)
 				end
 
 				if node[1] and node[1].kind == "number" then
+					return false, node[1]
+				elseif node[1] and node[1].kind == "tuple" and node[1].irreducible then
 					return false, node[1]
 				elseif node[1] and node[1].irreducible then
 					node.irreducible = true
@@ -447,7 +449,6 @@ local function reduce(expr)
 
 				node.irreducible = true
 				for i,v in ipairs(node) do
-					print(i,v)
 					if not v.irreducible then
 						node.irreducible = nil
 					end
