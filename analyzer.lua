@@ -2,6 +2,13 @@ local utils = require "utils"
 
 local function markLambdasChildren(ast)
 
+	-- OVERKILL! Do that only for named nodes, which are the ones that
+	-- can "escape" scope. Everything else is purely hierarchical.
+	
+	-- When doing lambda instantiation, just do a normal graph copy, but
+	-- for named nodes, check if they belong to this lambda (in which case deep copy),
+	-- or outside (just reference the same)
+
 	local lambdas = {}
 
 	local function addNode(node)
