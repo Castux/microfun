@@ -1,5 +1,43 @@
 local utils = require "utils"
 
+local function markLambdasChildren(ast)
+
+	local lambdas = {}
+
+	local function addNode(node)
+		for i,v in ipairs(lambdas) do
+			v.inScope[node] = true
+		end
+	end
+
+	local funcTable =
+	{
+		pre =
+		{
+			lambda = function(node)
+				addNode(node)
+				table.insert(lambdas, node)
+				node.inScope = {}
+				return true
+			end,
+
+			default = function(node)
+				addNode(node)
+				return true
+			end
+		},
+
+		post =
+		{
+			lambda = function(node)
+				table.remove(lambdas)
+			end
+		}
+	}
+
+	utils.traverse(ast, funcTable)
+end
+
 local builtins =
 {
 	add = {kind = "named", name = "add", builtin = true, func = function(x,y) return x + y end},
@@ -168,11 +206,11 @@ local function tryMatch(lambda, expr)
 				else
 					return false
 				end
-				
+
 			elseif expr.kind == "application" then
 				-- an application might match, we don't know yet
 				return "reduce"
-				
+
 			else
 				-- anything else will fail
 				return false
@@ -180,9 +218,16 @@ local function tryMatch(lambda, expr)
 
 		end
 	end
-	
+
 	error("Pattern " .. utils.dumpExpr(pattern) .. " is unsupported")
 
+end
+
+local function instantiate(lambda, values)
+
+	local new = utils.deepClone(lambda[2])
+
+	return new
 end
 
 local function reduce(expr)
@@ -246,7 +291,7 @@ local function reduce(expr)
 							return false, result	-- replace node!
 						end
 					end
-					
+
 				elseif left.builtin then
 					return true
 
@@ -254,7 +299,10 @@ local function reduce(expr)
 
 					local success, values = tryMatch(left, right)
 					if success == true then
-						-- subst
+						local new = instantiate(left, values)
+						left[3] = new
+						return false
+
 					elseif success == "reduce" then
 						-- just let it happen
 					else
@@ -289,6 +337,7 @@ end
 
 return
 {
+	markLambdasChildren = markLambdasChildren,
 	resolveScope = resolveScope,
 	reduce = reduce
 }
