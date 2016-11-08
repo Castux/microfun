@@ -32,6 +32,8 @@ local function astToDot(ast)
 		return false
 	end
 
+	local namedThatPosted = {}
+
 	local funcTable =
 	{
 		pre =
@@ -41,7 +43,7 @@ local function astToDot(ast)
 				local uid,existed = getUID(node)
 				if existed then return false end
 
-				add(uid .. " [label=" .. node.kind .. "];")
+				add(uid .. " [shape=record, label=" .. node.kind .. "];")
 				return true
 			end,
 			
@@ -52,10 +54,12 @@ local function astToDot(ast)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-
-				add(uid .. ' [shape=record, label= "' .. node.kind .. "|" .. node.name .. '"];')
+				
+				local label = node.builtin and "builtin" or "named"
+				add(uid .. ' [shape=record, label= "' .. label .. "|" .. node.name .. '"];')
 				return true
 			end
+			
 		},
 
 		post =
@@ -66,9 +70,23 @@ local function astToDot(ast)
 					add(thisUID .. " -> " .. getUID(v) .. ";")
 				end
 			end,
-
+			
+			application = function(node)
+				local thisUID = getUID(node)
+				add(thisUID .. ":sw ->" .. getUID(node[1]) .. ";")
+				add(thisUID .. ":se ->" .. getUID(node[2]) .. ";")
+			end,
+			
+			number = function() end,
 			identifier = function() end,
-			number = function() end
+			
+			named = function(node)
+				if namedThatPosted[node] then return end
+				if node[1] then
+					add(getUID(node) .. " -> " .. getUID(node[1]) .. ";")
+				end
+				namedThatPosted[node] = true
+			end
 		}
 	}
 
