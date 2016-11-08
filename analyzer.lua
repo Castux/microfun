@@ -210,12 +210,6 @@ local function reduce(expr)
 					end
 				end
 
-				--
-
-				if node[1].irreducible and node[2].irreducible then
-					node.irreducible = true
-					return false
-				end
 				return true
 			end
 		},
@@ -230,7 +224,11 @@ local function reduce(expr)
 
 		post =
 		{
-
+			application = function(node)
+				if node[1].irreducible and node[2].irreducible then
+					node.irreducible = true
+				end
+			end
 		}
 	}
 
