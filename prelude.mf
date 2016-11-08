@@ -7,7 +7,7 @@ compose = f -> g -> x -> f (g x),
 flip = f -> x -> y -> f y x,
 
 -- Numbers
--- builtin: add, mul, sub, div, mod
+-- builtin: add, mul, sub, div, mod, sqrt
 
 succ = add 1,
 pred = (flip sub) 1,
@@ -42,6 +42,11 @@ tail = (h,t) -> t,
 
 empty = [ () -> 1, l -> 0 ],
 
+equal = [
+	() -> [ () -> 1, l -> 0 ],
+	(a,as) -> [ (b,bs) -> and (eq a b) (equal as bs), () -> 0]
+],
+
 concat = [
 	() -> v -> v,
 	(h,t) -> v -> (h, concat t v)
@@ -51,13 +56,6 @@ reverse = [
 	() -> (),
 	(h,t) -> concat (reverse t) (h,())
 ],
-
-reverse2 = l ->
-	let helper = [
-		() -> res -> res,
-		(h,t) -> res -> helper t (h,res)
-	]
-	in helper l (),
 
 map = f -> [
 	() -> (),
@@ -98,9 +96,12 @@ zipWith = f -> [
 
 zip = zipWith cons,
 
-take = n -> [
-	() -> (),
-	(h,t) -> cons h (take (pred n) t)
+take = [
+	0 -> l -> (),
+	n -> [
+		() -> (),
+		(h,t) -> (h, (take (pred n) t))
+	]
 ],
 
 drop = [
@@ -116,6 +117,10 @@ range = a -> b ->
 		(a, range (succ a) b)
 		(),
 
+-- Infinite lists
+
+downfrom = n -> (n, downfrom (pred 1)),
+upfrom = n -> (n, upfrom (succ n)),
 repeat = x -> (x, repeat x)
 
 in

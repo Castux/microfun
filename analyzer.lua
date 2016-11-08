@@ -2,13 +2,14 @@ local utils = require "utils"
 
 local builtins =
 {
-	add = {kind = "named", name = "add", builtin = true, func = function(x,y) return x + y end},
-	mul = {kind = "named", name = "mul", builtin = true, func = function(x,y) return x * y end},
-	sub = {kind = "named", name = "sub", builtin = true, func = function(x,y) return x - y end},
-	div = {kind = "named", name = "div", builtin = true, func = function(x,y) return math.floor(x / y) end},
-	mod = {kind = "named", name = "mod", builtin = true, func = function(x,y) return x % y end},
-	eq = {kind = "named", name = "eq", builtin = true, func = function(x,y) return x == y and 1 or 0 end},
-	lt = {kind = "named", name = "lt", builtin = true, func = function(x,y) return x < y and 1 or 0 end}
+	add = {kind = "named", name = "add", builtin = true, arity = 2, func = function(x,y) return x + y end},
+	mul = {kind = "named", name = "mul", builtin = true, arity = 2, func = function(x,y) return x * y end},
+	sub = {kind = "named", name = "sub", builtin = true, arity = 2, func = function(x,y) return x - y end},
+	div = {kind = "named", name = "div", builtin = true, arity = 2, func = function(x,y) return math.floor(x / y) end},
+	mod = {kind = "named", name = "mod", builtin = true, arity = 2, func = function(x,y) return x % y end},
+	eq = {kind = "named", name = "eq", builtin = true, arity = 2, func = function(x,y) return x == y and 1 or 0 end},
+	lt = {kind = "named", name = "lt", builtin = true, arity = 2, func = function(x,y) return x < y and 1 or 0 end},
+	sqrt = {kind = "named", name = "sqrt", builtin = true, arity = 1, func = function(x) return math.floor(math.sqrt(x)) end}
 }
 
 local function resolveScope(ast)
@@ -387,15 +388,25 @@ local function reduce(expr)
 				end
 
 				-- builtin case
-
+				
 				local left = deref(node[1])
 				local right = deref(node[2])
+
+				if left.builtin and left.arity == 1 then
+					
+					node.irreducible = nil
+					if right.kind == "number" then
+						local result = {kind = "number", irreducible = true, [1] = left.func(right[1])}
+						return false, result
+					end
+					
+				end
 
 				if left.kind == "application" then
 					local leftleft = deref(left[1])
 					local leftright = deref(left[2])
 
-					if leftleft.builtin then
+					if leftleft.builtin and leftleft.arity == 2 then
 						node.irreducible = nil
 						if leftright.kind == "number" and right.kind == "number" then
 
