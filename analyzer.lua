@@ -2,21 +2,19 @@ local utils = require "utils"
 
 local builtins =
 {
-	add = function(x,y) return x + y end,
-	mul = function(x,y) return x * y end,
-	sub = function(x,y) return x - y end,
-	div = function(x,y) return math.floor(x / y) end,
-	mod = function(x,y) return x % y end,
-	eq = function(x,y) return x == y and 1 or 0 end,
-	lt = function(x,y) return x < y and 1 or 0 end
+	add = {kind = "named", name = "add", builtin = true, func = function(x,y) return x + y end},
+	mul = {kind = "named", name = "mul", builtin = true, func = function(x,y) return x * y end},
+	sub = {kind = "named", name = "sub", builtin = true, func = function(x,y) return x - y end},
+	div = {kind = "named", name = "div", builtin = true, func = function(x,y) return math.floor(x / y) end},
+	mod = {kind = "named", name = "mod", builtin = true, func = function(x,y) return x % y end},
+	eq = {kind = "named", name = "eq", builtin = true, func = function(x,y) return x == y and 1 or 0 end},
+	lt = {kind = "named", name = "lt", builtin = true, func = function(x,y) return x < y and 1 or 0 end}
 }
 
 local function resolveScope(ast)
 
-	-- The identifiers get a field to point to their definition:
-	-- * .builtin = true for a builtin
-	-- * .value pointing to a let rvalue for a let lvalue
-	-- * .lambda to a lambda for a lambda's pattern identifier
+	-- The identifiers get replaced with a "named expression", generated for
+	-- let bindings, and lambda parameters
 
 	-- analyzer state
 
@@ -61,11 +59,13 @@ local function resolveScope(ast)
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in let")
 					end
-
-					names[id] = binding[2]
+					
+					local newNode = {kind = "named", name = id, [1] = binding[2]}
+					
+					names[id] = newNode
 				end
 
-				return true
+				return true, node[#node]	-- replace with sub-expression
 			end,
 
 			bindinglvalue = function(node)
@@ -88,10 +88,6 @@ local function resolveScope(ast)
 
 			identifier = function(node)
 
-				if node.value then
-					error("Internal error: shouldn't visit identifier twice during binding")
-				end
-
 				local id = node[1]
 
 				if inPattern then
@@ -103,7 +99,7 @@ local function resolveScope(ast)
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
-					names[id] = {lambdaparam = true, lambda = lambdaStack[#lambdaStack]}
+					names[id] = {kind = "named", name = id}
 
 				elseif inBindingLValue then
 
@@ -116,13 +112,6 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
-						if type(found) == "function" then
-							node.builtin = true
-						elseif found.lambdaparam then
-							node.lambda = found.lambda
-						else
-							node.value = found
-						end
 					else
 						error("Could not find definition for: " .. id)
 					end
@@ -152,7 +141,7 @@ local function resolveScope(ast)
 		}
 	}
 
-	utils.traverse(ast, funcTable)
+	return utils.traverse(ast, funcTable)
 end
 
 -- Check if the expression matches the pattern
