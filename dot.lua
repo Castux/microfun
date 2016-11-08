@@ -99,11 +99,13 @@ local function astToDot(ast)
 	return table.concat(res)
 end
 
-local function viewAst(ast)
+local function viewAst(ast, path, noshow)
 	local str = astToDot(ast)
-	utils.writeFile("ast.dot", str)
-	os.execute("dot -Tpng -o ast.png ast.dot")
-	os.execute("ast.png")
+	utils.writeFile(path .. ".dot", str)
+	os.execute("dot -Tpng -o " .. path .. ".png " .. path .. ".dot")
+	if not noshow then
+		os.execute(path .. ".png")
+	end
 end
 
 return

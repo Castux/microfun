@@ -17,26 +17,21 @@ if not success then
 end
 
 --print(utils.dumpAST(result))
-
 --dot.viewAst(result)
 
 local expr = analyzer.resolveScope(result)
-print(utils.dumpExpr(expr))
-
-dot.viewAst(expr)
-
---[[
 
 for step = 0,math.huge do
 
-	print(step, utils.dumpExpr(result))
-	local acted, newExpr = analyzer.reduce(result)
-	result = newExpr
-
-	if not acted then
-		print(step, utils.dumpExpr(result))
+	print(step, utils.dumpExpr(expr))
+	dot.viewAst(expr, "step" .. step, step > 0)
+	
+	expr = analyzer.reduce(expr)
+	
+	if expr.irreducible then
+		print(step, utils.dumpExpr(expr))
 		break
 	end
 end
---]]
+
 print("Done")
