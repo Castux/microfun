@@ -16,6 +16,8 @@ if not success then
 	return
 end
 
+os.execute("rm *png *dot")
+
 --print(utils.dumpAST(result))
 --dot.viewAst(result, "ast", true)
 

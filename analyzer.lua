@@ -268,6 +268,19 @@ local function instantiate(lambda, values)
 		end		
 	end
 	
+	-- remove references to the lambda
+	
+	funcTable = { pre = {
+		default = function(node)
+			if node.lambda == clone then
+				node.lambda = nil
+			end
+			return true
+		end
+	}}
+
+	utils.traverse(clone, funcTable)
+	
 	-- that's it! unwrap the lambda, our expression is now fully bound
 	
 	return clone[2]
