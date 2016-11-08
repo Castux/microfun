@@ -83,8 +83,9 @@ product = foldr mul 1,
 orList = foldr or 0,
 andList = foldr and 1,
 
-any = f -> orList (map f),
-all = f -> andList (map f),
+any = f -> l -> orList (map f l),
+all = f -> l -> andList (map f l),
+none = f -> l -> not (any f l),
 
 zipWith = f -> [
 	()		-> b -> (),
