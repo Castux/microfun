@@ -57,9 +57,9 @@ local function resolveScope(ast)
 					if names[id] then
 						error("Multiple definitions for " .. id .. " in let")
 					end
-					
+
 					local newNode = {kind = "named", name = id, [1] = binding[2]}
-					
+
 					names[id] = newNode
 				end
 
@@ -74,7 +74,7 @@ local function resolveScope(ast)
 			lambda = function(node)
 				local names = {}
 				table.insert(scope, names)
-				
+
 				return true
 			end,
 
@@ -102,7 +102,7 @@ local function resolveScope(ast)
 			pattern = function(node)
 				inPattern = false
 			end,
-			
+
 			identifier = function(node)
 
 				local id = node[1]
@@ -117,9 +117,9 @@ local function resolveScope(ast)
 						error("Multiple definitions for " .. id .. " in pattern")
 					end
 					names[id] = {kind = "named", name = id}
-					
+
 					-- and replace
-					
+
 					return names[id]
 
 				elseif inBindingLValue then
@@ -156,6 +156,51 @@ local function reduce(expr)
 				node.irreducible = true
 				return false
 			end,
+
+			named = function(node)
+				if node.irreducible then return false end				
+				return true
+			end,
+
+			application = function(node)
+				if node.irreducible then return false end
+				
+				-- builtin case
+
+				if node[1].kind == "application" and
+				node[1][1].builtin and
+				node[1][2].kind == "number" and
+				node[2].kind == "number" then
+
+					local result = {kind = "number", [1] = node[1][1].func(node[1][2][1], node[2][1])}
+					return false, result	-- replace node!
+				end
+				
+				--
+				
+				if node[1].irreducible and node[2].irreducible then
+					node.irreducible = true
+					return false
+				end
+				return true
+			end
+		},
+
+		mid =
+		{
+			application = function(node)
+				-- continue (== reduce rhand) only if lhand is irreducible
+				return node[1].irreducible
+			end
+		},
+
+		post =
+		{
+			named = function(node)
+				if node.builtin or (node[1] and node[1].irreducible) then
+					node.irreducible = true
+				end
+			end
 		}
 	}
 

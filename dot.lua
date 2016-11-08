@@ -25,10 +25,21 @@ local function astToDot(ast)
 		end
 	end
 
+	local format = function(node, label)
+		
+		local str = getUID(node) .. ' [shape=record, label="'
+		str = str .. label .. '"'
+		if node.irreducible then
+			str = str .. ", style=bold"
+		end
+		str = str .. "];"
+		return str
+	end
+
 	local terminal = function(node)
 		local uid,existed = getUID(node)
 		if existed then return false end
-		add(uid .. ' [shape=record, label= "' .. node.kind .. "|" .. node[1] .. '"];')
+		add(format(node, node.kind .. "|" .. node[1]))
 		return false
 	end
 
@@ -42,8 +53,8 @@ local function astToDot(ast)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-
-				add(uid .. " [shape=record, label=" .. node.kind .. "];")
+				
+				add(format(node, node.kind))
 				return true
 			end,
 			
@@ -56,7 +67,7 @@ local function astToDot(ast)
 				if existed then return false end
 				
 				local label = node.builtin and "builtin" or "named"
-				add(uid .. ' [shape=record, label= "' .. label .. "|" .. node.name .. '"];')
+				add(format(node, label .. "|" .. node.name))
 				return true
 			end
 			

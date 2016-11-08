@@ -24,12 +24,13 @@ local expr = analyzer.resolveScope(result)
 for step = 0,math.huge do
 
 	print(step, utils.dumpExpr(expr))
-	dot.viewAst(expr, "step" .. step, step > 0)
+	dot.viewAst(expr, "step" .. step, true)
 	
 	expr = analyzer.reduce(expr)
 	
 	if expr.irreducible then
 		print(step, utils.dumpExpr(expr))
+		dot.viewAst(expr, "step" .. step)
 		break
 	end
 end
