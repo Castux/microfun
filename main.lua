@@ -17,14 +17,14 @@ if not success then
 end
 
 --print(utils.dumpAST(result))
---dot.viewAst(result, "ast")
+--dot.viewAst(result, "ast", true)
 
 local expr = analyzer.resolveScope(result)
 
 for step = 0,math.huge do
 
 	print(step, utils.dumpExpr(expr))
-	dot.viewAst(expr, "step" .. step, true)
+	dot.viewAst(expr, "step" .. step)
 	
 	expr = analyzer.reduce(expr)
 	
@@ -34,5 +34,7 @@ for step = 0,math.huge do
 		break
 	end
 end
+
+os.execute("step0.png")
 
 print("Done")

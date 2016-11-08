@@ -20,7 +20,6 @@ local function resolveScope(ast)
 
 	local scope = {}
 	local inPattern = false
-	local inBindingLValue = false
 
 	-- add builtins
 
@@ -58,7 +57,7 @@ local function resolveScope(ast)
 						error("Multiple definitions for " .. id .. " in let")
 					end
 
-					local newNode = {kind = "named", name = id, [1] = binding[2]}
+					local newNode = {kind = "named", name = id}
 
 					names[id] = newNode
 				end
@@ -67,8 +66,7 @@ local function resolveScope(ast)
 			end,
 
 			bindinglvalue = function(node)
-				inBindingLValue = true
-				return true
+				return false
 			end,
 
 			lambda = function(node)
@@ -102,10 +100,6 @@ local function resolveScope(ast)
 
 					return false, names[id]
 
-				elseif inBindingLValue then
-
-					-- In a binding, we ignore it, as it's been done already in the handler for let
-
 				else
 
 					-- Otherwise it's a rvalue: lookup the current scope stack to bind the identifier
@@ -124,6 +118,19 @@ local function resolveScope(ast)
 		post =
 		{
 			let = function(node)
+				
+				local names = scope[#scope]
+				
+				-- Save the possibly modified rhand sides in the new named nodes
+				
+				for i = 1, #node - 1 do
+
+					local binding = node[i]
+					local id = binding[1][1][1]
+					
+					names[id][1] = binding[2]
+				end
+				
 				table.remove(scope)
 				return node[#node]		-- replace with subexpression
 			end,
