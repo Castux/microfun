@@ -169,13 +169,13 @@ local function tryMatch(lambda, expr)
 					return false
 				end
 				
-			elseif expr.kind == "tuple" then
-				-- a number pattern cannot match another type
-				return false
+			elseif expr.kind == "application" then
+				-- an application might match, we don't know yet
+				return "reduce"
 				
 			else
-				-- otherwise, try to reduce	
-				return expr.irreducible and false or "reduce"
+				-- anything else will fail
+				return false
 			end
 
 		end
