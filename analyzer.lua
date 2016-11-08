@@ -118,19 +118,19 @@ local function resolveScope(ast)
 		post =
 		{
 			let = function(node)
-				
+
 				local names = scope[#scope]
-				
+
 				-- Save the possibly modified rhand sides in the new named nodes
-				
+
 				for i = 1, #node - 1 do
 
 					local binding = node[i]
 					local id = binding[1][1][1]
-					
+
 					names[id][1] = binding[2]
 				end
-				
+
 				table.remove(scope)
 				return node[#node]		-- replace with subexpression
 			end,
@@ -150,6 +150,39 @@ local function resolveScope(ast)
 	}
 
 	return utils.traverse(ast, funcTable)
+end
+
+local function tryMatch(lambda, expr)
+
+	local pattern = lambda[1]
+
+	if #pattern == 1 then
+		local sub = pattern[1]
+
+		if sub.kind == "number" then
+
+			if expr.kind == "number" then
+				-- a number pattern matches a number only if they are equal
+				if expr[1] == sub[1] then
+					return true, {}
+				else
+					return false
+				end
+				
+			elseif expr.kind == "tuple" then
+				-- a number pattern cannot match another type
+				return false
+				
+			else
+				-- otherwise, try to reduce	
+				return expr.irreducible and false or "reduce"
+			end
+
+		end
+	end
+	
+	error("Pattern " .. utils.dumpExpr(pattern) .. " is unsupported")
+
 end
 
 local function reduce(expr)
@@ -192,22 +225,44 @@ local function reduce(expr)
 			application = function(node)
 				if node.irreducible then return false end
 
+				if node[1].irreducible and node[2].irreducible then
+					node.irreducible = true
+				end
+
 				-- builtin case
 
 				local left = deref(node[1])
+				local right = deref(node[2])
 
 				if left.kind == "application" then
 					local leftleft = deref(left[1])
 					local leftright = deref(left[2])
-					local right = deref(node[2])
 
-					if leftleft.builtin and
-					leftright.kind == "number" and
-					right.kind == "number" then
+					if leftleft.builtin then
+						node.irreducible = nil
+						if leftright.kind == "number" and right.kind == "number" then
 
-						local result = {kind = "number", irreducible = true, [1] = leftleft.func(leftright[1], right[1])}
-						return false, result	-- replace node!
+							local result = {kind = "number", irreducible = true, [1] = leftleft.func(leftright[1], right[1])}
+							return false, result	-- replace node!
+						end
 					end
+					
+				elseif left.builtin then
+					return true
+
+				elseif left.kind == "lambda" then
+
+					local success, values = tryMatch(left, right)
+					if success == true then
+						-- subst
+					elseif success == "reduce" then
+						-- just let it happen
+					else
+						error("Couldn't match pattern " .. utils.dumpExpr(left[1]) .. " to " .. utils.dumpExpr(right))
+					end
+
+				else	
+					error("Cannot apply " .. utils.dumpExpr(left) .. " as function")
 				end
 
 				return true
@@ -224,11 +279,6 @@ local function reduce(expr)
 
 		post =
 		{
-			application = function(node)
-				if node[1].irreducible and node[2].irreducible then
-					node.irreducible = true
-				end
-			end
 		}
 	}
 

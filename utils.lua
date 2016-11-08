@@ -196,7 +196,11 @@ local function dumpExpr(ast)
 			tuple = wrap "(",
 			multilambda = wrap "[",
 			application = handleApp,
-			let = wrap "let "
+			let = wrap "let ",
+			pattern = function(node)
+				if #node ~= 1 then add "(" end
+				return true
+			end
 		},
 
 		mid =
@@ -208,13 +212,17 @@ local function dumpExpr(ast)
 				add(index == #node - 1 and " in " or ", ")
 				return true
 			end,
-			binding = wrap " = "
+			binding = wrap " = ",
+			pattern = wrap ","
 		},
 
 		post =
 		{
 			tuple = wrap ")",
-			multilambda = wrap "]"
+			multilambda = wrap "]",
+			pattern = function(node)
+				if #node ~= 1 then add ")" end
+			end
 		}
 	}
 
