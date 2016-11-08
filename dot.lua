@@ -44,6 +44,7 @@ local function astToDot(ast)
 	end
 
 	local namedThatPosted = {}
+	local inPattern = false
 
 	local funcTable =
 	{
@@ -58,7 +59,14 @@ local function astToDot(ast)
 				return true
 			end,
 
-			number = terminal,
+			number = function(node)
+				local uid,existed = getUID(node)
+				if existed then return false end
+				if not inPattern then
+					add(format(node, node.kind .. "|" .. node[1]))
+				end
+			end,
+			
 			identifier = terminal,
 
 			named = function(node)
@@ -92,6 +100,7 @@ local function astToDot(ast)
 			end,
 			
 			pattern = function(node)
+				inPattern = true
 				return true
 			end
 
@@ -135,7 +144,9 @@ local function astToDot(ast)
 				
 				local pattern = node[1]
 				for i,v in ipairs(pattern) do
-					add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. " [style=bold];")
+					if v.kind == "named" then
+						add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. " [style=bold];")
+					end
 				end
 				
 				-- link the expression
@@ -149,7 +160,9 @@ local function astToDot(ast)
 				end
 			end,
 			
-			pattern = function() end
+			pattern = function()
+				inPattern = false
+			end
 		}
 	}
 
