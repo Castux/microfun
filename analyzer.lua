@@ -199,6 +199,11 @@ local function tryMatch(lambda, expr)
 				return false
 			end
 
+		else
+			assert(sub.kind == "named") 
+			-- a single parameter always matches
+			
+			return true, {[sub.name] = expr}			
 		end
 	end
 
@@ -276,10 +281,17 @@ local function instantiate(lambda, values)
 				node.lambda = nil
 			end
 			return true
+		end,
+		
+		named = function(node)
+			if node.lambda == clone then
+				node.lambda = nil
+			end
+			return isInScope(clone, node)
 		end
 	}}
-
-	utils.traverse(clone, funcTable)
+	
+	clone = utils.traverse(clone, funcTable)
 	
 	-- that's it! unwrap the lambda, our expression is now fully bound
 	
