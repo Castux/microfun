@@ -29,8 +29,8 @@ for step = 0,math.huge do
 	expr = analyzer.reduce(expr)
 	
 	if expr.irreducible then
-		print(step, utils.dumpExpr(expr))
-		dot.viewAst(expr, "step" .. step)
+		print(step + 1, utils.dumpExpr(expr))
+		dot.viewAst(expr, "step" .. (step + 1))
 		break
 	end
 end

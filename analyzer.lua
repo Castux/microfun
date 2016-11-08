@@ -172,7 +172,7 @@ local function reduce(expr)
 				node[1][2].kind == "number" and
 				node[2].kind == "number" then
 
-					local result = {kind = "number", [1] = node[1][1].func(node[1][2][1], node[2][1])}
+					local result = {kind = "number", irreducible = true, [1] = node[1][1].func(node[1][2][1], node[2][1])}
 					return false, result	-- replace node!
 				end
 				

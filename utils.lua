@@ -19,7 +19,11 @@ local function traverse(ast, funcTable)
 	local mid = funcTable.mid[ast.kind] or funcTable.mid.default
 	local post = funcTable.post[ast.kind] or funcTable.post.default
 
-	local recurse, replace = pre(ast)
+	local recurse, prereplace = pre(ast)
+	
+	if prereplace then
+		return prereplace
+	end
 	
 	if recurse then
 		for i,v in ipairs(ast) do
@@ -37,8 +41,8 @@ local function traverse(ast, funcTable)
 		
 	end
 	
-	local replace = post(ast) or replace
-	return replace or ast
+	local postreplace = post(ast)
+	return postreplace or ast
 end
 
 local function clone(node)
