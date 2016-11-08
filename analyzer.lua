@@ -148,6 +148,14 @@ end
 
 local function reduce(expr)
 
+	local function deref(node)
+		if node.kind == "named" and node[1] then
+			return node[1]
+		else
+			return node
+		end
+	end
+
 	funcTable =
 	{
 		pre =
@@ -158,26 +166,43 @@ local function reduce(expr)
 			end,
 
 			named = function(node)
-				if node.irreducible then return false end				
+				if node.irreducible then return false end
+				
+				if node.builtin then
+					node.irreducible = true
+					return false
+				end
+				
+				if node[1] and node[1].irreducible then
+					return false, node[1]
+				end
+				
 				return true
 			end,
 
 			application = function(node)
 				if node.irreducible then return false end
-				
+
 				-- builtin case
 
-				if node[1].kind == "application" and
-				node[1][1].builtin and
-				node[1][2].kind == "number" and
-				node[2].kind == "number" then
+				local left = deref(node[1])
 
-					local result = {kind = "number", irreducible = true, [1] = node[1][1].func(node[1][2][1], node[2][1])}
-					return false, result	-- replace node!
+				if left.kind == "application" then
+					local leftleft = deref(left[1])
+					local leftright = deref(left[2])
+					local right = deref(node[2])
+
+					if leftleft.builtin and
+						leftright.kind == "number" and
+						right.kind == "number" then
+
+						local result = {kind = "number", irreducible = true, [1] = leftleft.func(leftright[1], right[1])}
+						return false, result	-- replace node!
+					end
 				end
-				
+
 				--
-				
+
 				if node[1].irreducible and node[2].irreducible then
 					node.irreducible = true
 					return false
@@ -196,11 +221,7 @@ local function reduce(expr)
 
 		post =
 		{
-			named = function(node)
-				if node.builtin or (node[1] and node[1].irreducible) then
-					node.irreducible = true
-				end
-			end
+
 		}
 	}
 
