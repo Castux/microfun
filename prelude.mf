@@ -124,4 +124,12 @@ downfrom = n -> (n, downfrom (pred 1)),
 upfrom = n -> (n, upfrom (succ n)),
 repeat = x -> (x, repeat x)
 
+-- Some arithmetics
+
+divides = n -> compose (eq 0) (mod n),
+divisors = n -> filter (divides n) (range 1 n),
+
+isPrime = n -> and (gte n 2) (none (divides n) (range 2 (sqrt n))),
+primes = filter isPrime (upfrom 1)
+
 in
