@@ -73,7 +73,7 @@ local function astToDot(ast)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-
+				
 				local label = node.builtin and "builtin" or "named"
 				add(format(node, label .. "|" .. node.name))
 				return true

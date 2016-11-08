@@ -30,13 +30,13 @@ local expr = analyzer.resolveScope(result)
 for step = 0,math.huge do
 
 	print(step, utils.dumpExpr(expr))
-	dot.viewAst(expr, "step" .. step)
+	dot.viewAst(expr, string.format("step%02d", step))
 	
 	expr = analyzer.reduce(expr)
 	
 	if expr.irreducible then
 		print(step + 1, utils.dumpExpr(expr))
-		dot.viewAst(expr, "step" .. (step + 1))
+		dot.viewAst(expr, string.format("step%02d", step + 1))
 		break
 	end
 end

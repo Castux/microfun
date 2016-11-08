@@ -15,7 +15,7 @@ local function resolveScope(ast)
 
 	-- The identifiers get replaced with a "named expression", generated for
 	-- let bindings, and lambda parameters
-	
+
 	-- Named expression and lambda get a .lambda pointer to their closest enclosing
 	-- lambda. That will be used to determine later what is in scope and what to duplicate
 	-- when instantiating a lambda.
@@ -41,11 +41,11 @@ local function resolveScope(ast)
 
 		return nil
 	end
-	
+
 	-- find the closest enclosing lambda, if any
-	
+
 	local function lookupLambda()
-		
+
 		for i = #scope,1,-1 do
 			if scope[i]["@lambda"] then
 				return scope[i]["@lambda"]
@@ -87,9 +87,9 @@ local function resolveScope(ast)
 			end,
 
 			lambda = function(node)
-				
+
 				node.lambda = lookupLambda()
-				
+
 				local names = {}
 				names["@lambda"] = node
 				table.insert(scope, names)
@@ -202,7 +202,7 @@ local function tryMatch(lambda, expr)
 		else
 			assert(sub.kind == "named") 
 			-- a single parameter always matches
-			
+
 			return true, {[sub.name] = expr}			
 		end
 	end
@@ -212,7 +212,7 @@ local function tryMatch(lambda, expr)
 end
 
 local function isInScope(lambda, node)
-	
+
 	if node.lambda == lambda then
 		return true
 	elseif node.lambda then
@@ -220,7 +220,7 @@ local function isInScope(lambda, node)
 	else
 		return false
 	end
-	
+
 end
 
 local function instantiate(lambda, values)
@@ -242,15 +242,15 @@ local function instantiate(lambda, values)
 
 		for k,v in pairs(node) do
 			if type(v) == "table" then
-				
+
 				if v.kind == "named" then
-					
+
 					if isInScope(lambda, v) then
 						new[k] = rec(v)
 					else
 						new[k] = v
 					end
-					
+
 				else
 					new[k] = rec(v)
 				end			
@@ -261,40 +261,40 @@ local function instantiate(lambda, values)
 
 		return new
 	end
-	
+
 	local clone = rec(lambda)
-	
+
 	-- then we substitute the lambda's named values for their argument's values
-	
+
 	local pattern = clone[1]
 	for i,v in ipairs(pattern) do
 		if v.kind == "named" then
 			v[1] = values[v.name]
 		end		
 	end
-	
+
 	-- remove references to the lambda
-	
+
 	funcTable = { pre = {
-		default = function(node)
-			if node.lambda == clone then
-				node.lambda = nil
+			default = function(node)
+				if node.lambda == clone then
+					node.lambda = nil
+				end
+				return true
+			end,
+
+			named = function(node)
+				if node.lambda == clone then
+					node.lambda = nil
+				end
+				return isInScope(clone, node)
 			end
-			return true
-		end,
-		
-		named = function(node)
-			if node.lambda == clone then
-				node.lambda = nil
-			end
-			return isInScope(clone, node)
-		end
-	}}
-	
+		}}
+
 	clone = utils.traverse(clone, funcTable)
-	
+
 	-- that's it! unwrap the lambda, our expression is now fully bound
-	
+
 	return clone[2]
 end
 
@@ -363,17 +363,33 @@ local function reduce(expr)
 				elseif left.builtin then
 					return true
 
-				elseif left.kind == "lambda" then
+				elseif left.kind == "lambda" or left.kind == "multilambda" then
 
-					local success, values = tryMatch(left, right)
-					if success == true then
-						local new = instantiate(left, values)
-						return false, new
+					local lambdas = left.kind == "multilambda" and left or {left}
 
-					elseif success == "reduce" then
-						-- just let it happen
-					else
+					-- try to match the lambdas in order
+
+					for i,lambda in ipairs(lambdas) do
+						local success, values = tryMatch(lambda, right)
+						if success == true then
+
+							-- this one matched? let's apply it
+							local new = instantiate(lambda, values)
+							return false, new
+
+						elseif success == "reduce" then
+
+							-- this one needs more information? let's reduce the rhand side more
+							return true
+						end
+					end
+					
+					-- by now, no pattern matched
+					
+					if left.kind == "lambda" then
 						error("Couldn't match pattern " .. utils.dumpExpr(left[1]) .. " to " .. utils.dumpExpr(right))
+					else
+						error("Couldn't match any pattern in" .. utils.dumpExpr(left) .. " to " .. utils.dumpExpr(right))
 					end
 
 				else	
