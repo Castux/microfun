@@ -1,4 +1,5 @@
-local nop = function(node) return true end
+local truenop = function(node) return true end
+local nilnop = function(node) end
 
 local function traverse(ast, funcTable)
 
@@ -10,16 +11,16 @@ local function traverse(ast, funcTable)
 	funcTable.mid = funcTable.mid or {}
 	funcTable.post = funcTable.post or {}
 
-	funcTable.pre.default = funcTable.pre.default or nop
-	funcTable.mid.default = funcTable.mid.default or nop
-	funcTable.post.default = funcTable.post.default or nop
+	funcTable.pre.default = funcTable.pre.default or truenop
+	funcTable.mid.default = funcTable.mid.default or truenop
+	funcTable.post.default = funcTable.post.default or nilnop
 
 	local pre = funcTable.pre[ast.kind] or funcTable.pre.default
 	local mid = funcTable.mid[ast.kind] or funcTable.mid.default
 	local post = funcTable.post[ast.kind] or funcTable.post.default
 
-	local recurse, replace = pre(ast)
-
+	local recurse = pre(ast)
+	
 	if recurse then
 		for i,v in ipairs(ast) do
 			
@@ -34,9 +35,9 @@ local function traverse(ast, funcTable)
 			end
 		end
 		
-		post(ast)
 	end
 	
+	local replace = post(ast)
 	return replace or ast
 end
 
@@ -115,7 +116,10 @@ local function dumpAST(ast)
 			default = function(node)
 				ident = ident - 1
 				add(identChar:rep(ident) .. ")")
-			end
+			end,
+			
+			identifier = function() end,
+			number = function() end
 		}
 	}
 

@@ -65,7 +65,7 @@ local function resolveScope(ast)
 					names[id] = newNode
 				end
 
-				return true, node[#node]	-- replace with sub-expression
+				return true
 			end,
 
 			bindinglvalue = function(node)
@@ -84,8 +84,29 @@ local function resolveScope(ast)
 			pattern = function(node)
 				inPattern = true
 				return true
+			end
+		},
+
+		post =
+		{
+			let = function(node)
+				table.remove(scope)
+				return node[#node]		-- replace with subexpression
 			end,
 
+			bindinglvalue = function(node)
+				inBindingLValue = false
+			end,
+
+			lambda = function(node)
+				table.remove(lambdaStack)
+				table.remove(scope)
+			end,
+
+			pattern = function(node)
+				inPattern = false
+			end,
+			
 			identifier = function(node)
 
 				local id = node[1]
@@ -112,32 +133,12 @@ local function resolveScope(ast)
 
 					local found = lookup(id)
 					if found then
-						return false, found		-- replace with the found named expression
+						return found		-- replace with the found named expression
 					else
 						error("Could not find definition for: " .. id)
 					end
 				end
 
-			end
-		},
-
-		post =
-		{
-			let = function(node)
-				table.remove(scope)
-			end,
-
-			bindinglvalue = function(node)
-				inBindingLValue = false
-			end,
-
-			lambda = function(node)
-				table.remove(lambdaStack)
-				table.remove(scope)
-			end,
-
-			pattern = function(node)
-				inPattern = false
 			end
 		}
 	}
