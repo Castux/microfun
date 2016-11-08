@@ -1,0 +1,30 @@
+let
+
+tree = a -> left -> right -> (a,left,right),
+
+isTree = [
+	() -> 1,
+	(a,left,right) -> and (isTree left) (isTree right),
+	x -> 0
+],
+
+balancedTree = a -> [
+	0 -> (),
+	1 -> (a, (), ()),
+	n -> let child = balancedTree a (pred n) in (a, child, child)
+],
+
+treeSize = [
+	() -> 0,
+	(a,left,right) -> succ (add (treeSize left) (treeSize right))
+],
+
+isBalanced = [
+	() -> 1,
+	(a,left,right) ->
+		and
+			(lte (abs (sub (treeSize right) (treeSize left))) 1)
+			(and (isBalanced left) (isBalanced right))
+]
+
+in

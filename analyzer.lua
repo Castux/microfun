@@ -317,9 +317,15 @@ local function instantiate(lambda, values)
 	end
 
 	-- remove references to the lambda
+	
+	local visited = {}
 
 	funcTable = { pre = {
 			default = function(node)
+				
+				if visited[node] then return false end
+				visited[node] = true
+				
 				if node.lambda == clone then
 					node.lambda = nil
 				end
@@ -327,9 +333,14 @@ local function instantiate(lambda, values)
 			end,
 
 			named = function(node)
+				
+				if visited[node] then return false end
+				visited[node] = true
+				
 				if node.lambda == clone then
 					node.lambda = nil
 				end
+				
 				return isInScope(clone, node)
 			end
 		}}
@@ -462,10 +473,11 @@ local function reduce(expr)
 				for i,v in ipairs(node) do
 					if not v.irreducible then
 						node.irreducible = nil
+						return true
 					end
 				end
 				
-				return true
+				return false
 			end
 		},
 
@@ -474,10 +486,6 @@ local function reduce(expr)
 			application = function(node)
 				-- continue (== reduce rhand) only if lhand is irreducible
 				return node[1].irreducible
-			end,
-			
-			tuple = function(node,i)
-				return node[i].irreducible
 			end
 		},
 

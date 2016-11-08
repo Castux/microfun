@@ -5,12 +5,18 @@ let
 id = x -> x,
 compose = f -> g -> x -> f (g x),
 flip = f -> x -> y -> f y x,
+apply = f -> x -> f x,
+match = flip apply,
 
 -- Numbers
 -- builtin: add, mul, sub, div, mod, sqrt
 
 succ = add 1,
 pred = (flip sub) 1,
+minus = sub 0,
+abs = n -> if (lt n 0) (sub 0 n) n,
+max = a -> b -> if (lt a b) b a,
+min = a -> b -> if (lt a b) a b,
 
 -- Booleans
 
@@ -31,6 +37,12 @@ lte = a -> b -> or (lt a b) (eq a b),
 -- Lists
 
 cons = h -> t -> (h,t),
+
+isList = [
+	() -> 1,
+	(x,xs) -> isList xs,
+	n -> 0
+],
 
 length = [
 	() -> 0,
@@ -113,16 +125,26 @@ drop = [
 	]
 ],
 
+split = p -> 
+	foldr
+	[ x -> (ts, fs) -> if (p x) ((x,ts), fs) (ts, (x,fs)) ]
+	((),()),
+
 range = a -> b ->
 	if (lte a b)
 		(a, range (succ a) b)
 		(),
 
+sort = [
+	() -> (),
+	(x,xs) -> concat (sort (filter (gt x) xs)) (x, sort (filter (lte x) xs))
+],
+
 -- Infinite lists
 
 downfrom = n -> (n, downfrom (pred 1)),
 upfrom = n -> (n, upfrom (succ n)),
-repeat = x -> (x, repeat x)
+repeat = x -> (x, repeat x),
 
 -- Some arithmetics
 

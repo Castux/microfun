@@ -43,8 +43,8 @@ local function astToDot(ast)
 		return false
 	end
 
-	local namedThatPosted = {}
 	local inPattern = false
+	local drewLinks = {}
 
 	local funcTable =
 	{
@@ -54,7 +54,7 @@ local function astToDot(ast)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-
+				
 				add(format(node, node.kind))
 				return true
 			end,
@@ -102,13 +102,37 @@ local function astToDot(ast)
 			pattern = function(node)
 				inPattern = true
 				return true
+			end,
+			
+			tuple = function(node)
+				local uid,existed = getUID(node)
+				if existed then return false end
+				
+				local label = "{tuple | {"
+				for i,v in ipairs(node) do
+					label = label .. "<arg" .. i .. "> " .. (v.kind == "number" and v[1] or "")
+					if i < #node then
+						label = label .. " | "
+					end
+					
+					if v.kind == "number" then
+						getUID(v)	-- cheat: pretend we drew this node already
+					end
+				end
+				label = label .. "}}"
+				
+				add(format(node, label))
+				return true
 			end
-
 		},
 
 		post =
 		{
 			default = function(node)
+				
+				if drewLinks[node] then return end				
+				drewLinks[node] = true
+				
 				local thisUID = getUID(node)
 
 				if #node == 2 then
@@ -125,11 +149,13 @@ local function astToDot(ast)
 			identifier = function() end,
 
 			named = function(node)
-				if namedThatPosted[node] then return end
+				
+				if drewLinks[node] then return end				
+				drewLinks[node] = true
+				
 				if node[1] then
 					add(getUID(node) .. " -> " .. getUID(node[1]) .. ";")
 				end
-				namedThatPosted[node] = true
 				
 				if node.lambda then
 					add(getUID(node) .. " -> " .. getUID(node.lambda) .. ":w [style=dotted];")
@@ -137,6 +163,9 @@ local function astToDot(ast)
 			end,
 			
 			lambda = function(node)
+				
+				if drewLinks[node] then return end				
+				drewLinks[node] = true
 				
 				local thisUID = getUID(node)
 				
@@ -162,6 +191,22 @@ local function astToDot(ast)
 			
 			pattern = function()
 				inPattern = false
+			end,
+			
+			tuple = function(node)
+				
+				if drewLinks[node] then return end				
+				drewLinks[node] = true
+				
+				local thisUID = getUID(node)
+				
+				for i,v in ipairs(node) do
+					if v.kind == "number" then
+						-- skip
+					else
+						add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. ";")
+					end
+				end
 			end
 		}
 	}
