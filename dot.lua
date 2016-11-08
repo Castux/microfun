@@ -1,5 +1,7 @@
 local utils = require "utils"
 
+-- Supports both the raw AST and the name-resolved expression
+
 local function astToDot(ast)
 
 	local res = {}
@@ -8,38 +10,60 @@ local function astToDot(ast)
 
 	local getUID
 	do
+		local uids = {}
 		local uid = 0
-		getUID = function()
+
+		getUID = function(node)
+			if uids[node] then
+				return uids[node], true
+			end
+
 			uid = uid + 1
-			return uid
+
+			uids[node] = "node" .. uid
+			return uids[node], false
 		end
 	end
 
-	local uids = {}
+	local terminal = function(node)
+		local uid,existed = getUID(node)
+		if existed then return false end
+		add(uid .. ' [shape=record, label= "' .. node.kind .. "|" .. node[1] .. '"];')
+		return false
+	end
 
 	local funcTable =
 	{
 		pre =
 		{
 			default = function(node)
-				local uid = "node" .. getUID()
-				uids[node] = uid
 
-				if node.kind == "number" or node.kind == "identifier" then
-					add(uid .. ' [shape=record, label= "' .. node.kind .. "|" .. node[1] .. '"];')
-					return false
-				else
-					add(uid .. " [label=" .. node.kind .. "];")
-					return true
-				end
+				local uid,existed = getUID(node)
+				if existed then return false end
+
+				add(uid .. " [label=" .. node.kind .. "];")
+				return true
+			end,
+			
+			number = terminal,
+			identifier = terminal,
+			
+			named = function(node)
+
+				local uid,existed = getUID(node)
+				if existed then return false end
+
+				add(uid .. ' [shape=record, label= "' .. node.kind .. "|" .. node.name .. '"];')
+				return true
 			end
 		},
 
 		post =
 		{
 			default = function(node)
+				local thisUID = getUID(node)
 				for i,v in ipairs(node) do
-					add(uids[node] .. " -> " .. uids[v] .. ";")
+					add(thisUID .. " -> " .. getUID(v) .. ";")
 				end
 			end,
 

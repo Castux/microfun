@@ -33,9 +33,9 @@ local function traverse(ast, funcTable)
 				if not continue then break end
 			end
 		end
+		
+		post(ast)
 	end
-
-	post(ast)
 	
 	return replace or ast
 end
@@ -115,10 +115,7 @@ local function dumpAST(ast)
 			default = function(node)
 				ident = ident - 1
 				add(identChar:rep(ident) .. ")")
-			end,
-
-			identifier = function() end,
-			number = function() end
+			end
 		}
 	}
 
