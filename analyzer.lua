@@ -377,6 +377,8 @@ local function reduce(expr)
 					return false, node[1]
 				elseif node[1] and node[1].kind == "tuple" and node[1].irreducible then
 					return false, node[1]
+				elseif node[1] and node[1].kind == "named" then
+					return false, node[1]
 				elseif node[1] and node[1].irreducible then
 					node.irreducible = true
 					return false
