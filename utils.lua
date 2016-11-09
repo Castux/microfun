@@ -271,6 +271,14 @@ local function writeFile(path, str)
 	fp:close()
 end
 
+local function dispatch(functions, node)
+	if functions[node.kind] then
+		return functions[node.kind](node)
+	else
+		error("Cannot dispatch to node kind: " .. node.kind)
+	end
+end
+
 return
 {
 	traverse = traverse,
@@ -279,5 +287,6 @@ return
 	clone = clone,
 	deepClone = deepClone,
 	writeFile = writeFile,
-	deref = deref
+	deref = deref,
+	dispatch = dispatch
 }
