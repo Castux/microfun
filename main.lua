@@ -3,7 +3,6 @@ local serpent = require "serpent"
 local utils = require "utils"
 local analyzer = require "analyzer"
 local dot = require "dot"
-local reduce = require "reduce"
 
 local prelude = io.open("prelude.mf"):read("*a")
 prelude = prelude .. io.open("tree.mf"):read("*a")
@@ -30,7 +29,7 @@ local printAll = false
 
 for step = 1,math.huge do
 
-	local reduced,newexpr = reduce(expr)
+	local reduced,newexpr = analyzer.reduce(expr)
 	expr = newexpr
 
 	if reduced then
