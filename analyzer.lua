@@ -1,5 +1,7 @@
 local utils = require "utils"
 
+local deref = utils.deref
+
 local builtins =
 {
 	add = {kind = "named", name = "add", builtin = true, arity = 2, func = function(x,y) return x + y end},
@@ -353,14 +355,6 @@ local function instantiate(lambda, values)
 end
 
 local function reduce(expr)
-
-	local function deref(node)
-		if node.kind == "named" and node[1] then
-			return deref(node[1])
-		else
-			return node
-		end
-	end
 
 	funcTable =
 	{

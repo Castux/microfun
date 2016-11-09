@@ -1,3 +1,11 @@
+local function deref(node)
+	if node.kind == "named" and node[1] then
+		return deref(node[1])
+	else
+		return node
+	end
+end
+
 local truenop = function(node) return true end
 local nilnop = function(node) end
 
@@ -255,5 +263,6 @@ return
 	dumpExpr = dumpExpr,
 	clone = clone,
 	deepClone = deepClone,
-	writeFile = writeFile
+	writeFile = writeFile,
+	deref = deref
 }
