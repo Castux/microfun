@@ -85,17 +85,21 @@ local function reduceBuiltin(node)
 	end
 end
 
+local irreducibleFunc = function(node)
+	return false,node
+end
+
 local reduceFuncs =
 {
-	number = function(node)
-		return false,node
-	end,
+	number = irreducibleFunc,
+	lambda = irreducibleFunc,
+	multilambda = irreducibleFunc,
 
 	named = function(node)
 
 		local child = node[1]
 
-		-- Childless named node (builtin/ non applied parameter)
+		-- Childless named node (builtin/non applied parameter)
 
 		if not child then
 			return false,node
@@ -109,18 +113,10 @@ local reduceFuncs =
 			node[1] = newchild
 			return true,node
 		end
-
-		-- Child is irreducible
-		-- In some cases we can remove the named node
-
-		if child.kind == "number" or
-		child.kind == "named" or
-		child.kind == "tuple"
-		then
-			return true,child
-		end
-
-		return false,node
+		
+		child.oldname = node.name
+		
+		return true,child
 	end,
 
 	tuple = function(node)
@@ -141,38 +137,7 @@ local reduceFuncs =
 		return false,node
 	end,
 
-	lambda = function(node)
-
-		-- Try reduce expression
-
-		local child = node[2]
-		local reduced, newchild = reduce(child)
-
-		if reduced then
-			node[2] = newchild
-			return true,node
-		end
-
-		return false,node
-	end,
-
-	multilambda = function(node)
-
-		-- Try reduce lambdas
-
-		for i,child in ipairs(node) do
-			local reduced, newchild = reduce(child)
-
-			if reduced then
-				node[i] = newchild
-				return true,node
-			end
-		end
-
-		-- All children irreducible
-
-		return false,node
-	end,
+	
 
 	application = function(node)
 
@@ -188,7 +153,7 @@ local reduceFuncs =
 				return true,node
 			end
 		end
-
+				
 		-- Builtin case
 
 		if left.builtin then
@@ -200,9 +165,7 @@ local reduceFuncs =
 		end
 
 		-- Check that it *is* a function
-
-		left = utils.deref(left)
-
+		
 		if not(left.kind == "lambda" or left.kind == "multilambda") then
 			error("Cannot apply as function: " .. utils.dumpExpr(left))
 		end
