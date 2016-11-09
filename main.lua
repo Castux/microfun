@@ -10,8 +10,6 @@ prelude = prelude .. io.open("tree.mf"):read("*a")
 
 local source = io.open("test.mf"):read("*a")
 
---prelude = ""
-
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
 if not success then
@@ -28,7 +26,7 @@ local expr = analyzer.resolveScope(result)
 print(0, utils.dumpExpr(expr))
 dot.viewAst(expr, string.format("step%04d", 0))
 
----[[
+local printAll = true
 
 for step = 1,math.huge do
 
@@ -36,14 +34,19 @@ for step = 1,math.huge do
 	expr = newexpr
 
 	if reduced then
-		print(step, utils.dumpExpr(expr))
-		dot.viewAst(expr, string.format("step%04d", step))
+		if printAll then
+			print(step, utils.dumpExpr(expr))
+			dot.viewAst(expr, string.format("step%04d", step))
+		end
 	else
 		break
 	end
 end
 
---]]
+if not printAll then
+	print(utils.dumpExpr(expr))
+	dot.viewAst(expr, string.format("step%04d", 1))
+end
 
 os.execute("open *.png")
 

@@ -175,12 +175,6 @@ local reduceFuncs =
 		local right = node[2]		
 		local lambdas = left.kind == "multilambda" and left or {left}
 
-		-- In a lambda, the param are still undecided. This is irreducible
-		
-		if right.kind == "named" and not right[1] then
-			return false,node
-		end
-
 		-- Try to match the lambdas in order
 
 		for i,lambda in ipairs(lambdas) do
