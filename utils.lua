@@ -11,6 +11,8 @@ local nilnop = function(node) end
 
 local function traverse(ast, funcTable)
 
+	local visited = {}
+
 	funcTable.pre = funcTable.pre or {}
 	funcTable.mid = funcTable.mid or {}
 	funcTable.post = funcTable.post or {}
@@ -24,6 +26,12 @@ local function traverse(ast, funcTable)
 		if type(ast) ~= "table" then
 			return
 		end
+		
+		if visited[ast] then
+			return
+		end
+		
+		visited[ast] = true
 
 		local pre = funcTable.pre[ast.kind] or funcTable.pre.default
 		local mid = funcTable.mid[ast.kind] or funcTable.mid.default
