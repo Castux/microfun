@@ -1,4 +1,8 @@
 local utils = require "utils"
+local analyzer = require "analyzer"
+
+local tryMatch = analyzer.tryMatch
+local instantiate = analyzer.instantiate
 
 local reduce
 
@@ -22,7 +26,7 @@ local function reduceBuiltin(node)
 	end
 
 	-- Arrity 1
-	
+
 	local left = node[1]
 
 	if left.arity == 1 then		
@@ -32,6 +36,11 @@ local function reduceBuiltin(node)
 			local result = { kind = "number", [1] = left.func(right[1]) }
 			return true,result
 
+		elseif right.kind == "named" then
+			-- we are probably in a lambda, and this is the parameter, without value yet
+
+			assert(not right[1])
+			return false,node
 		else
 			error("Cannot apply builtin function " .. left.name .. " to " .. utils.dumpExpr(right))
 		end
@@ -46,28 +55,33 @@ local function reduceBuiltin(node)
 
 	-- Arrity 2, outer node
 
-	if left.kind == "application" then
-		local leftleft = left[1]
-		assert(leftleft.builtin)
+	assert(left.kind == "application")
 
-		if leftleft.arity == 2 then
+	local leftleft = left[1]
+	assert(leftleft.builtin)
 
-			-- Right is already irreducible, apply (see *)
+	if leftleft.arity == 2 then
 
-			local right = node[2]
-			local leftright = left[2]
+		-- Right is already irreducible, apply (see *)
 
-			if leftright.kind == "number" and right.kind == "number" then
+		local right = node[2]
+		local leftright = left[2]
 
-				local result = {kind = "number", [1] = leftleft.func(leftright[1], right[1])}
-				return true,result
-			else
-				error("Cannot apply builtin function " .. leftleft.name .. " to " .. utils.dumpExpr(leftright) .. " and " .. utils.dumpExpr(right))
-			end
+		if leftright.kind == "number" and right.kind == "number" then
 
+			local result = {kind = "number", [1] = leftleft.func(leftright[1], right[1])}
+			return true,result
+
+		elseif leftright.kind == "named" or right.kind == "named" then
+
+			-- we are probably in a lambda, and one of this is the parameter, without value yet
+			assert(not right[1] or not leftright[1])
 		else
-			error("Builtin arrity >2 not supported")
+			error("Cannot apply builtin function " .. leftleft.name .. " to " .. utils.dumpExpr(leftright) .. " and " .. utils.dumpExpr(right))
 		end
+
+	else
+		error("Builtin arrity >2 not supported")
 	end
 end
 
@@ -187,23 +201,52 @@ local reduceFuncs =
 
 		-- Check that it *is* a function
 
+		left = utils.deref(left)
+
 		if not(left.kind == "lambda" or left.kind == "multilambda") then
 			error("Cannot apply as function: " .. utils.dumpExpr(left))
 		end
 
 		-- Apply!
 
+		local right = node[2]		
+		local lambdas = left.kind == "multilambda" and left or {left}
 
+		-- In a lambda, the param are still undecided. This is irreducible
+		
+		if right.kind == "named" and not right[1] then
+			return false,node
+		end
 
+		-- Try to match the lambdas in order
 
+		for i,lambda in ipairs(lambdas) do
+			local success, values = tryMatch(lambda, right)
+			if success == true then
 
+				-- this one matched? let's apply it
+				local new = instantiate(lambda, values)
+				return true,new
 
+			elseif success == "reduce" then
 
+				-- this one needs more information? let's reduce the rhand side more
 
+				local reduced, newchild = reduce(right)
+				if reduced then
+					node[2] = newchild
+					return true,node
+				end
+			end
+		end
 
-		-- All irreducible
+		-- by now, no pattern matched
 
-		return false,node
+		if left.kind == "lambda" then
+			error("Couldn't match pattern " .. utils.dumpExpr(left[1]) .. " to " .. utils.dumpExpr(right))
+		else
+			error("Couldn't match any pattern in " .. utils.dumpExpr(left) .. " to " .. utils.dumpExpr(right))
+		end
 	end
 }
 

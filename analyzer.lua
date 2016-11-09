@@ -210,6 +210,8 @@ local function tryMatch(lambda, expr)
 	local pattern = lambda[1]
 	local names = {}
 	
+	expr = utils.deref(expr)
+	
 	if #pattern == 1 then
 		
 		local res = matchAtomic(pattern[1], expr, names)
@@ -499,5 +501,7 @@ return
 {
 	markLambdasChildren = markLambdasChildren,
 	resolveScope = resolveScope,
-	reduce = reduce
+	reduce = reduce,
+	tryMatch = tryMatch,
+	instantiate = instantiate
 }
