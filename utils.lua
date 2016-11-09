@@ -176,17 +176,16 @@ local function dumpExpr(ast)
 	
 	if isList(ast) then
 		local res = "{"
-		
-		local function rec(node)
-			res = res .. dumpExpr(node[1])
-			if #node[2] > 0 then
+		 
+		while true do
+			res = res .. dumpExpr(ast[1])
+			if #ast[2] > 0 then
 				res = res .. ","
-				rec(node[2])
+				ast = ast[2]
+			else
+				break
 			end
 		end
-		
-		rec(ast)
-		
 		return res .. "}"
 	end
 
