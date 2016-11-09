@@ -343,6 +343,7 @@ local function instantiate(lambda, values)
 				
 				if node.lambda == clone then
 					node.lambda = nil
+					node.wasparam = true
 				end
 				
 				return isInScope(clone, node)

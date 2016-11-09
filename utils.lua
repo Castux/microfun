@@ -225,8 +225,22 @@ local function dumpExpr(ast)
 				number = function(node) add(node[1]) end,
 
 				named = function(node)
-
-					add(node.name .. (node.builtin and "*" or ""))
+					
+					if not node[1] then
+						add(node.name .. (node.builtin and "*" or ""))
+						return
+					end
+					
+					if node[1].kind == "lambda" or node[1].kind == "multilambda" then
+						add(node.name)
+						return
+					end
+					
+					if node.wasparam then
+						return true
+					end
+					
+					add(node.name)
 					recnames[node] = (recnames[node] or 0) + 1
 
 					if node[1] and recnames[node] == 1 then
@@ -267,6 +281,19 @@ local function dumpExpr(ast)
 				end,
 
 				named = function(node)
+					
+					if not node[1] then
+						return
+					end
+					
+					if node[1].kind == "lambda" or node[1].kind == "multilambda" then
+						return
+					end
+					
+					if node.wasparam then
+						return
+					end
+					
 					if node[1] and recnames[node] == 1 then
 						add "}"
 					end

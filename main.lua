@@ -26,7 +26,7 @@ local expr = analyzer.resolveScope(result)
 print(0, utils.dumpExpr(expr))
 dot.viewAst(expr, string.format("step%04d", 0))
 
-local printAll = true
+local printAll = false
 
 for step = 1,math.huge do
 

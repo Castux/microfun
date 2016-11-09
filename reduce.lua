@@ -116,6 +116,8 @@ local reduceFuncs =
 		
 		child.oldname = node.name
 		
+		-- Replace with child
+		
 		return true,child
 	end,
 
@@ -136,8 +138,6 @@ local reduceFuncs =
 
 		return false,node
 	end,
-
-	
 
 	application = function(node)
 
