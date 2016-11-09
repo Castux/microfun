@@ -145,6 +145,8 @@ local function dumpAST(ast)
 	return table.concat(res)
 end
 
+local recnames = {}
+
 local function dumpExpr(ast)
 
 	local res = {}
@@ -208,8 +210,14 @@ local function dumpExpr(ast)
 			number = function(node) add(node[1]) end,
 
 			named = function(node)
+				
 				add(node.name .. (node.builtin and "*" or ""))
-				return false
+				recnames[node] = (recnames[node] or 0) + 1
+				
+				if node[1] and recnames[node] == 1 then
+					add "{"
+					return true
+				end
 			end,
 
 			tuple = wrap "(",
@@ -241,6 +249,13 @@ local function dumpExpr(ast)
 			multilambda = wrapnil "]",
 			pattern = function(node)
 				if #node ~= 1 then add ")" end
+			end,
+			
+			named = function(node)
+				if node[1] and recnames[node] == 1 then
+					add "}"
+				end
+				recnames[node] = recnames[node] - 1
 			end
 		}
 	}
