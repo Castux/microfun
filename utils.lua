@@ -83,48 +83,6 @@ local function traverse(ast, funcTable)
 	return rec(ast)
 end
 
-local function clone(node)
-
-	local new = {}
-
-	for k,v in pairs(node) do
-		if type(v) == "table" then
-			new[k] = clone(v)
-		else
-			new[k] = v
-		end
-	end
-
-	return new
-end
-
-local function deepClone(graph)
-
-	local clones = {}
-
-	local function rec(node)
-
-		if clones[node] then
-			return clones[node]
-		end
-
-		local new = {}
-		clones[node] = new
-
-		for k,v in pairs(node) do
-			if type(v) == "table" then
-				new[k] = rec(v)
-			else
-				new[k] = v
-			end
-		end
-
-		return new
-	end
-
-	return rec(graph)
-end
-
 local function dumpAST(ast)
 
 	local res = {}
@@ -362,8 +320,6 @@ return
 	traverse = traverse,
 	dumpAST = dumpAST,
 	dumpExpr = dumpExpr,
-	clone = clone,
-	deepClone = deepClone,
 	writeFile = writeFile,
 	deref = deref,
 	dispatch = dispatch
