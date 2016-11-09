@@ -6,6 +6,23 @@ local function deref(node)
 	end
 end
 
+local function isList(expr)
+	
+	if not expr.kind == "tuple" then
+		return false
+	end
+	
+	if #expr == 0 then
+		return true
+	end
+	
+	if #expr == 2 then
+		return isList(expr[2])
+	end
+	
+	return false
+end
+
 local truenop = function(node) return true end
 local nilnop = function(node) end
 
@@ -156,6 +173,22 @@ end
 local recnames = {}
 
 local function dumpExpr(ast)
+	
+	if isList(ast) then
+		local res = "{"
+		
+		local function rec(node)
+			res = res .. dumpExpr(node[1])
+			if #node[2] > 0 then
+				res = res .. ","
+				rec(node[2])
+			end
+		end
+		
+		rec(ast)
+		
+		return res .. "}"
+	end
 
 	local visited = {}
 
@@ -323,6 +356,7 @@ local function dispatch(functions, node)
 		error("Cannot dispatch to node kind: " .. node.kind)
 	end
 end
+
 
 return
 {
