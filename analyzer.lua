@@ -390,11 +390,6 @@ local function reduceBuiltin(node)
 			local result = { kind = "number", [1] = left.func(right[1]) }
 			return true,result
 
-		elseif right.kind == "named" then
-			-- we are probably in a lambda, and this is the parameter, without value yet
-
-			assert(not right[1])
-			return false,node
 		else
 			error("Cannot apply builtin function " .. left.name .. " to " .. utils.dumpExpr(right))
 		end
