@@ -26,11 +26,11 @@ local function traverse(ast, funcTable)
 		if type(ast) ~= "table" then
 			return
 		end
-		
+
 		if visited[ast] then
 			return
 		end
-		
+
 		visited[ast] = true
 
 		local pre = funcTable.pre[ast.kind] or funcTable.pre.default
@@ -157,120 +157,130 @@ local recnames = {}
 
 local function dumpExpr(ast)
 
-	local res = {}
+	local visited = {}
 
-	local function add(str)
-		table.insert(res, str)
-	end
+	local function dumpRec(ast)
+		
+		if visited[ast] then return ast.name or "!!!" end
+		visited[ast] = true
 
-	local function wrap(str)
-		return function(node)
-			add(str)
-			return true
-		end
-	end
+		local res = {}
 
-	local function wrapnil(str)
-		return function(node)
-			add(str)
-		end
-	end
-
-	local function handleApp(node)
-
-		local tmp = {}
-
-		local llambda = node[1].kind == "lambda"
-
-		if llambda then
-			table.insert(tmp, "(")
+		local function add(str)
+			table.insert(res, str)
 		end
 
-		table.insert(tmp, dumpExpr(node[1]))
-
-		if llambda then
-			table.insert(tmp, ")")
+		local function wrap(str)
+			return function(node)
+				add(str)
+				return true
+			end
 		end
 
-		table.insert(tmp, " ")
-
-		local rapp = node[2].kind == "application" or node[2].kind == "lambda"
-
-		if rapp then
-			table.insert(tmp, "(")
+		local function wrapnil(str)
+			return function(node)
+				add(str)
+			end
 		end
 
-		table.insert(tmp, dumpExpr(node[2]))
+		local function handleApp(node)
 
-		if rapp then
-			table.insert(tmp, ")")
+			local tmp = {}
+
+			local llambda = node[1].kind == "lambda"
+
+			if llambda then
+				table.insert(tmp, "(")
+			end
+
+			table.insert(tmp, dumpRec(node[1]))
+
+			if llambda then
+				table.insert(tmp, ")")
+			end
+
+			table.insert(tmp, " ")
+
+			local rapp = node[2].kind == "application" or node[2].kind == "lambda"
+
+			if rapp then
+				table.insert(tmp, "(")
+			end
+
+			table.insert(tmp, dumpRec(node[2]))
+
+			if rapp then
+				table.insert(tmp, ")")
+			end
+
+			add(table.concat(tmp))
+
+			return false
 		end
 
-		add(table.concat(tmp))
-
-		return false
-	end
-
-	local funcTable =
-	{
-		pre =
+		local funcTable =
 		{
-			number = function(node) add(node[1]) end,
+			pre =
+			{
+				number = function(node) add(node[1]) end,
 
-			named = function(node)
-				
-				add(node.name .. (node.builtin and "*" or ""))
-				recnames[node] = (recnames[node] or 0) + 1
-				
-				if node[1] and recnames[node] == 1 then
-					add "{"
+				named = function(node)
+
+					add(node.name .. (node.builtin and "*" or ""))
+					recnames[node] = (recnames[node] or 0) + 1
+
+					if node[1] and recnames[node] == 1 then
+						add "{"
+						return true
+					end
+				end,
+
+				tuple = wrap "(",
+				multilambda = wrap "[",
+				application = handleApp,
+				let = wrap "let ",
+				pattern = function(node)
+					if #node ~= 1 then add "(" end
 					return true
 				end
-			end,
+			},
 
-			tuple = wrap "(",
-			multilambda = wrap "[",
-			application = handleApp,
-			let = wrap "let ",
-			pattern = function(node)
-				if #node ~= 1 then add "(" end
-				return true
-			end
-		},
+			mid =
+			{
+				tuple = wrap ", ",
+				lambda = wrap " -> ",
+				multilambda = wrap ", ",
+				let = function(node, index)
+					add(index == #node - 1 and " in " or ", ")
+					return true
+				end,
+				binding = wrap " = ",
+				pattern = wrap ","
+			},
 
-		mid =
-		{
-			tuple = wrap ", ",
-			lambda = wrap " -> ",
-			multilambda = wrap ", ",
-			let = function(node, index)
-				add(index == #node - 1 and " in " or ", ")
-				return true
-			end,
-			binding = wrap " = ",
-			pattern = wrap ","
-		},
+			post =
+			{
+				tuple = wrapnil ")",
+				multilambda = wrapnil "]",
+				pattern = function(node)
+					if #node ~= 1 then add ")" end
+				end,
 
-		post =
-		{
-			tuple = wrapnil ")",
-			multilambda = wrapnil "]",
-			pattern = function(node)
-				if #node ~= 1 then add ")" end
-			end,
-			
-			named = function(node)
-				if node[1] and recnames[node] == 1 then
-					add "}"
+				named = function(node)
+					if node[1] and recnames[node] == 1 then
+						add "}"
+					end
+					recnames[node] = recnames[node] - 1
 				end
-				recnames[node] = recnames[node] - 1
-			end
+			}
 		}
-	}
 
-	traverse(ast, funcTable)
+		traverse(ast, funcTable)
 
-	return table.concat(res)
+		return table.concat(res)
+	end
+	
+	return dumpRec(ast)
 end
 
 local function writeFile(path, str)
