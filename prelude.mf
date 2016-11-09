@@ -130,6 +130,8 @@ split = p ->
 	[ x -> (ts, fs) -> if (p x) ((x,ts), fs) (ts, (x,fs)) ]
 	((),()),
 
+flatten = foldr concat (),
+
 range = a -> b ->
 	if (lte a b)
 		(a, range (succ a) b)
