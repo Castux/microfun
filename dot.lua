@@ -227,7 +227,7 @@ local function astToDot(ast)
 				end
 			end,
 
-			default = function(node)
+			application = function(node)
 
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
