@@ -54,7 +54,7 @@ local function astToDot(ast)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-				
+
 				add(format(node, node.kind))
 				return true
 			end,
@@ -66,26 +66,26 @@ local function astToDot(ast)
 					add(format(node, node.kind .. "|" .. node[1]))
 				end
 			end,
-			
+
 			identifier = terminal,
 
 			named = function(node)
 
 				local uid,existed = getUID(node)
 				if existed then return false end
-				
+
 				local label = node.builtin and "builtin" or "named"
 				add(format(node, label .. "|" .. node.name))
 				return true
 			end,
-			
+
 			lambda = function(node)
-				
+
 				local uid,existed = getUID(node)
 				if existed then return false end
-				
+
 				local pattern = node[1]
-				
+
 				local label = "{lambda | {"
 				for i,v in ipairs(pattern) do
 					label = label .. "<arg" .. i .. "> " .. (v.kind == "named" and v.name or v[1])
@@ -94,34 +94,52 @@ local function astToDot(ast)
 					end
 				end
 				label = label .. "}}"
-				
+
 				add(format(node, label))
 				return true
 			end,
-			
+
 			pattern = function(node)
 				inPattern = true
 				return true
 			end,
-			
+
 			tuple = function(node)
 				local uid,existed = getUID(node)
 				if existed then return false end
-				
+
 				local label = "{tuple | {"
 				for i,v in ipairs(node) do
 					label = label .. "<arg" .. i .. "> " .. (v.kind == "number" and v[1] or "")
 					if i < #node then
 						label = label .. " | "
 					end
-					
+
 					if v.kind == "number" then
 						getUID(v)	-- cheat: pretend we drew this node already
 					end
 				end
 				label = label .. "}}"
-				
+
 				add(format(node, label))
+				return true
+			end,
+
+			application = function(node)
+
+				local uid,existed = getUID(node)
+				if existed then return false end
+
+				local left = node[1]
+
+				if left.kind == "named" and left.builtin then
+					local label = "{ application | " .. left.name .. " }"
+					getUID(left)	-- cheat: pretend we drew this already
+					add(format(node, label))
+				else
+					add(format(node, node.kind))
+				end
+
 				return true
 			end
 		},
@@ -129,10 +147,10 @@ local function astToDot(ast)
 		post =
 		{
 			default = function(node)
-				
+
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
-				
+
 				local thisUID = getUID(node)
 
 				if #node == 2 then
@@ -149,57 +167,57 @@ local function astToDot(ast)
 			identifier = function() end,
 
 			named = function(node)
-				
+
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
-				
+
 				if node[1] then
 					add(getUID(node) .. " -> " .. getUID(node[1]) .. ";")
 				end
-				
+
 				if node.lambda then
 					add(getUID(node) .. " -> " .. getUID(node.lambda) .. ":w [style=dotted];")
 				end
 			end,
-			
+
 			lambda = function(node)
-				
+
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
-				
+
 				local thisUID = getUID(node)
-				
+
 				-- skip the pattern node, make arrows directly from the args in the box
-				
+
 				local pattern = node[1]
 				for i,v in ipairs(pattern) do
 					if v.kind == "named" then
 						add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. " [style=bold];")
 					end
 				end
-				
+
 				-- link the expression
-				
+
 				add(thisUID .. ":se -> " .. getUID(node[2]) .. ";")
-				
+
 				-- and the possible back reference
-				
+
 				if node.lambda then
 					add(thisUID .. " -> " .. getUID(node.lambda) .. ":w [style=dotted];")
 				end
 			end,
-			
+
 			pattern = function()
 				inPattern = false
 			end,
-			
+
 			tuple = function(node)
-				
+
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
-				
+
 				local thisUID = getUID(node)
-				
+
 				for i,v in ipairs(node) do
 					if v.kind == "number" then
 						-- skip
@@ -207,6 +225,20 @@ local function astToDot(ast)
 						add(thisUID .. ":arg" .. i .. ":s -> " .. getUID(v) .. ";")
 					end
 				end
+			end,
+
+			default = function(node)
+
+				if drewLinks[node] then return end				
+				drewLinks[node] = true
+
+				local thisUID = getUID(node)
+
+				if not(node[1].kind == "named" and node[1].builtin) then
+					add(thisUID .. ":sw -> " .. getUID(node[1]) .. ";")
+				end
+
+				add(thisUID .. ":se -> " .. getUID(node[2]) .. ";")
 			end
 		}
 	}
