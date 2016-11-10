@@ -155,7 +155,7 @@ repeat = x -> (x, repeat x),
 divides = n -> eq 0 . mod n,
 divisors = n -> filter (divides n) < range 1 n,
 
-isPrime = n -> and (gte n 2) < none (divides n) < range 2 (sqrt n),
-primes = filter isPrime < upfrom 1
+isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte n 2),
+primes = upfrom 1 > filter isPrime
 
 in
