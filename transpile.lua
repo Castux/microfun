@@ -57,13 +57,32 @@ local function transpileAtomicPattern(pattern, value)
 	return res.dump()
 end
 
+local function transpilePattern(pattern, value)
+	
+	local res = builder()
+	
+	res.add "arg = reduce(arg)\n"
+	res.add("if type(arg) == 'table' and arg[1] == 'tup' and #arg == " .. (#pattern + 1) .. " then\n")
+	
+	for i,sub in ipairs(pattern) do
+		if sub.kind == "named" then
+			res.add("local " .. mangle(sub) .. " = arg[" .. i+1 .. "]\n")
+		else
+			error("Unsupported pattern")
+		end
+	end
+	res.indent("return(" .. value .. ")\n")
+	res.add "end\n"
+	return res.dump()
+end
+
 local function transpileLambda(lambda)
 
 	local pattern = lambda[1]
 	if #pattern == 1 then
 		return transpileAtomicPattern(pattern[1], transpile(lambda[2]))
 	else
-		error("Unsupported pattern:" .. utils.dumpExpr(pattern))
+		return transpilePattern(pattern, transpile(lambda[2]))
 	end
 
 end
