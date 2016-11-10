@@ -389,6 +389,22 @@ local function reduceBuiltin(node)
 
 	local left = node[1]
 
+	-- Super special builtins
+	
+	if left.name == "eval" or left.name == "show" then
+		
+		-- for eval, all is already done (reducing the expression)
+		-- for show, let's show
+		
+		if left.name == "show" then
+			print(utils.dumpExpr(node[2]))
+		end
+		
+		return true,node[2]
+	end
+	
+	-- Normal builtins
+
 	if left.arity == 1 then		
 		local right = node[2]		-- shouldn't need deref, names of numbers are reduced
 		if right.kind == "number" then
