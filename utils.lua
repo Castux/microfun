@@ -325,6 +325,11 @@ local function reverseLambdaRefs(root)
 		pre =
 		{
 			named = function(node)
+				
+				if not node[1] then
+					return false
+				end
+				
 				local lambda = node.lambda
 				if lambda then
 					res[lambda] = res[lambda] or {}
