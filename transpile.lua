@@ -41,7 +41,7 @@ local function transpileAtomicPattern(pattern, value)
 	local res = builder()
 
 	if pattern.kind == "named" then
-		res.add("local " .. mangle(pattern.name) .. " = arg\n")
+		res.add("local " .. mangle(pattern) .. " = arg\n")
 		res.add("do return (" .. value .. ") end\n")
 		
 	elseif pattern.kind == "number" then
