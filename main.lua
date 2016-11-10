@@ -8,6 +8,8 @@ local transpile = require "transpile"
 local prelude = io.open("prelude.mf"):read("*a")
 prelude = prelude .. io.open("tree.mf"):read("*a")
 
+prelude = ""
+
 local source = io.open("test.mf"):read("*a")
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
@@ -24,16 +26,19 @@ end
 
 local expr = analyzer.resolveScope(result)
 print(0, utils.dumpExpr(expr))
---dot.viewAst(expr, string.format("step%04d", 0))
+dot.viewAst(expr, string.format("step%04d", 0))
+
+---[[
 
 local res = transpile.transpile(expr)
-print("transpile result:", res)
+print(res)
 
-utils.writeFile("out.lua", "require 'runtime'\nprint(reduce(" .. res .. "))")
+utils.writeFile("out.lua", res)
 
 dofile "out.lua"
+--]]
 
---[[
+---[[
 
 local printAll = false
 
