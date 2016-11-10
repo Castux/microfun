@@ -8,7 +8,7 @@ local transpile = require "transpile"
 local prelude = io.open("prelude.mf"):read("*a")
 prelude = prelude .. io.open("tree.mf"):read("*a")
 
-prelude = ""
+--prelude = ""
 
 local source = io.open("test.mf"):read("*a")
 

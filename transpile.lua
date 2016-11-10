@@ -60,19 +60,35 @@ end
 local function transpilePattern(pattern, value)
 	
 	local res = builder()
+	local numifs = 0
 	
 	res.add "arg = reduce(arg)\n"
-	res.add("if type(arg) == 'table' and arg[1] == 'tup' and #arg == " .. (#pattern + 1) .. " then\n")
+	res.add("if type(arg) == 'table' and arg[1] == 'tup' and #arg == " .. (#pattern + 1) .. " then	-- tuple pattern\n")
 	
 	for i,sub in ipairs(pattern) do
+		local arg = "arg[" .. i + 1 .. "]"
+		
 		if sub.kind == "named" then
-			res.add("local " .. mangle(sub) .. " = arg[" .. i+1 .. "]\n")
+			res.add("local " .. mangle(sub) .. " = " .. arg .."\n")
+			
+		elseif sub.kind == "number" then
+			res.add(arg .. " = reduce(" .. arg .. ")\n")
+			res.add("if " .. arg .. " == " .. sub[1] .. " then\n")
+			
+			numifs = numifs + 1
 		else
 			error("Unsupported pattern")
 		end
 	end
+	
 	res.indent("return(" .. value .. ")\n")
-	res.add "end\n"
+	
+	for i = 1,numifs do
+		res.add "end\n"
+	end
+	
+	res.add "end -- tuple pattern\n"
+	
 	return res.dump()
 end
 
