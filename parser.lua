@@ -61,6 +61,45 @@ local function foldApplication(acc, val)
 	return {kind = "application", pos = acc.pos, acc, val}
 end
 
+local function foldGoesRight(list)
+	
+	if #list == 1 then
+		return list[1]
+	end
+	
+	local current = list[1]
+	
+	for i = 2,#list do
+		local left = list[i]
+		local node = {kind = "application", pos = left.pos, left, current}
+		current = node
+	end	
+	
+	return current
+end
+
+local function handleGoesLeft(node)
+	
+	if #node == 1 then
+		return node[1]
+	else
+		return node
+	end
+end
+
+local function handleCompose(node)
+	
+	if #node == 1 then
+		return node[1]
+	end
+	
+	local comp = {kind = "identifier", pos = node[1].pos, "compose"}
+	local left = {kind = "application", pos = comp.pos, comp, node[1]}
+	local top = {kind = "application", pos = comp.pos, left, node[2]}
+	
+	return top
+end
+
 local function commaSeparated(rule, ctx)
 	return rule * ws * ("," * ws * rule * ws) ^ 0
 end
@@ -98,9 +137,8 @@ local Grammar = lpeg.P {
 	Program = ws * V "Expr" * ws * expect( P(-1), "end of file"),
 
 	Expr = V "Let"
-		+ V "Application"
 		+ V "Lambda"
-		+ V "AtomicExpr",
+		+ V "GoesRight",
 
 	Let = rule("let",
 		P "let" * ws *
@@ -127,6 +165,14 @@ local Grammar = lpeg.P {
 		+ "(" * ws * commaSeparated(V "Name" + V "Constant", "identifier or number") ^ -1 * ws * ")"
 	),
 
+	GoesRight = Ct ( V "GoesLeft" * ws * ( P ">" * ws * V "GoesLeft" * ws ) ^ 0 ) / foldGoesRight,
+	
+	GoesLeft = rule("application", V "Composition" * ws * ( P "<" * ws * V "GoesLeft" * ws ) ^ -1) / handleGoesLeft,
+	
+	Composition = rule("composition", V "Composand" * ws * ( P "." * ws * V "Composition" * ws ) ^ -1) / handleCompose,
+	
+	Composand = V "Application" + V "AtomicExpr",
+	
 	Application = Cf( (V "AtomicExpr" * ws) ^ 2, foldApplication ),
 
 	AtomicExpr = V "Name"

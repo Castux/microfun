@@ -141,7 +141,7 @@ range = a -> b ->
 
 sort = [
 	() -> (),
-	(x,xs) -> concat (sort (filter (gt x) xs)) (x, sort (filter (lte x) xs))
+	(x,xs) -> concat (sort < filter (gt x) < xs) (x, sort < filter (lte x) < xs)
 ],
 
 -- Infinite lists
@@ -152,10 +152,10 @@ repeat = x -> (x, repeat x),
 
 -- Some arithmetics
 
-divides = n -> compose (eq 0) (mod n),
-divisors = n -> filter (divides n) (range 1 n),
+divides = n -> eq 0 . mod n,
+divisors = n -> filter (divides n) < range 1 n,
 
-isPrime = n -> and (gte n 2) (none (divides n) (range 2 (sqrt n))),
-primes = filter isPrime (upfrom 1)
+isPrime = n -> and (gte n 2) < none (divides n) < range 2 (sqrt n),
+primes = filter isPrime < upfrom 1
 
 in
