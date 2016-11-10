@@ -8,7 +8,7 @@ end
 
 local function isList(expr)
 	
-	if not (expr.kind == "tuple") then
+	if not (expr and expr.kind == "tuple") then
 		return false
 	end
 	

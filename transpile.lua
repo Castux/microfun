@@ -104,6 +104,16 @@ local transpileFuncs =
 
 	application = function(node)
 		return "{'app'," .. transpile(node[1]) .. "," .. transpile(node[2]) .. "}"
+	end,
+	
+	tuple = function(node)
+		local res = builder()
+		res.add "{'tup'"
+		for i,v in ipairs(node) do
+			res.add("," .. transpile(v))
+		end
+		res.add "}"
+		return res.dump()
 	end
 }
 
@@ -119,7 +129,7 @@ local function wrap(node)
 	res.add(transpileLocals(node))
 	res.add "local mf_source = "
 	res.add(transpile(node) .. "\n")
-	res.add "print(reduce(mf_source))\n"
+	res.add "show(reduce(mf_source, 'strict'))\n"
 		
 	return res.dump()
 end

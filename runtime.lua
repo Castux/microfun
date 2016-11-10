@@ -1,4 +1,4 @@
-function reduce(data)
+function reduce(data, strict)
 
 	while type(data) == "table" do
 
@@ -10,6 +10,14 @@ function reduce(data)
 			end
 
 			data = func(data[3])
+
+		elseif data[1] == "tup" then
+			if strict then
+				for i = 2,#data do
+					data[i] = reduce(data[i], strict)
+				end
+			end
+			break
 		end
 	end
 
@@ -69,4 +77,10 @@ for name,v in pairs(builtins) do
 		wrapBinary(name,v.func)
 	end
 
+end
+
+local serpent = require "serpent"
+
+function show(expr)
+	print(serpent.line(expr, {comment = false}))
 end
