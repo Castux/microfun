@@ -83,8 +83,41 @@ for name,v in pairs(builtins) do
 
 end
 
+local function isList(expr)
+
+	if expr == nil or type(expr) ~= "table" or expr[1] ~= "tup" then
+		return false
+	end
+
+	if #expr == 1 then
+		return true
+	end
+
+	if #expr == 3 then
+		return isList(expr[3])
+	end
+
+	return false
+end
+
 local serpent = require "serpent"
 
 function show(expr)
-	print(serpent.line(expr, {comment = false}))
+	if isList(expr) then
+		io.write "{"
+
+		while true and #expr > 1 do
+			show(expr[2])
+			if #expr[3] > 1 then
+				io.write ","
+				expr = expr[3]
+			else
+				break
+			end
+		end
+		io.write "}"
+	
+	else
+		io.write(serpent.line(expr, {comment = false}))
+	end
 end
