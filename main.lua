@@ -26,19 +26,19 @@ end
 
 local expr = analyzer.resolveScope(result)
 print(0, utils.dumpExpr(expr))
-dot.viewAst(expr, string.format("step%04d", 0))
+--dot.viewAst(expr, string.format("step%04d", 0))
 
 ---[[
 
 local res = transpile.transpile(expr)
-print(res)
+--print(res)
 
 utils.writeFile("out.lua", res)
 
 dofile "out.lua"
 --]]
 
----[[
+--[[
 
 local printAll = false
 

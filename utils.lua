@@ -316,6 +316,32 @@ local function dispatch(functions, node)
 	end
 end
 
+local function reverseLambdaRefs(root)
+
+	local res = {}
+
+	local funcs =
+	{
+		pre =
+		{
+			named = function(node)
+				local lambda = node.lambda
+				if lambda then
+					res[lambda] = res[lambda] or {}
+					table.insert(res[lambda], node)
+				else
+					res[root] = res[root] or {}
+					table.insert(res[root], node)
+				end
+				
+				return true
+			end
+		}
+	}
+	
+	traverse(root, funcs)
+	return res
+end
 
 return
 {
@@ -324,5 +350,6 @@ return
 	dumpExpr = dumpExpr,
 	writeFile = writeFile,
 	deref = deref,
-	dispatch = dispatch
+	dispatch = dispatch,
+	reverseLambdaRefs = reverseLambdaRefs
 }

@@ -1,4 +1,5 @@
 local utils = require "utils"
+local serpent = require "serpent"
 
 local function mangle(node)
 	return "mf_" .. node.name .. (node.localnum and "_" .. node.localnum or "")
@@ -13,27 +14,31 @@ local function builder()
 	t.add = function(str) table.insert(t, str) end
 	t.dump = function() return table.concat(t) end
 	t.indent = function(str) t.add(indent(str)) end
-	
+
 	return t
 end
 
 local transpile
+local lambdaRefs
 
 local function transpileLocals(node)
 
-	node.locals["@next"] = nil
+	local locals = lambdaRefs[node]
+	if locals then
+		local res = builder()
 
-	local res = builder()
+		for i,loc in ipairs(locals) do
+			res.add("local " .. mangle(loc) .. " = {'ref'}\n")
+		end
+
+		for i,loc in ipairs(locals) do
+			res.add(mangle(loc) .. "[2] = " .. transpile(loc[1]) .. "\n")
+		end
+
+		return res.dump()
+	end
 	
-	for loc,_ in pairs(node.locals) do
-		res.add("local " .. mangle(loc) .. " = {'ref'}\n")
-	end
-
-	for loc,_ in pairs(node.locals) do
-		res.add(mangle(loc) .. "[2] = " .. transpile(loc[1]) .. "\n")
-	end
-
-	return res.dump()
+	return ""
 end
 
 local function transpileAtomicPattern(pattern, value)
@@ -43,7 +48,7 @@ local function transpileAtomicPattern(pattern, value)
 	if pattern.kind == "named" then
 		res.add("local " .. mangle(pattern) .. " = arg\n")
 		res.add("do return (" .. value .. ") end\n")
-		
+
 	elseif pattern.kind == "number" then
 		res.add "arg = reduce(arg)\n"
 		res.add("if type(arg) == 'number' and arg == " .. pattern[1] .. " then\n")
@@ -58,37 +63,37 @@ local function transpileAtomicPattern(pattern, value)
 end
 
 local function transpilePattern(pattern, value)
-	
+
 	local res = builder()
 	local numifs = 0
-	
+
 	res.add "arg = reduce(arg)\n"
 	res.add("if type(arg) == 'table' and arg[1] == 'tup' and #arg == " .. (#pattern + 1) .. " then	-- tuple pattern\n")
-	
+
 	for i,sub in ipairs(pattern) do
 		local arg = "arg[" .. i + 1 .. "]"
-		
+
 		if sub.kind == "named" then
 			res.add("local " .. mangle(sub) .. " = " .. arg .."\n")
-			
+
 		elseif sub.kind == "number" then
 			res.add(arg .. " = reduce(" .. arg .. ")\n")
 			res.add("if " .. arg .. " == " .. sub[1] .. " then\n")
-			
+
 			numifs = numifs + 1
 		else
 			error("Unsupported pattern")
 		end
 	end
-	
+
 	res.indent("return(" .. value .. ")\n")
-	
+
 	for i = 1,numifs do
 		res.add "end\n"
 	end
-	
+
 	res.add "end -- tuple pattern\n"
-	
+
 	return res.dump()
 end
 
@@ -119,7 +124,7 @@ local transpileFuncs =
 		res.indent(transpileLambda(node))
 		res.indent "error('Could not match pattern')\n"
 		res.add("end\n")
-		
+
 		return res.dump()
 	end,
 
@@ -130,17 +135,17 @@ local transpileFuncs =
 		for i,lambda in ipairs(node) do
 			res.indent(transpileLambda(lambda))
 		end
-		
+
 		res.indent "error('Could not match pattern')\n"
 		res.add("end\n")
-		
+
 		return res.dump()
 	end,
 
 	application = function(node)
 		return "{'app'," .. transpile(node[1]) .. "," .. transpile(node[2]) .. "}"
 	end,
-	
+
 	tuple = function(node)
 		local res = builder()
 		res.add "{'tup'"
@@ -158,14 +163,15 @@ end
 
 local function wrap(node)
 
+	lambdaRefs = utils.reverseLambdaRefs(node)
 	local res = builder()
-	
+
 	res.add "require 'runtime'\n"
 	res.add(transpileLocals(node))
 	res.add "local mf_source = "
 	res.add(transpile(node) .. "\n")
 	res.add "show(reduce(mf_source, 'strict'))\n"
-		
+
 	return res.dump()
 end
 
