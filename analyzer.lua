@@ -580,6 +580,7 @@ end
 
 return
 {
+	builtins = builtins,
 	resolveScope = resolveScope,
 	reduce = reduceWrap
 }

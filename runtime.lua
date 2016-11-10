@@ -1,3 +1,5 @@
+local builtins = require "analyzer".builtins
+
 function reduce(data, strict)
 
 	while type(data) == "table" do
@@ -27,18 +29,6 @@ function reduce(data, strict)
 
 	return data
 end
-
-local builtins =
-{
-	add = {arity = 2, func = function(x,y) return x + y end},
-	mul = {arity = 2, func = function(x,y) return x * y end},
-	sub = {arity = 2, func = function(x,y) return x - y end},
-	div = {arity = 2, func = function(x,y) return math.floor(x / y) end},
-	mod = {arity = 2, func = function(x,y) return x % y end},
-	eq = {arity = 2, func = function(x,y) return x == y and 1 or 0 end},
-	lt = {arity = 2, func = function(x,y) return x < y and 1 or 0 end},
-	sqrt = {arity = 1, func = function(x) return math.floor(math.sqrt(x)) end}
-}
 
 local function wrapUnary(name, func)
 
