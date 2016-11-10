@@ -58,6 +58,26 @@ local function resolveScope(ast)
 		return nil
 	end
 
+	-- back references from lambdas to all locals
+	
+	local function newLocalTable()
+		local table = {}
+		setmetatable(table, { __mode = 'k' })
+		return table
+	end
+	
+	local globals = newLocalTable()
+	local function addLocal(node)
+		local lambda = node.lambda
+
+		if lambda then
+			lambda.locals = lambda.locals or newLocalTable()
+			lambda.locals[node] = true
+		else
+			globals[node] = true
+		end
+	end
+
 	local funcTable =
 	{
 		pre =
@@ -78,6 +98,7 @@ local function resolveScope(ast)
 					end
 
 					local newNode = {kind = "named", name = id, lambda = lookupLambda()}
+					addLocal(newNode)
 
 					names[id] = newNode
 				end
@@ -173,11 +194,16 @@ local function resolveScope(ast)
 		}
 	}
 
-	return utils.traverse(ast, funcTable)
+	local bound = utils.traverse(ast, funcTable)
+	bound.locals = globals
+	
+	collectgarbage()
+	
+	return bound
 end
 
 local function matchAtomic(atom, expr, names)
-	
+
 	if atom.kind == "number" then
 
 		if expr.kind == "number" then
@@ -209,14 +235,14 @@ local function tryMatch(lambda, expr)
 
 	local pattern = lambda[1]
 	local names = {}
-	
+
 	expr = utils.deref(expr)
-	
+
 	if #pattern == 1 then
-		
+
 		local res = matchAtomic(pattern[1], expr, names)
 		return res, names
-		
+
 	else
 		-- the tuple case
 		if expr.kind == "tuple" then
@@ -226,20 +252,20 @@ local function tryMatch(lambda, expr)
 			if #pattern ~= #expr then
 				return false
 			end
-			
+
 			-- and if all subs match
-			
+
 			for i,v in ipairs(pattern) do
 				local res = matchAtomic(pattern[i], expr[i], names)
-				
+
 				if res == "reduce" then
 					return "reduce"
 				elseif not res then
 					return false
 				end
-				
+
 			end
-			
+
 			-- all matched! return the combined name table
 			return true, names
 
@@ -321,15 +347,15 @@ local function instantiate(lambda, values)
 	end
 
 	-- remove references to the lambda
-	
+
 	local visited = {}
 
 	funcTable = { pre = {
 			default = function(node)
-				
+
 				if visited[node] then return false end
 				visited[node] = true
-				
+
 				if node.lambda == clone then
 					node.lambda = nil
 				end
@@ -337,15 +363,15 @@ local function instantiate(lambda, values)
 			end,
 
 			named = function(node)
-				
+
 				if visited[node] then return false end
 				visited[node] = true
-				
+
 				if node.lambda == clone then
 					node.lambda = nil
 					node.wasparam = true
 				end
-				
+
 				return isInScope(clone, node)
 			end
 		}}
@@ -462,11 +488,11 @@ local reduceFuncs =
 			node[1] = newchild
 			return true,node
 		end
-		
+
 		child.oldname = node.name
-		
+
 		-- Replace with child
-		
+
 		return true,child
 	end,
 
@@ -502,7 +528,7 @@ local reduceFuncs =
 				return true,node
 			end
 		end
-				
+
 		-- Builtin case
 
 		if left.builtin then
@@ -514,7 +540,7 @@ local reduceFuncs =
 		end
 
 		-- Check that it *is* a function
-		
+
 		if not(left.kind == "lambda" or left.kind == "multilambda") then
 			error("Cannot apply as function: " .. utils.dumpExpr(left))
 		end

@@ -1,6 +1,24 @@
 local utils = require "utils"
 
+local function mangle(name)
+	return "mf_" .. name
+end
+
 local transpile
+
+local function transpileLocals(node)
+	
+	local res = ""
+	for loc,_ in pairs(node.locals) do
+		res = res .. "local " .. mangle(loc.name) .. ";"
+	end
+	
+	for loc,_ in pairs(node.locals) do
+		res = res .. mangle(loc.name) .. " = " .. transpile(loc[1]) .. ";"
+	end
+	
+	return res
+end
 
 local transpileFuncs =
 {
@@ -9,7 +27,7 @@ local transpileFuncs =
 	end,
 	
 	named = function(node)
-		return node.name
+		return node.builtin and node.name or mangle(node.name)
 	end,
 	
 	lambda = function(node)
@@ -19,7 +37,7 @@ local transpileFuncs =
 		if #pattern == 1 then
 			
 			if pattern[1].kind == "named" then
-				res = res .. "local " .. pattern[1].name .. " = arg;"
+				res = res .. "local " .. mangle(pattern[1].name) .. " = arg;"
 			else
 				error("Unsupported pattern")
 			end
@@ -40,7 +58,21 @@ local transpileFuncs =
 
 transpile = function(node)
 	
-	return utils.dispatch(transpileFuncs, node)
+	local res = ""
+	
+	if node.locals then
+		res = res .. "(function()"
+		res = res .. transpileLocals(node)
+		res = res .. "return("
+	end
+	
+	res = res .. utils.dispatch(transpileFuncs, node)
+	
+	if node.locals then
+		res = res .. ")end)()"
+	end
+	
+	return res
 end
 
 
