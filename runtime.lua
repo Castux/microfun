@@ -18,6 +18,10 @@ function reduce(data, strict)
 				end
 			end
 			break
+
+		elseif data[1] == "ref" then
+			data = data[2]
+
 		end
 	end
 

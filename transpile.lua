@@ -26,11 +26,11 @@ local function transpileLocals(node)
 	local res = builder()
 	
 	for loc,_ in pairs(node.locals) do
-		res.add("local " .. mangle(loc) .. "\n")
+		res.add("local " .. mangle(loc) .. " = {'ref'}\n")
 	end
 
 	for loc,_ in pairs(node.locals) do
-		res.add(mangle(loc) .. " = " .. transpile(loc[1]) .. "\n")
+		res.add(mangle(loc) .. "[2] = " .. transpile(loc[1]) .. "\n")
 	end
 
 	return res.dump()
