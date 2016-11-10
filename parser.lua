@@ -178,7 +178,8 @@ local Grammar = lpeg.P {
 	AtomicExpr = V "Name"
 		+ V "Constant"
 		+ V "ParensExprList"
-		+ V "MultiLambda",
+		+ V "MultiLambda"
+		+ V "List",
 
 	ParensExprList = rule("parensexprlist",
 		"(" * ws *
@@ -191,6 +192,16 @@ local Grammar = lpeg.P {
 		commaSeparated(V "Lambda", "lambda") * ws *
 		expectP "]"
 	),
+	
+	ListContent = rule("tuple", ( V "Expr" * ws * ( "," * ws * V "ListContent" * ws ) ^-1 * ws ) ^-1 ) / function(node)
+		if #node == 1 then
+			node[2] = {kind = "tuple", pos = node[1].pos}
+		end
+		
+		return node
+	end,	
+	
+	List = P "{" * ws * V "ListContent" * ws * expectP "}"
 }
 
 return Grammar
