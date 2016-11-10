@@ -348,6 +348,19 @@ local function reverseLambdaRefs(root)
 	return res
 end
 
+local function indent(str)
+	return '\t' .. str:gsub('\n(.)', '\n\t%1')
+end
+
+local function builder()
+	local t = {}
+	t.add = function(str) table.insert(t, str) end
+	t.dump = function() return table.concat(t) end
+	t.indent = function(str) t.add(indent(str)) end
+
+	return t
+end
+
 return
 {
 	traverse = traverse,
@@ -356,5 +369,7 @@ return
 	writeFile = writeFile,
 	deref = deref,
 	dispatch = dispatch,
-	reverseLambdaRefs = reverseLambdaRefs
+	reverseLambdaRefs = reverseLambdaRefs,
+	indent = indent,
+	builder = builder
 }

@@ -1,4 +1,6 @@
 local builtins = require "analyzer".builtins
+local builder = require "utils".builder
+
 
 function reduce(data, strict)
 
@@ -92,45 +94,53 @@ local function isList(expr)
 end
 
 function eval(expr)
-	
+
 	return reduce(expr, "strict")
 end
 
-function show(expr)
+local function dump(expr)
 
-	expr = reduce(expr, "strict")
+	local out = builder()
 
 	if isList(expr) then
-		io.write "{"
+		out.add "{"
 
 		while true and #expr > 1 do
-			show(expr[2])
+			out.add(dump(expr[2]))
 			if #expr[3] > 1 then
-				io.write ","
+				out.add ","
 				expr = expr[3]
 			else
 				break
 			end
 		end
-		io.write "}"
+		out.add "}"
 
 	elseif type(expr) == "function" then
-		io.write("<function>")
+		out.add "<function>"
 
 	elseif type(expr) == "number" then
-		io.write(expr)
+		out.add(expr)
 	elseif type(expr) == "table" and expr[1] == "tup" then
-		io.write "("
+		out.add "("
 		for i = 2,#expr do
-			show(expr[i])
+			out.add(dump(expr[i]))
 			if i < #expr then
-				io.write ","
+				out.add ","
 			end
 		end
-		io.write ")"
+		out.add ")"
 	else
-		io.write "???"
+		out.add "???"
 	end
+
+	return out.dump()	
+end
+
+function show(expr)
+
+	expr = reduce(expr, "strict")
+	print(dump(expr))
 
 	return expr
 end
