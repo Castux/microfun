@@ -7,19 +7,19 @@ local function deref(node)
 end
 
 local function isList(expr)
-	
+
 	if not (expr and expr.kind == "tuple") then
 		return false
 	end
-	
+
 	if #expr == 0 then
 		return true
 	end
-	
+
 	if #expr == 2 then
 		return isList(expr[2])
 	end
-	
+
 	return false
 end
 
@@ -131,11 +131,12 @@ end
 local recnames = {}
 
 local function dumpExpr(ast)
-	
+
+
 	if isList(ast) then
 		local res = "{"
-		 
-		while true do
+
+		while true and #ast > 0 do
 			res = res .. dumpExpr(ast[1])
 			if #ast[2] > 0 then
 				res = res .. ","
@@ -147,10 +148,11 @@ local function dumpExpr(ast)
 		return res .. "}"
 	end
 
+
 	local visited = {}
 
 	local function dumpRec(ast)
-		
+
 		if visited[ast] then return ast.name or "!!!" end
 		visited[ast] = true
 
@@ -215,21 +217,21 @@ local function dumpExpr(ast)
 				number = function(node) add(node[1]) end,
 
 				named = function(node)
-					
+
 					if not node[1] then
 						add(node.name .. (node.builtin and "*" or ""))
 						return
 					end
-					
+
 					if node[1].kind == "lambda" or node[1].kind == "multilambda" then
 						add(node.name)
 						return
 					end
-					
+
 					if node.wasparam then
 						return true
 					end
-					
+
 					add(node.name)
 					recnames[node] = (recnames[node] or 0) + 1
 
@@ -271,19 +273,19 @@ local function dumpExpr(ast)
 				end,
 
 				named = function(node)
-					
+
 					if not node[1] then
 						return
 					end
-					
+
 					if node[1].kind == "lambda" or node[1].kind == "multilambda" then
 						return
 					end
-					
+
 					if node.wasparam then
 						return
 					end
-					
+
 					if node[1] and recnames[node] == 1 then
 						add "}"
 					end
@@ -296,7 +298,7 @@ local function dumpExpr(ast)
 
 		return table.concat(res)
 	end
-	
+
 	return dumpRec(ast)
 end
 

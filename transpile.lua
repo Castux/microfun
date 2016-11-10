@@ -63,7 +63,7 @@ local function transpileLambda(lambda)
 	if #pattern == 1 then
 		return transpileAtomicPattern(pattern[1], transpile(lambda[2]))
 	else
-		error("Unsupported pattern")
+		error("Unsupported pattern:" .. utils.dumpExpr(pattern))
 	end
 
 end
