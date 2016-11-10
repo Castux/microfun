@@ -1,5 +1,8 @@
-let double = x -> add x x
+let fact = [
+	1 -> 1,
+	n -> mul n (fact (pred n))
+]
 
 in
 
-show (take 40 primes)
+show (fact 10)
