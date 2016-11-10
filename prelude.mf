@@ -7,6 +7,8 @@ compose = f -> g -> x -> f (g x),
 flip = f -> x -> y -> f y x,
 apply = f -> x -> f x,
 match = flip apply,
+curry = f -> x -> y -> f (x,y),
+uncurry = f -> (x,y) -> f x y,
 
 -- Numbers
 -- builtin: add, mul, sub, div, mod, sqrt
