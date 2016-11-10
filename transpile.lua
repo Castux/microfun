@@ -41,13 +41,16 @@ local function transpileLocals(node)
 	return ""
 end
 
-local function transpileAtomicPattern(pattern, value)
+local function transpileAtomicPattern(pattern, value, lambda)
 
 	local res = builder()
 
 	if pattern.kind == "named" then
 		res.add("local " .. mangle(pattern) .. " = arg\n")
-		res.add("do return (" .. value .. ") end\n")
+		res.add("do\n")
+		res.indent(transpileLocals(lambda))
+		res.indent("return (" .. value .. ")\n")
+		res.add "end\n"
 
 	elseif pattern.kind == "number" then
 		res.add "arg = reduce(arg)\n"
@@ -62,7 +65,7 @@ local function transpileAtomicPattern(pattern, value)
 	return res.dump()
 end
 
-local function transpilePattern(pattern, value)
+local function transpilePattern(pattern, value, lambda)
 
 	local res = builder()
 	local numifs = 0
@@ -86,7 +89,10 @@ local function transpilePattern(pattern, value)
 		end
 	end
 
+	res.indent "do\n"
+	res.indent(transpileLocals(lambda))
 	res.indent("return(" .. value .. ")\n")
+	res.indent "end\n"
 
 	for i = 1,numifs do
 		res.add "end\n"
@@ -101,9 +107,9 @@ local function transpileLambda(lambda)
 
 	local pattern = lambda[1]
 	if #pattern == 1 then
-		return transpileAtomicPattern(pattern[1], transpile(lambda[2]))
+		return transpileAtomicPattern(pattern[1], transpile(lambda[2]), lambda)
 	else
-		return transpilePattern(pattern, transpile(lambda[2]))
+		return transpilePattern(pattern, transpile(lambda[2]), lambda)
 	end
 
 end
@@ -131,6 +137,7 @@ local transpileFuncs =
 	multilambda = function(node)
 		local res = builder()
 		res.add "function(arg)\n"
+		res.indent(transpileLocals(node))
 
 		for i,lambda in ipairs(node) do
 			res.indent(transpileLambda(lambda))
