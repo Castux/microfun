@@ -1,7 +1,7 @@
 local utils = require "utils"
 
-local function mangle(name)
-	return "mf_" .. name
+local function mangle(node)
+	return "mf_" .. node.name .. (node.localnum and "_" .. node.localnum or "")
 end
 
 local function indent(str)
@@ -21,14 +21,16 @@ local transpile
 
 local function transpileLocals(node)
 
+	node.locals["@next"] = nil
+
 	local res = builder()
 	
 	for loc,_ in pairs(node.locals) do
-		res.add("local " .. mangle(loc.name) .. "\n")
+		res.add("local " .. mangle(loc) .. "\n")
 	end
 
 	for loc,_ in pairs(node.locals) do
-		res.add(mangle(loc.name) .. " = " .. transpile(loc[1]) .. "\n")
+		res.add(mangle(loc) .. " = " .. transpile(loc[1]) .. "\n")
 	end
 
 	return res.dump()
@@ -73,7 +75,7 @@ local transpileFuncs =
 	end,
 
 	named = function(node)
-		return node.builtin and node.name or mangle(node.name)
+		return node.builtin and node.name or mangle(node)
 	end,
 
 	lambda = function(node)

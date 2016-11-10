@@ -59,23 +59,26 @@ local function resolveScope(ast)
 	end
 
 	-- back references from lambdas to all locals
-	
+
 	local function newLocalTable()
 		local table = {}
+		table["@next"] = 0
 		setmetatable(table, { __mode = 'k' })
 		return table
 	end
-	
+
 	local globals = newLocalTable()
 	local function addLocal(node)
 		local lambda = node.lambda
-
 		if lambda then
 			lambda.locals = lambda.locals or newLocalTable()
-			lambda.locals[node] = true
-		else
-			globals[node] = true
 		end
+
+		local table = lambda and lambda.locals or globals
+
+		table[node] = true
+		node.localnum = table["@next"]
+		table["@next"] = table["@next"] + 1
 	end
 
 	local funcTable =
@@ -196,9 +199,9 @@ local function resolveScope(ast)
 
 	local bound = utils.traverse(ast, funcTable)
 	bound.locals = globals
-	
+
 	collectgarbage()
-	
+
 	return bound
 end
 
