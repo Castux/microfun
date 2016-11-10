@@ -1,3 +1,5 @@
-let ones = (1,ones) in
+let double = x -> add x x
 
-take 100 ones
+in
+
+show (take 40 primes)

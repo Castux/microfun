@@ -65,12 +65,13 @@ end
 
 for name,v in pairs(builtins) do
 
-	if v.arity == 1 then
-		wrapUnary(name,v.func)
-	else
-		wrapBinary(name,v.func)
+	if v.func then
+		if v.arity == 1 then
+			wrapUnary(name,v.func)
+		else
+			wrapBinary(name,v.func)
+		end
 	end
-
 end
 
 local function isList(expr)
@@ -90,9 +91,15 @@ local function isList(expr)
 	return false
 end
 
-local serpent = require "serpent"
+function eval(expr)
+	
+	return reduce(expr, "strict")
+end
 
 function show(expr)
+
+	expr = reduce(expr, "strict")
+
 	if isList(expr) then
 		io.write "{"
 
@@ -106,8 +113,24 @@ function show(expr)
 			end
 		end
 		io.write "}"
-	
+
+	elseif type(expr) == "function" then
+		io.write("<function>")
+
+	elseif type(expr) == "number" then
+		io.write(expr)
+	elseif type(expr) == "table" and expr[1] == "tup" then
+		io.write "("
+		for i = 2,#expr do
+			show(expr[i])
+			if i < #expr then
+				io.write ","
+			end
+		end
+		io.write ")"
 	else
-		io.write(serpent.line(expr, {comment = false}))
+		io.write "???"
 	end
+
+	return expr
 end

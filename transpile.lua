@@ -175,7 +175,7 @@ local function wrap(node)
 	res.add(transpileLocals(node))
 	res.add "local mf_source = "
 	res.add(transpile(node) .. "\n")
-	res.add "show(reduce(mf_source, 'strict'))\n"
+	res.add "reduce(mf_source)\n"
 
 	return res.dump()
 end
