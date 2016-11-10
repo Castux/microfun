@@ -48,16 +48,14 @@ local function transpileAtomicPattern(pattern, lambda)
 
 	if pattern.kind == "named" then
 		res.add("local " .. mangle(pattern) .. " = arg\n")
-		res.add("do\n")
-		res.indent(transpileLocals(lambda))
-		res.indent("return (" .. value .. ")\n")
-		res.add "end\n"
+		res.add("do ")
+		res.add(transpileLocals(lambda))
+		res.add("return (" .. indent(value) .. ") end\n")
 
 	elseif pattern.kind == "number" then
 		res.add "arg = reduce(arg)\n"
 		res.add("if type(arg) == 'number' and arg == " .. pattern[1] .. " then\n")
-		res.indent("return(" .. value .. ")\n")
-		res.add "end\n"
+		res.indent("return (" .. value .. ") end\n")
 
 	else
 		error("Unsupported pattern")
@@ -90,10 +88,9 @@ local function transpilePattern(pattern, lambda)
 		end
 	end
 
-	res.indent "do\n"
+	res.indent "do "
 	res.indent(transpileLocals(lambda))
-	res.indent("return(" .. transpile(lambda[2]) .. ")\n")
-	res.indent "end\n"
+	res.indent("return (" .. transpile(lambda[2]) .. ") end\n")
 
 	for i = 1,numifs do
 		res.add "end\n"
