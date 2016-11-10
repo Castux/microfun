@@ -5,10 +5,9 @@ let
 id = x -> x,
 compose = f -> g -> x -> f (g x),
 flip = f -> x -> y -> f y x,
-apply = f -> x -> f x,
-match = flip apply,
 curry = f -> x -> y -> f (x,y),
 uncurry = f -> (x,y) -> f x y,
+const = c -> x -> c,
 
 -- Numbers
 -- builtin: add, mul, sub, div, mod, sqrt
@@ -22,7 +21,7 @@ min = a -> b -> if (lt a b) a b,
 
 -- Booleans
 
-if = cond -> t -> f -> [ 1 -> t, 0 -> f ] cond,
+if = cond -> t -> f -> cond > [ 1 -> t, 0 -> f ],
 
 and = a -> b -> if a b 0,
 or = a -> b -> if a 1 b,
