@@ -10,6 +10,8 @@ prelude = prelude .. io.open("tree.mf"):read("*a")
 
 local source = io.open("test.mf"):read("*a")
 local interpreter = false
+local debug = false
+local withDot = true
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -19,6 +21,12 @@ if not success then
 end
 
 local expr = analyzer.resolveScope(result)
+if debug then
+	print("init", utils.dumpExpr(expr))
+	if withDot then
+		dot.viewAst(expr, "init")
+	end
+end
 
 if interpreter then
 
@@ -26,6 +34,13 @@ if interpreter then
 
 		local reduced,newexpr = analyzer.reduce(expr)
 		expr = newexpr
+		
+		if debug then
+			print("step", utils.dumpExpr(expr))
+			if withDot then
+				dot.viewAst(expr, string.format("%04d", step), "ignoreNamedLambdas")
+			end
+		end
 
 		if not reduced then
 			break
