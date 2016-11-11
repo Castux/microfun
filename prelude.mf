@@ -155,6 +155,7 @@ divides = n -> eq 0 . mod n,
 divisors = n -> filter (divides n) < range 1 n,
 
 isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte n 2),
-primes = upfrom 1 > filter isPrime
+primes = upfrom 1 > filter isPrime,
+fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci))
 
 in

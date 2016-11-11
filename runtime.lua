@@ -93,8 +93,12 @@ function reduce(data, strict)
 				if type(func) ~= "function" then
 					error("Cannot apply non-function: " .. dump(func))
 				end
-
+				
+				-- save the result, and some memory
 				data.result = func(data[3])
+				data[2] = nil
+				data[3] = nil
+				
 				data = data.result
 			end
 
