@@ -50,6 +50,11 @@ if interpreter then
 else
 	
 	local res = transpile.transpile(expr)
+	
+	if debug then
+		utils.writeFile("out.lua", res)
+	end
+	
 	local chunk = loadstring(res)
 	assert(chunk)
 	
