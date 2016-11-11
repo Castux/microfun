@@ -18,7 +18,16 @@ local function isList(expr)
 	return false
 end
 
+local recguard = {}
+setmetatable(recguard, {__mode = 'k'})
+
 local function dump(expr)
+	
+	if recguard[expr] then
+		return recguard[expr]
+	end
+	
+	recguard[expr] = "rec"
 
 	local out = builder()
 
@@ -61,10 +70,13 @@ local function dump(expr)
 	elseif type(expr) == "table" and expr[1] == "ref" then
 		out.add(dump(expr[2]))
 	else
-		out.add("??? " .. tostring(expr)) 
+		error("Undumpable expression")
 	end
+	
+	out = out.dump()
+	recguard[expr] = out
 
-	return out.dump()	
+	return out
 end
 
 function reduce(data, strict)
@@ -72,22 +84,20 @@ function reduce(data, strict)
 	while type(data) == "table" do
 
 		if data[1] == "app" then
-			
-			if data.seen then
-				print("Heeeey we're seeing this again: " .. dump(data[2]))
-			end
-			
-			data.seen = true
 
-			local func = reduce(data[2])
-			data[2] = func 	-- memoize
-			if type(func) ~= "function" then
-				error("Cannot apply non-function: " .. dump(func))
+			if data.result then
+				data = data.result
+			else
+
+				local func = reduce(data[2])
+				if type(func) ~= "function" then
+					error("Cannot apply non-function: " .. dump(func))
+				end
+
+				data.result = func(data[3])
+				data = data.result
 			end
 
-			data.memo = func(data[3])
-			data = data.memo
-	
 		elseif data[1] == "tup" then
 			if strict then
 				for i = 2,#data do
@@ -97,7 +107,7 @@ function reduce(data, strict)
 			break
 
 		elseif data[1] == "ref" then
-			data[2] = reduce(data[2])	-- make sure to memoize results!
+			data[2] = reduce(data[2])
 			data = data[2]
 		end
 	end
