@@ -1,20 +1,93 @@
 local builtins = require "analyzer".builtins
 local builder = require "utils".builder
 
+local function isList(expr)
+
+	if expr == nil or type(expr) ~= "table" or expr[1] ~= "tup" then
+		return false
+	end
+
+	if #expr == 1 then
+		return true
+	end
+
+	if #expr == 3 then
+		return isList(expr[3])
+	end
+
+	return false
+end
+
+local function dump(expr)
+
+	local out = builder()
+
+	if isList(expr) then
+		out.add "{"
+
+		while true and #expr > 1 do
+			out.add(dump(expr[2]))
+			if #expr[3] > 1 then
+				out.add ","
+				expr = expr[3]
+			else
+				break
+			end
+		end
+		out.add "}"
+
+	elseif type(expr) == "function" then
+		out.add "*"
+
+	elseif type(expr) == "number" then
+		out.add(expr)
+	elseif type(expr) == "table" and expr[1] == "tup" then
+		out.add "("
+		for i = 2,#expr do
+			out.add(dump(expr[i]))
+			if i < #expr then
+				out.add ","
+			end
+		end
+		out.add ")"
+
+	elseif type(expr) == "table" and expr[1] == "app" then
+		out.add "("
+		out.add(dump(expr[2]))
+		out.add " "
+		out.add(dump(expr[3]))
+		out.add ")"
+
+	elseif type(expr) == "table" and expr[1] == "ref" then
+		out.add(dump(expr[2]))
+	else
+		out.add("??? " .. tostring(expr)) 
+	end
+
+	return out.dump()	
+end
 
 function reduce(data, strict)
 
 	while type(data) == "table" do
 
 		if data[1] == "app" then
+			
+			if data.seen then
+				print("Heeeey we're seeing this again: " .. dump(data[2]))
+			end
+			
+			data.seen = true
 
 			local func = reduce(data[2])
+			data[2] = func 	-- memoize
 			if type(func) ~= "function" then
-				error("Cannot apply non-function: " .. tostring(func))
+				error("Cannot apply non-function: " .. dump(func))
 			end
 
-			data = func(data[3])
-
+			data.memo = func(data[3])
+			data = data.memo
+	
 		elseif data[1] == "tup" then
 			if strict then
 				for i = 2,#data do
@@ -24,8 +97,8 @@ function reduce(data, strict)
 			break
 
 		elseif data[1] == "ref" then
+			data[2] = reduce(data[2])	-- make sure to memoize results!
 			data = data[2]
-
 		end
 	end
 
@@ -76,69 +149,11 @@ for name,v in pairs(builtins) do
 	end
 end
 
-local function isList(expr)
-
-	if expr == nil or type(expr) ~= "table" or expr[1] ~= "tup" then
-		return false
-	end
-
-	if #expr == 1 then
-		return true
-	end
-
-	if #expr == 3 then
-		return isList(expr[3])
-	end
-
-	return false
-end
-
 function eval(expr)
-
 	return reduce(expr, "strict")
 end
 
-local function dump(expr)
-
-	local out = builder()
-
-	if isList(expr) then
-		out.add "{"
-
-		while true and #expr > 1 do
-			out.add(dump(expr[2]))
-			if #expr[3] > 1 then
-				out.add ","
-				expr = expr[3]
-			else
-				break
-			end
-		end
-		out.add "}"
-
-	elseif type(expr) == "function" then
-		out.add "<function>"
-
-	elseif type(expr) == "number" then
-		out.add(expr)
-	elseif type(expr) == "table" and expr[1] == "tup" then
-		out.add "("
-		for i = 2,#expr do
-			out.add(dump(expr[i]))
-			if i < #expr then
-				out.add ","
-			end
-		end
-		out.add ")"
-	else
-		out.add "???"
-	end
-
-	return out.dump()	
-end
-
 function show(expr)
-
 	expr = reduce(expr, "strict")
 	print(dump(expr))
 
