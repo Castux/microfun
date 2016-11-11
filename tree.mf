@@ -13,7 +13,8 @@ treeFold = f -> i -> [
 	(e,l,r) -> f e (treeFold f i l) (treeFold f i r)
 ],
 
-treeSize = treeFold (e -> l -> r -> add 1 (add l r)) 0,
+treeSize = treeFold (e -> l -> r -> succ (add l r)) 0,
+treeHeight = treeFold (x -> l -> r -> succ (max l r)) 0,
 treeToList = treeFold (e -> l -> r -> concat l (e, r)) (),
 treeMap = f -> treeFold (e -> l -> r -> tree (f e) l r) (),
 
