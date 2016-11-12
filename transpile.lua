@@ -1,5 +1,5 @@
 local utils = require "utils"
-local serpent = require "serpent"
+local builtins = require "analyzer".builtins
 
 local indent = utils.indent
 local builder = utils.builder
@@ -27,7 +27,7 @@ local function transpileLocals(node)
 
 		return res.dump()
 	end
-	
+
 	return ""
 end
 
@@ -138,7 +138,12 @@ local transpileFuncs =
 	end,
 
 	application = function(node)
-		return "{'app'," .. transpile(node[1]) .. "," .. transpile(node[2]) .. "}"
+
+		if node[1].builtin then
+			return node[1].name .. "(" .. transpile(node[2]) .. ")"
+		else
+			return "{'app'," .. transpile(node[1]) .. "," .. transpile(node[2]) .. "}"
+		end
 	end,
 
 	tuple = function(node)
@@ -163,9 +168,8 @@ local function wrap(node)
 
 	res.add "require 'runtime'\n"
 	res.add(transpileLocals(node))
-	res.add "local mf_source = "
+	res.add "local mf_root = "
 	res.add(transpile(node) .. "\n")
-	res.add "reduce(mf_source)\n"
 
 	return res.dump()
 end

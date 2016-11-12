@@ -79,7 +79,7 @@ local function dump(expr)
 	return out
 end
 
-function reduce(data, strict)
+function reduce(data, recurseTuples)
 
 	while type(data) == "table" do
 
@@ -103,9 +103,9 @@ function reduce(data, strict)
 			end
 
 		elseif data[1] == "tup" then
-			if strict then
+			if recurseTuples then
 				for i = 2,#data do
-					data[i] = reduce(data[i], strict)
+					data[i] = reduce(data[i], recurseTuples)
 				end
 			end
 			break
@@ -164,11 +164,11 @@ for name,v in pairs(builtins) do
 end
 
 function eval(expr)
-	return reduce(expr, "strict")
+	return reduce(expr, "recurseTuples")
 end
 
 function show(expr)
-	expr = reduce(expr, "strict")
+	expr = reduce(expr, "recurseTuples")
 	print(dump(expr))
 
 	return expr
