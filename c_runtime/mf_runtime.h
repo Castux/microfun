@@ -1,16 +1,6 @@
 #ifndef _MF_RUNTIME_H
 #define _MF_RUNTIME_H
 
-struct mf_app_struct;
-typedef struct mf_app_struct *mf_app;
-
-struct mf_value_struct;
-typedef struct mf_value_struct mf_value;
-
-typedef mf_value *mf_tuple;
-
-typedef void (*mf_func) (void);
-
 typedef enum
 {
 	TAG_NUMBER = -3,
@@ -19,28 +9,41 @@ typedef enum
 	TAG_TUPLE = 0	// Uses length of tuple here!
 } mf_tag;
 
-struct mf_value_struct
+typedef struct
 {
 	mf_tag tag;
-	union
-	{
-		long int	number;
-		mf_func		func;
-		mf_app		app;
-		mf_tuple	tuple;		
-	};
-};
+} *mf_value;
 
-struct mf_app_struct
+typedef struct
 {
+	mf_tag tag;
+	long int number;
+} mf_number;
+
+typedef struct
+{
+	mf_tag tag;
 	mf_value func;
 	mf_value arg;
-};
+} mf_app;
+
+typedef struct
+{
+	mf_tag tag;
+	void (*func)(void);
+} mf_func;
+
+typedef struct
+{
+	mf_tag tag;
+	mf_value tuple[];
+} mf_tuple;
+
 
 mf_value make_number(long int number);
-mf_value make_func(mf_func func);
+mf_value make_func(void (*func)(void));
 mf_value make_app(mf_value func, mf_value arg);
-mf_value make_tuple(int length);
+mf_tuple *make_tuple(int length);
 
 void init(int size);
 void push(mf_value value);

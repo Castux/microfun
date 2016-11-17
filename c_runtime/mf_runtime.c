@@ -6,41 +6,37 @@
 
 mf_value make_number(long int number)
 {
-	mf_value value;
-	value.tag = TAG_NUMBER;
-
-	value.number = number;
-	return value;
+	mf_number *value = GC_MALLOC(sizeof(mf_number));
+	value->tag = TAG_NUMBER;
+	value->number = number;
+	
+	return (mf_value) value;
 }
 
-mf_value make_func(mf_func func)
+mf_value make_func(void (*func)(void))
 {
-	mf_value value;
-	value.tag = TAG_FUNC;
-
-	value.func = func;
-	return value;
+	mf_func *value = GC_MALLOC(sizeof(mf_func));
+	value->tag = TAG_FUNC;
+	value->func = func;
+	
+	return (mf_value) value;
 }
 
 mf_value make_app(mf_value func, mf_value arg)
 {
-	mf_value value;
-	value.tag = TAG_FUNC;
+	mf_app *value = GC_MALLOC(sizeof(mf_app));
+	value->tag = TAG_APP;
+	value->func = func;
+	value->arg = arg;
 
-	value.app = GC_MALLOC(sizeof(struct mf_app_struct));
-	value.app->func = func;
-	value.app->arg = arg;
-
-	return value;
+	return (mf_value) value;
 }
 
-mf_value make_tuple(int length)
+mf_tuple *make_tuple(int length)
 {
-	mf_value value;
-	value.tag = length;
-
-	value.tuple = GC_MALLOC(length * sizeof(mf_value));
-
+	mf_tuple *value = GC_MALLOC(sizeof(mf_tuple) + sizeof(mf_value[length]));
+	value->tag = length;
+	
 	return value;
 }
 
@@ -73,7 +69,7 @@ void push(mf_value value)
 
 	stack[stack_top] = value;
 }
-
+/*
 void reduce(mf_value value)
 {
 	if(value.tag != TAG_APP)
@@ -101,3 +97,4 @@ void reduce(mf_value value)
 
 	// AAAAH WE CAN'T
 }
+*/
