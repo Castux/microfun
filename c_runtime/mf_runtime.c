@@ -13,13 +13,13 @@ mf_value make_number(long int number)
 	return (mf_value) value;
 }
 
-mf_value make_func(void (*func)(void))
+mf_closure *make_closure(mf_func func, int num_upvalues)
 {
-	mf_func *value = GC_MALLOC(sizeof(mf_func));
-	value->tag = TAG_FUNC;
+	mf_closure *value = GC_MALLOC(sizeof(mf_closure) + sizeof(mf_value[num_upvalues]));
+	value->tag = TAG_CLOSURE;
 	value->func = func;
 	
-	return (mf_value) value;
+	return value;
 }
 
 mf_value make_app(mf_value func, mf_value arg)

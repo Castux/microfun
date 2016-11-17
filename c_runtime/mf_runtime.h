@@ -4,10 +4,12 @@
 typedef enum
 {
 	TAG_NUMBER = -3,
-	TAG_FUNC = -2,
+	TAG_CLOSURE = -2,
 	TAG_APP = -1,
 	TAG_TUPLE = 0	// Uses length of tuple here!
 } mf_tag;
+
+typedef void (*mf_func)(mf_value arg, mf_func *closure);
 
 typedef struct
 {
@@ -30,9 +32,9 @@ typedef struct
 typedef struct
 {
 	mf_tag tag;
-	void (*func)(mf_value arg, mf_func *closure);
+	mf_func func;
 	mf_value upvalues[];
-} mf_func;
+} mf_closure;
 
 typedef struct
 {
@@ -42,7 +44,7 @@ typedef struct
 
 
 mf_value make_number(long int number);
-mf_value make_func(void (*func)(mf_value arg, mf_func *closure));
+mf_closure *make_closure(mf_func func, int num_upvalues);
 mf_value make_app(mf_value func, mf_value arg);
 mf_tuple *make_tuple(int length);
 
