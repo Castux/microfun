@@ -2,7 +2,7 @@ local utils = require "utils"
 
 -- Supports both the raw AST and the name-resolved expression
 
-local function astToDot(ast)
+local function astToDot(ast, ignoreNamedLamdbas)
 
 	local res = {}
 
@@ -76,6 +76,11 @@ local function astToDot(ast)
 
 				local label = node.builtin and "builtin" or "named"
 				add(format(node, label .. "|" .. node.name))
+				
+				local child = node[1]
+				if child and ignoreNamedLamdbas and (child.kind == "lambda" or child.kind == "multilambda") then
+					return false
+				end
 				return true
 			end,
 
@@ -171,7 +176,13 @@ local function astToDot(ast)
 				if drewLinks[node] then return end				
 				drewLinks[node] = true
 
-				if node[1] then
+				local child = node[1]
+
+				if child and ignoreNamedLamdbas and (child.kind == "lambda" or child.kind == "multilambda") then
+					return
+				end
+
+				if child then
 					add(getUID(node) .. " -> " .. getUID(node[1]) .. ";")
 				end
 
@@ -252,13 +263,12 @@ local function astToDot(ast)
 	return table.concat(res)
 end
 
-local function viewAst(ast, path, show)
-	local str = astToDot(ast)
+local function viewAst(ast, path, ignoreNamedLambdas)
+	local str = astToDot(ast, ignoreNamedLambdas)
 	utils.writeFile(path .. ".dot", str)
-	os.execute("/usr/local/bin/dot -Tpng -o " .. path .. ".png " .. path .. ".dot")
-	if show then
-		os.execute(path .. ".png")
-	end
+	
+	local dotPath = "dot"
+	os.execute(dotPath .. " -Tpng -o " .. path .. ".png " .. path .. ".dot")
 end
 
 return

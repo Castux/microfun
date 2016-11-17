@@ -1,31 +1,118 @@
 local builtins = require "analyzer".builtins
 local builder = require "utils".builder
 
+local function isList(expr)
 
-function reduce(data, strict)
+	if expr == nil or type(expr) ~= "table" or expr[1] ~= "tup" then
+		return false
+	end
+
+	if #expr == 1 then
+		return true
+	end
+
+	if #expr == 3 then
+		return isList(expr[3])
+	end
+
+	return false
+end
+
+local recguard = {}
+setmetatable(recguard, {__mode = 'k'})
+
+local function dump(expr)
+	
+	if recguard[expr] then
+		return recguard[expr]
+	end
+	
+	recguard[expr] = "rec"
+
+	local out = builder()
+
+	if isList(expr) then
+		out.add "{"
+
+		while true and #expr > 1 do
+			out.add(dump(expr[2]))
+			if #expr[3] > 1 then
+				out.add ","
+				expr = expr[3]
+			else
+				break
+			end
+		end
+		out.add "}"
+
+	elseif type(expr) == "function" then
+		out.add "*"
+
+	elseif type(expr) == "number" then
+		out.add(expr)
+	elseif type(expr) == "table" and expr[1] == "tup" then
+		out.add "("
+		for i = 2,#expr do
+			out.add(dump(expr[i]))
+			if i < #expr then
+				out.add ","
+			end
+		end
+		out.add ")"
+
+	elseif type(expr) == "table" and expr[1] == "app" then
+		out.add "("
+		out.add(dump(expr[2]))
+		out.add " "
+		out.add(dump(expr[3]))
+		out.add ")"
+
+	elseif type(expr) == "table" and expr[1] == "ref" then
+		out.add(dump(expr[2]))
+	else
+		error("Undumpable expression")
+	end
+	
+	out = out.dump()
+	recguard[expr] = out
+
+	return out
+end
+
+function reduce(data, recurseTuples)
 
 	while type(data) == "table" do
 
 		if data[1] == "app" then
 
-			local func = reduce(data[2])
-			if type(func) ~= "function" then
-				error("Cannot apply non-function: " .. tostring(func))
+			if data.result then
+				data = data.result
+			else
+
+				local func = reduce(data[2])
+				if type(func) ~= "function" then
+					error("Cannot apply non-function: " .. dump(func))
+				end
+				
+				-- save the result, and some memory
+				data.result = func(data[3])
+				data[2] = nil
+				data[3] = nil
+				
+				data = data.result
 			end
 
-			data = func(data[3])
-
 		elseif data[1] == "tup" then
-			if strict then
+			if recurseTuples then
 				for i = 2,#data do
-					data[i] = reduce(data[i], strict)
+					data[i] = reduce(data[i], recurseTuples)
 				end
 			end
 			break
 
 		elseif data[1] == "ref" then
+			data[2] = reduce(data[2])
 			data = data[2]
-
 		end
 	end
 
@@ -76,70 +163,12 @@ for name,v in pairs(builtins) do
 	end
 end
 
-local function isList(expr)
-
-	if expr == nil or type(expr) ~= "table" or expr[1] ~= "tup" then
-		return false
-	end
-
-	if #expr == 1 then
-		return true
-	end
-
-	if #expr == 3 then
-		return isList(expr[3])
-	end
-
-	return false
-end
-
 function eval(expr)
-
-	return reduce(expr, "strict")
-end
-
-local function dump(expr)
-
-	local out = builder()
-
-	if isList(expr) then
-		out.add "{"
-
-		while true and #expr > 1 do
-			out.add(dump(expr[2]))
-			if #expr[3] > 1 then
-				out.add ","
-				expr = expr[3]
-			else
-				break
-			end
-		end
-		out.add "}"
-
-	elseif type(expr) == "function" then
-		out.add "<function>"
-
-	elseif type(expr) == "number" then
-		out.add(expr)
-	elseif type(expr) == "table" and expr[1] == "tup" then
-		out.add "("
-		for i = 2,#expr do
-			out.add(dump(expr[i]))
-			if i < #expr then
-				out.add ","
-			end
-		end
-		out.add ")"
-	else
-		out.add "???"
-	end
-
-	return out.dump()	
+	return reduce(expr, "recurseTuples")
 end
 
 function show(expr)
-
-	expr = reduce(expr, "strict")
+	expr = reduce(expr, "recurseTuples")
 	print(dump(expr))
 
 	return expr
