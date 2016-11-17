@@ -65,10 +65,7 @@ concat = [
 	(h,t) -> v -> (h, concat t v)
 ],
 
-reverse = [
-	() -> (),
-	(h,t) -> concat (reverse t) (h,())
-],
+reverse = foldl (flip cons) {},
 
 map = f -> [
 	() -> (),
@@ -168,6 +165,7 @@ repeat = iterate id,
 
 divides = n -> eq 0 . mod n,
 divisors = n -> filter (divides n) < range 1 n,
+digits = reverse . map (flip mod 10) . takeWhile (lt 0) . iterate (flip div 10),
 
 isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte n 2),
 primes = upfrom 1 > filter isPrime,
