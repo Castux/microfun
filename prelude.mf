@@ -127,6 +127,20 @@ drop = [
 	]
 ],
 
+dropWhile = f -> [
+	() -> (),
+	(x,xs) -> if (f x)
+		(dropWhile f xs)
+		(x,xs)
+],
+
+takeWhile = f -> [
+	() -> (),
+	(x,xs) -> if (f x)
+		(x, takeWhile f xs)
+		()
+],
+
 split = p -> 
 	foldr
 	[ x -> (ts, fs) -> if (p x) ((x,ts), fs) (ts, (x,fs)) ]
@@ -146,9 +160,10 @@ sort = [
 
 -- Infinite lists
 
-downfrom = n -> (n, downfrom (pred 1)),
-upfrom = n -> (n, upfrom (succ n)),
-repeat = x -> (x, repeat x),
+iterate = f -> x -> (x, iterate f (f x)),
+downfrom = iterate pred,
+upfrom = iterate succ,
+repeat = iterate id,
 
 -- Some arithmetics
 
