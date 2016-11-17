@@ -50,6 +50,7 @@ mf_tuple *make_tuple(int length);
 
 void init(int size);
 void push(mf_value value);
+mf_value peek(int i);
 
 void error(const char* message);
 void reduce(mf_value value);

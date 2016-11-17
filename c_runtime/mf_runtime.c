@@ -70,6 +70,14 @@ void push(mf_value value)
 	stack[stack_top] = value;
 }
 
+mf_value peek(int i)
+{
+	if(i > stack_top)
+		error("peek underflow");
+
+	return stack[stack_top - i];
+}
+
 void reduce(mf_value value)
 {
 	if(value->tag != TAG_APP)
@@ -85,9 +93,12 @@ void reduce(mf_value value)
 
 	// At this point, value is the function to apply
 
-	if(value->tag != TAG_FUNC)
+	if(value->tag != TAG_CLOSURE)
 		error("cannot apply non function");
 
-	((mf_func*) value)->func();
+	mf_value arg = ((mf_app*) peek(1))->arg;
+	mf_closure *closure = (mf_closure *) value;
+
+	closure->func(arg, closure);
 }
 
