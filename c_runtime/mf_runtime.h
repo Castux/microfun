@@ -30,7 +30,8 @@ typedef struct
 typedef struct
 {
 	mf_tag tag;
-	void (*func)(void);
+	void (*func)(mf_value arg, mf_func *closure);
+	mf_value upvalues[];
 } mf_func;
 
 typedef struct
@@ -41,7 +42,7 @@ typedef struct
 
 
 mf_value make_number(long int number);
-mf_value make_func(void (*func)(void));
+mf_value make_func(void (*func)(mf_value arg, mf_func *closure));
 mf_value make_app(mf_value func, mf_value arg);
 mf_tuple *make_tuple(int length);
 
