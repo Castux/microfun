@@ -69,32 +69,25 @@ void push(mf_value value)
 
 	stack[stack_top] = value;
 }
-/*
+
 void reduce(mf_value value)
 {
-	if(value.tag != TAG_APP)
+	if(value->tag != TAG_APP)
 		return;
 
 	// Unwind the stack
 
-	while(value.tag == TAG_APP)
+	while(value->tag == TAG_APP)
 	{
 		push(value);
-		value = value.app->func;
+		value = ((mf_app*) value)->func;
 	}
 
 	// At this point, value is the function to apply
 
-	if(value.tag != TAG_FUNC)
+	if(value->tag != TAG_FUNC)
 		error("cannot apply non function");
 
-	// The function reads the arguments, replacing all the application
-	// with the result value
-
-	value.func();
-
-	// Update application
-
-	// AAAAH WE CAN'T
+	((mf_func*) value)->func();
 }
-*/
+
