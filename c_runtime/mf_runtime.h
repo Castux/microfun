@@ -9,8 +9,6 @@ typedef enum
 	TAG_TUPLE = 0	// Uses length of tuple here!
 } mf_tag;
 
-typedef void (*mf_func)(mf_value arg, mf_func *closure);
-
 typedef struct
 {
 	mf_tag tag;
@@ -28,6 +26,8 @@ typedef struct
 	mf_value func;
 	mf_value arg;
 } mf_app;
+
+typedef void (*mf_func)(mf_value arg, mf_value *upvalues);
 
 typedef struct
 {

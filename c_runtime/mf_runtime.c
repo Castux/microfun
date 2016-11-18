@@ -99,6 +99,6 @@ void reduce(mf_value value)
 	mf_value arg = ((mf_app*) peek(1))->arg;
 	mf_closure *closure = (mf_closure *) value;
 
-	closure->func(arg, closure);
+	closure->func(arg, closure->upvalues);
 }
 
