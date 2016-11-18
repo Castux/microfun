@@ -1,15 +1,15 @@
 local parser = require "parser"
-local serpent = require "serpent"
 local utils = require "utils"
 local analyzer = require "analyzer"
 local dot = require "dot"
+local reduce = require "interpreter"
 local transpile = require "transpile"
 
 local prelude = io.open("prelude.mf"):read("*a")
 prelude = prelude .. io.open("tree.mf"):read("*a")
 
 local source = io.open("test.mf"):read("*a")
-local interpreter = false
+local interpreter = true
 local debug = false
 local withDot = true
 
@@ -32,7 +32,7 @@ if interpreter then
 
 	for step = 1,math.huge do
 
-		local reduced,newexpr = analyzer.reduce(expr)
+		local reduced,newexpr = reduce(expr)
 		expr = newexpr
 		
 		if debug then
