@@ -52,13 +52,9 @@ mf_closure *make_closure(mf_func func, int num_upvalues);
 mf_value *make_app(mf_value *func, mf_value *arg);
 mf_tuple *make_tuple(int length);
 
-void init(int size);
-void push(mf_value *value);
-mf_value *peek(int i);
-
 void error(const char *message);
+
+void init(void);
 mf_value *reduce(mf_value *value);
-
-
 
 #endif // _MF_RUNTIME_H

@@ -55,36 +55,9 @@ void error(const char *message)
 	exit(EXIT_FAILURE);
 }
 
-// Stack
-
-int stack_size;
-mf_value **stack;
-int stack_top;
-
-void init(int size)
+void init(void)
 {
-	stack_size = size;
-
-	stack = GC_MALLOC(size * sizeof(mf_value*));
-	stack_top = -1;
-}
-
-void push(mf_value *value)
-{
-	stack_top++;
-
-	if(stack_top >= stack_size)
-		error("stack overflow");
-
-	stack[stack_top] = value;
-}
-
-mf_value *peek(int i)
-{
-	if(i > stack_top)
-		error("peek underflow");
-
-	return stack[stack_top - i];
+	GC_INIT();
 }
 
 mf_value *reduce(mf_value *value)

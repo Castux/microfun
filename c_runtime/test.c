@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include "mf_runtime.h"
 
-#include "gc.h"
-
-
 mf_value *add_anon(mf_value *arg, mf_value **upvalues)
 {
 	mf_number ub_arg = unbox_number(arg);
@@ -23,7 +20,7 @@ mf_value *add(mf_value *arg, mf_value **upvalues)
 
 int main(void)
 {
-	GC_INIT();
+	init();
 	
 	mf_value *n = box_number(100);
 	mf_value *m = box_number(50);
