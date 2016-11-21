@@ -28,13 +28,11 @@ int main(void)
 	mf_value *n = box_number(100);
 	mf_value *m = box_number(50);
 
-	mf_value *ret1 = add(n, 0);
+	mf_value *add_closure = (mf_value *) make_closure(add, 0);
+	mf_value *app = make_app(add_closure, n);
+	app = make_app(app, m);
 
-	if(ret1->tag != TAG_CLOSURE)
-		error("WTF");
+	mf_value *result = reduce(app);
 
-	mf_closure *closure = (mf_closure*) ret1;
-	mf_value *ret2 = closure->func(m, closure->upvalues);
-
-	return unbox_number(ret2);
+	return unbox_number(result);
 }

@@ -36,6 +36,7 @@ mf_value *make_app(mf_value *func, mf_value *arg)
 	value->tag = TAG_APP;
 	value->func = func;
 	value->arg = arg;
+	value->result = NULL;
 
 	return (mf_value*) value;
 }
@@ -86,27 +87,34 @@ mf_value *peek(int i)
 	return stack[stack_top - i];
 }
 
-void reduce(mf_value *value)
+mf_value *reduce(mf_value *value)
 {
 	if(value->tag != TAG_APP)
-		return;
+		return value;
 
-	// Unwind the stack
+	mf_app *app = (mf_app*) value;
 
-	while(value->tag == TAG_APP)
+	// Use saved result if any
+
+	if(app->result != NULL)
+		return app->result;
+
+	// Reduce function expression
+
+	if(app->func->tag != TAG_CLOSURE)
 	{
-		push(value);
-		value = ((mf_app*) value)->func;
+		app->func = reduce(app->func);
 	}
 
-	// At this point, value is the function to apply
-
-	if(value->tag != TAG_CLOSURE)
+	if(app->func->tag != TAG_CLOSURE)
 		error("cannot apply non function");
 
-	mf_value *arg = ((mf_app*) peek(1))->arg;
-	mf_closure *closure = (mf_closure*) value;
+	mf_closure *closure = (mf_closure*) app->func;
 
-	closure->func(arg, closure->upvalues);
+	// At this point, we apply by calling the closure
+
+	app->result = closure->func(app->arg, closure->upvalues);
+
+	return app->result;
 }
 

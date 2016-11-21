@@ -27,6 +27,7 @@ typedef struct
 	mf_tag tag;
 	mf_value *func;
 	mf_value *arg;
+	mf_value *result;
 } mf_app;
 
 typedef mf_value *(*mf_func)(mf_value *arg, mf_value **upvalues);
@@ -56,7 +57,7 @@ void push(mf_value *value);
 mf_value *peek(int i);
 
 void error(const char *message);
-void reduce(mf_value *value);
+mf_value *reduce(mf_value *value);
 
 
 
