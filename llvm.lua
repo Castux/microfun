@@ -30,4 +30,10 @@ llvm.valueArray = function(values)
 	return ffi.new("LLVMValueRef[?]", #values, values)
 end
 
+llvm.outString = function()
+	return ffi.new("char*[1]")
+end
+
+llvm.toString = ffi.string
+
 return llvm
