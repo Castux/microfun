@@ -1,6 +1,8 @@
 #ifndef _MF_RUNTIME_H
 #define _MF_RUNTIME_H
 
+typedef long int mf_number;
+
 typedef enum
 {
 	TAG_NUMBER = -3,
@@ -12,48 +14,49 @@ typedef enum
 typedef struct
 {
 	mf_tag tag;
-} *mf_value;
+} mf_value;
 
 typedef struct
 {
 	mf_tag tag;
 	long int number;
-} mf_number;
+} mf_boxed_number;
 
 typedef struct
 {
 	mf_tag tag;
-	mf_value func;
-	mf_value arg;
+	mf_value *func;
+	mf_value *arg;
 } mf_app;
 
-typedef void (*mf_func)(mf_value arg, mf_value *upvalues);
+typedef mf_value *(*mf_func)(mf_value *arg, mf_value **upvalues);
 
 typedef struct
 {
 	mf_tag tag;
 	mf_func func;
-	mf_value upvalues[];
+	mf_value *upvalues[];
 } mf_closure;
 
 typedef struct
 {
 	mf_tag tag;
-	mf_value tuple[];
+	mf_value *tuple[];
 } mf_tuple;
 
 
-mf_value make_number(long int number);
+mf_value *box_number(mf_number number);
+mf_number unbox_number(mf_value *value);
 mf_closure *make_closure(mf_func func, int num_upvalues);
-mf_value make_app(mf_value func, mf_value arg);
+mf_value *make_app(mf_value *func, mf_value *arg);
 mf_tuple *make_tuple(int length);
 
 void init(int size);
-void push(mf_value value);
-mf_value peek(int i);
+void push(mf_value *value);
+mf_value *peek(int i);
 
-void error(const char* message);
-void reduce(mf_value value);
+void error(const char *message);
+void reduce(mf_value *value);
 
 
 
