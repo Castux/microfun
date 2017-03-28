@@ -17,6 +17,11 @@ primeDivisors = [
 		(k, primeDivisors < div n k)
 ],
 
-fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci))
+fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci)),
+
+let fact = [
+	1 -> 1,
+	n -> mul n (fact (pred n))
+]
 
 in
