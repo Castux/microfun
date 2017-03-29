@@ -159,6 +159,6 @@ sort = [
 iterate = f -> x -> (x, iterate f (f x)),
 downfrom = iterate pred,
 upfrom = iterate succ,
-repeat = iterate id,
+repeat = iterate id
 
 in
