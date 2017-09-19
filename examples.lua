@@ -17,11 +17,20 @@ primeDivisors = [
 		(k, primeDivisors < div n k)
 ],
 
+primes2 =
+	let
+		isPrime = n -> primes2 > takeWhile (flip lte (sqrt n)) > none (divides n),	
+		primesUpFrom = n -> if (isPrime n)
+			(n, primesUpFrom (add 2 n))
+			(primesUpFrom (add 2 n))
+	in
+		(2, primesUpFrom 3),
+
 fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci)),
 
 let fact = [
 	1 -> 1,
-	n -> mul n (fact (pred n))
+	n -> mul n (fact < pred n)
 ]
 
 in
