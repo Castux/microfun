@@ -188,6 +188,7 @@ will return 0 given an empty tuple, the sum of the two elements when given a 2-t
 
 Expressions are evaluated as late as possible:
 
+- In an application, the left-hand side is evaluated until it can be checked to be a function
 - When matching against a number, the expression is fully evaluated and the result compared to the pattern
 - When matching against a tuple pattern, the expression is reduced until either
     - It reduces to a number, in which case the matching fails
