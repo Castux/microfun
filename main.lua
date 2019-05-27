@@ -19,12 +19,22 @@ if not source then
 	print_usage()
 end
 
+local function has_param(arg)
+	for i = 2,#args do
+		if args[i] == arg then
+			return true
+		end
+	end
+	
+	return false
+end
+
+local interpreter = has_param "interpret"
+local debug = has_param "debug"
+local withDot = has_param "dot"
+
+
 local source = io.open(source):read("*a")
-
-local interpreter = args[2] == "interpret"
-local debug = args[3] == "debug"
-local withDot = args[4] == "dot"
-
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
 if not success then

@@ -19,4 +19,4 @@ primes2 =
 
 in
 
-map show < take 500 < primes
+show < take 500 < map show < primes
