@@ -196,7 +196,7 @@ Expressions are evaluated as late as possible:
 - When applying built-in functions, such as arithmetic functions, which require full evaluation of the expression, and perform type checking.
 - When applying the special functions `eval` or `show`
 
-Note also that an expression which is bound to an identifier is never evaluated more than once (in other words, its value is memoized). This allows efficient and mind-bending things like:
+Note also that an expression which is bound to an identifier is memoized in its current state of reduction: if further reduction is required, it resumes where it was stopped earlier. This allows efficient and mind-bending things like:
 
 `fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci))`
 
