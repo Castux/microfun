@@ -77,7 +77,7 @@ else
 		utils.writeFile("out.lua", res)
 	end
 
-	local chunk = loadstring(res)
+	local chunk = (loadstring or load)(res)		-- 5.1 to 5.3 compat
 	assert(chunk)
 
 	chunk()
