@@ -8,10 +8,22 @@ local transpile = require "transpile"
 local prelude = io.open("prelude.mf"):read("*a")
 prelude = prelude .. io.open("tree.mf"):read("*a")
 
-local source = io.open("test.mf"):read("*a")
-local interpreter = true
-local debug = false
-local withDot = true
+local function print_usage()
+	error("Usage: lua main.lua <source> [interpret] [debug] [dot]")
+end
+
+local args = {...}
+
+local source = args[1]
+if not source then
+	print_usage()
+end
+
+local source = io.open(source):read("*a")
+
+local interpreter = args[2] == "interpret"
+local debug = args[3] == "debug"
+local withDot = args[4] == "dot"
 
 local success, result = pcall(parser.match, parser, (prelude .. source))
 
@@ -34,7 +46,7 @@ if interpreter then
 
 		local reduced,newexpr = reduce(expr)
 		expr = newexpr
-		
+
 		if debug then
 			print("step", utils.dumpExpr(expr))
 			if withDot then
@@ -48,15 +60,15 @@ if interpreter then
 	end
 
 else
-	
+
 	local res = transpile.transpile(expr)
-	
+
 	if debug then
 		utils.writeFile("out.lua", res)
 	end
-	
+
 	local chunk = loadstring(res)
 	assert(chunk)
-	
+
 	chunk()
 end
