@@ -95,7 +95,7 @@ The prelude and built-in functions use the following convention:
 
 `let name1 = expr1, name2 = expr2, ... in body`
 
-Binds given names to the given expressions to be resolved in the body. For instance:
+Binds given names to the given expressions in the body. For instance:
 
 ```
 let
@@ -119,7 +119,9 @@ in
         show a
 ```
 
-Will output 20
+Will output 20.
+
+Note that because of lazy evaluation, the bound expressions can already refer to the names they are bound to, although non-careful use of that feature can cause infinite recursions.
 
 ## Lambda
 
@@ -181,6 +183,22 @@ For instance the function `[ 0 -> 1, 1 -> 0, n -> add n 100 ]` return 1 when giv
 ```
 
 will return 0 given an empty tuple, the sum of the two elements when given a 2-tuple, and will generate a runtime error for any other input.
+
+## Lazy evaluation
+
+Expressions are evaluated as late as possible:
+
+- When matching against a number, the expression is fully evaluated and the result compared to the pattern
+- When matching against a tuple pattern, the expression is reduced until either
+    - It reduces to a number, in which case the matching fails
+    - It reduces to a tuple, in which case the size of the tuple is compared to the size of the tuple pattern: different lengths means no match, same lengths means a match. Note that the subexpressions are *not* evaluated at that time, they are only bound to the identifiers in the pattern in case of successful match.
+    - Note that matching against a single identifier (which always succeeds), does not cause reduction of the expression, only binding.
+- When applying built-in functions, such as arithmetic functions, which require full evaluation of the expression, and perform type checking.
+- When applying the special functions `eval` or `show`
+
+Note also that an expression which is bound to an identifier is never evaluated more than once (in other words, its value is memoized). This allows efficient and mind-bending things like:
+
+`fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci))`
 
 ## Function application
 
