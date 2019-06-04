@@ -13,9 +13,9 @@ public struct Diagnostic
     public string Emitter { get; private set; }
     public Severity Severity { get; private set; }
     public string Message { get; private set; }
-    public SourcePos Position { get; private set; }
+    public SourcePosition Position { get; private set; }
 
-    public Diagnostic(string emitter, Severity severity, string message, SourcePos position)
+    public Diagnostic(string emitter, Severity severity, string message, SourcePosition position)
     {
         Emitter = emitter;
         Severity = severity;
@@ -46,11 +46,11 @@ public struct Diagnostic
         {
             s += Position.File.Path + ":";
 
-            LineCol beg = Position.File.ToLineCol(Position.Begin);
-            LineCol end = Position.File.ToLineCol(Position.End);
+            LineColumn begin = Position.File.ToLineColumn(Position.Begin);
+            LineColumn end = Position.File.ToLineColumn(Position.End);
 
-            s += beg.Line;
-            if (beg.Line != end.Line)
+            s += begin.Line;
+            if (begin.Line != end.Line)
                 s += "-" + end.Line;
 
             s += ": ";
@@ -64,23 +64,23 @@ public struct Diagnostic
 
         if (Position.File != null)
         {
-            LineCol beg = Position.File.ToLineCol(Position.Begin);
-            LineCol end = Position.File.ToLineCol(Position.End);
+            LineColumn begin = Position.File.ToLineColumn(Position.Begin);
+            LineColumn end = Position.File.ToLineColumn(Position.End);
 
-            for (int l = beg.Line; l <= end.Line; l++)
+            for (int l = begin.Line; l <= end.Line; l++)
             {
                 string line = Position.File.Lines[l - 1].Text;
 
                 // Compute limits for marks
 
                 int mstart, mend;
-                if (l == beg.Line)
-                    mstart = beg.Col;
+                if (l == begin.Line)
+                    mstart = begin.Column;
                 else
                     mstart = 1;
 
                 if (l == end.Line)
-                    mend = end.Col;
+                    mend = end.Column;
                 else
                     mend = line.Length;
 
@@ -120,7 +120,7 @@ public class Report
         this.emitter = emitter;
     }
 
-    public void Add(Severity severity, string message, SourcePos position)
+    public void Add(Severity severity, string message, SourcePosition position)
     {
         Diagnostic d = new Diagnostic(emitter, severity, message, position);
         diagnostics.Add(d);

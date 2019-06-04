@@ -6,7 +6,7 @@ public class SourceFile
 {
     public string Path { get; private set; }
     public string Text { get; private set; }
-    public List<SourcePos> Lines { get; private set; }
+    public List<SourcePosition> Lines { get; private set; }
 
     public SourceFile(string path)
     {
@@ -24,14 +24,14 @@ public class SourceFile
 
         // compute line positions
 
-        Lines = new List<SourcePos>();
+        Lines = new List<SourcePosition>();
         int begin = 0;
 
         for (int i = 0; i < Text.Length; i++)
         {
             if (Text[i] == '\n' || i == Text.Length - 1)
             {
-                Lines.Add(new SourcePos(this, begin, i));
+                Lines.Add(new SourcePosition(this, begin, i));
                 begin = i + 1;
             }
         }
@@ -41,23 +41,23 @@ public class SourceFile
 
     // human-readable line and column position for diagnostics (ie. both start at 1)
 
-    public LineCol ToLineCol(int position)
+    public LineColumn ToLineColumn(int position)
     {
         for (int i = 0; i < Lines.Count; i++)
         {
             if (position >= Lines[i].Begin && position <= Lines[i].End)
             {
-                return new LineCol(i + 1, position - Lines[i].Begin + 1);
+                return new LineColumn(i + 1, position - Lines[i].Begin + 1);
             }
         }
 
-        throw new Exception("invalid LineCol");
+        throw new Exception("invalid LineColumn");
     }
 }
 
-public struct SourcePos
+public struct SourcePosition
 {
-    public SourcePos(SourceFile file, int begin, int end)
+    public SourcePosition(SourceFile file, int begin, int end)
     {
         File = file;
         Begin = begin;
@@ -69,35 +69,35 @@ public struct SourcePos
         get
         {
             if (File != null && End < File.Text.Length)
-                return File.Text.Substring(Begin, Len);
+                return File.Text.Substring(Begin, Length);
             else
                 return null;
         }
     }
 
-    public static SourcePos operator +(SourcePos a, SourcePos b)
+    public static SourcePosition operator +(SourcePosition a, SourcePosition b)
     {
         if (a.File != b.File)
             throw new Exception("different files");
 
-        return new SourcePos(a.File, a.Begin, b.End);
+        return new SourcePosition(a.File, a.Begin, b.End);
     }
 
     public readonly SourceFile File;
     public readonly int Begin;
     public readonly int End;
 
-    public int Len => End - Begin + 1;
+    public int Length => End - Begin + 1;
 }
 
-public struct LineCol
+public struct LineColumn
 {
-    public LineCol(int line, int col)
+    public LineColumn(int line, int column)
     {
         Line = line;
-        Col = col;
+        Column = column;
     }
 
     public readonly int Line;
-    public readonly int Col;
+    public readonly int Column;
 }

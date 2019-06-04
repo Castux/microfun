@@ -92,10 +92,10 @@ public struct Token
     }
 
     public Kind Which { get; private set; }
-    public SourcePos Pos { get; private set; }
+    public SourcePosition Pos { get; private set; }
     public long? NumberValue { get; private set; }
 
-    public Token(Kind which, SourcePos pos, long? numberValue)
+    public Token(Kind which, SourcePosition pos, long? numberValue)
     {
         Which = which;
         Pos = pos;

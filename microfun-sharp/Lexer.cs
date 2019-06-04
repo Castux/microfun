@@ -88,7 +88,7 @@ public class Lexer
                     }
                     else
                     {
-                        var pos = new SourcePos(Here.File, Here.Begin, Here.Begin + match.Length - 1);
+                        var pos = new SourcePosition(Here.File, Here.Begin, Here.Begin + match.Length - 1);
                         AddError("malformed number literal", pos);
                         return false;
                     }
@@ -139,7 +139,7 @@ public class Lexer
 
     private void AddToken(Token.Kind kind, int length, long? numberValue = null)
     {
-        SourcePos pos = new SourcePos(file, headPos, headPos + length - 1);
+        SourcePosition pos = new SourcePosition(file, headPos, headPos + length - 1);
         headPos += length;
 
         Token t = new Token(kind, pos, numberValue);
@@ -147,11 +147,11 @@ public class Lexer
         Tokens.Add(t);
     }
 
-    private SourcePos Here
+    private SourcePosition Here
     {
         get
         {
-            return new SourcePos(file, headPos, headPos);
+            return new SourcePosition(file, headPos, headPos);
         }
     }
 
@@ -160,7 +160,7 @@ public class Lexer
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
 
-    private void AddError(string message, SourcePos pos)
+    private void AddError(string message, SourcePosition pos)
     {
         Report.Add(Severity.Error, message, pos);
     }
