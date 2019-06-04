@@ -43,20 +43,15 @@ public class SourceFile
 
     public LineCol ToLineCol(int position)
     {
-        var res = new LineCol(0, 0);
-
         for (int i = 0; i < Lines.Count; i++)
         {
             if (position >= Lines[i].Begin && position <= Lines[i].End)
             {
-                res.Line = i + 1;
-                res.Col = position - Lines[i].Begin + 1;
-
-                break;
+                return new LineCol(i + 1, position - Lines[i].Begin + 1);
             }
         }
 
-        return res;
+        throw new Exception("invalid LineCol");
     }
 }
 
@@ -103,7 +98,6 @@ public struct LineCol
         Col = col;
     }
 
-    public int Line;
-    public int Col;
+    public readonly int Line;
+    public readonly int Col;
 }
-
