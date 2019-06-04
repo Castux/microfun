@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 public class Lexer
@@ -168,7 +165,7 @@ public class Lexer
 
     private void AddError(string message, SourcePos pos)
     {
-        Report.Add(Diagnostic.Severity.Error, message, pos);
+        Report.Add(Severity.Error, message, pos);
     }
 
 }

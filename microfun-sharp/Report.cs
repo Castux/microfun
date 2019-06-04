@@ -3,22 +3,35 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+public enum Severity
+{
+    Info,
+    Warning,
+    Error
+};
+
 public struct Diagnostic
 {
-    public enum Severity
+    public string Emitter { get; private set; }
+    public Severity Severity { get; private set; }
+    public string Message { get; private set; }
+    public SourcePos Position { get; private set; }
+
+    public Diagnostic(string emitter, Severity severity, string message, SourcePos position)
     {
-        Info,
-        Warning,
-        Error
-    };
+        Emitter = emitter;
+        Severity = severity;
+        Message = message;
+        Position = position;
+    }
 
     public string PrettyString()
     {
-        string s = emitter;
+        string s = Emitter;
 
         // First line
 
-        switch (severity)
+        switch (Severity)
         {
             case Severity.Info:
                 s += " info: ";
@@ -31,12 +44,12 @@ public struct Diagnostic
                 break;
         }
 
-        if (position.File != null)
+        if (Position.File != null)
         {
-            s += position.File.Path + ":";
+            s += Position.File.Path + ":";
 
-            LineCol beg = position.File.ToLineCol(position.Begin);
-            LineCol end = position.File.ToLineCol(position.End);
+            LineCol beg = Position.File.ToLineCol(Position.Begin);
+            LineCol end = Position.File.ToLineCol(Position.End);
 
             s += beg.Line;
             if (beg.Line != end.Line)
@@ -47,18 +60,18 @@ public struct Diagnostic
 
         // Message
 
-        s += message + "\n";
+        s += Message + "\n";
 
         // Source reminder
 
-        if (position.File != null)
+        if (Position.File != null)
         {
-            LineCol beg = position.File.ToLineCol(position.Begin);
-            LineCol end = position.File.ToLineCol(position.End);
+            LineCol beg = Position.File.ToLineCol(Position.Begin);
+            LineCol end = Position.File.ToLineCol(Position.End);
 
             for (int l = beg.Line; l <= end.Line; l++)
             {
-                string line = position.File.Lines[l - 1].Text;
+                string line = Position.File.Lines[l - 1].Text;
 
                 // Compute limits for marks
 
@@ -100,11 +113,6 @@ public struct Diagnostic
 
         return s;
     }
-
-    public string emitter;
-    public Severity severity;
-    public string message;
-    public SourcePos position;
 }
 
 public class Report
@@ -114,14 +122,9 @@ public class Report
         this.emitter = emitter;
     }
 
-    public void Add(Diagnostic.Severity severity, string message, SourcePos position)
+    public void Add(Severity severity, string message, SourcePos position)
     {
-        Diagnostic d;
-        d.emitter = emitter;
-        d.severity = severity;
-        d.message = message;
-        d.position = position;
-
+        Diagnostic d = new Diagnostic(emitter, severity, message, position);
         diagnostics.Add(d);
     }
 
