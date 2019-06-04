@@ -31,16 +31,16 @@ public struct Diagnostic
                 break;
         }
 
-        if (position.file != null)
+        if (position.File != null)
         {
-            s += position.file.Path + ":";
+            s += position.File.Path + ":";
 
-            LineCol beg = position.file.ToLineCol(position.begin);
-            LineCol end = position.file.ToLineCol(position.end);
+            LineCol beg = position.File.ToLineCol(position.Begin);
+            LineCol end = position.File.ToLineCol(position.End);
 
-            s += beg.line;
-            if (beg.line != end.line)
-                s += "-" + end.line;
+            s += beg.Line;
+            if (beg.Line != end.Line)
+                s += "-" + end.Line;
 
             s += ": ";
         }
@@ -51,25 +51,25 @@ public struct Diagnostic
 
         // Source reminder
 
-        if (position.file != null)
+        if (position.File != null)
         {
-            LineCol beg = position.file.ToLineCol(position.begin);
-            LineCol end = position.file.ToLineCol(position.end);
+            LineCol beg = position.File.ToLineCol(position.Begin);
+            LineCol end = position.File.ToLineCol(position.End);
 
-            for (int l = beg.line; l <= end.line; l++)
+            for (int l = beg.Line; l <= end.Line; l++)
             {
-                string line = position.file.Lines[l - 1].Text;
+                string line = position.File.Lines[l - 1].Text;
 
                 // Compute limits for marks
 
                 int mstart, mend;
-                if (l == beg.line)
-                    mstart = beg.col;
+                if (l == beg.Line)
+                    mstart = beg.Col;
                 else
                     mstart = 1;
 
-                if (l == end.line)
-                    mend = end.col;
+                if (l == end.Line)
+                    mend = end.Col;
                 else
                     mend = line.Length;
 

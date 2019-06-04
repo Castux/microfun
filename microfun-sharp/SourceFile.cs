@@ -47,10 +47,10 @@ public class SourceFile
 
         for (int i = 0; i < Lines.Count; i++)
         {
-            if (position >= Lines[i].begin && position <= Lines[i].end)
+            if (position >= Lines[i].Begin && position <= Lines[i].End)
             {
-                res.line = i + 1;
-                res.col = position - Lines[i].begin + 1;
+                res.Line = i + 1;
+                res.Col = position - Lines[i].Begin + 1;
 
                 break;
             }
@@ -64,17 +64,17 @@ public struct SourcePos
 {
     public SourcePos(SourceFile file, int begin, int end)
     {
-        this.file = file;
-        this.begin = begin;
-        this.end = end;
+        this.File = file;
+        this.Begin = begin;
+        this.End = end;
     }
 
     public string Text
     {
         get
         {
-            if (file != null && end < file.Text.Length)
-                return file.Text.Substring(begin, Len);
+            if (File != null && End < File.Text.Length)
+                return File.Text.Substring(Begin, Len);
             else
                 return null;
         }
@@ -82,28 +82,28 @@ public struct SourcePos
 
     public static SourcePos operator +(SourcePos a, SourcePos b)
     {
-        if (a.file != b.file)
+        if (a.File != b.File)
             throw new Exception("different files");
 
-        return new SourcePos(a.file, a.begin, b.end);
+        return new SourcePos(a.File, a.Begin, b.End);
     }
 
-    public SourceFile file;
-    public int begin;
-    public int end;
+    public readonly SourceFile File;
+    public readonly int Begin;
+    public readonly int End;
 
-    public int Len => end - begin + 1;
+    public int Len => End - Begin + 1;
 }
 
 public struct LineCol
 {
     public LineCol(int line, int col)
     {
-        this.line = line;
-        this.col = col;
+        this.Line = line;
+        this.Col = col;
     }
 
-    public int line;
-    public int col;
+    public int Line;
+    public int Col;
 }
 

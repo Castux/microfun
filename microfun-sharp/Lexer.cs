@@ -6,64 +6,68 @@ using System.Text.RegularExpressions;
 
 public class Lexer
 {
+    public List<Token> Tokens { get; private set; }
+    public Report Report { get; private set; }
+
+    private readonly SourceFile file;
+    private readonly string text;
+
+    private int headPos;
+
+    private readonly Regex wsRegex;
+    private readonly Regex commentRegex;
+    private readonly Regex identRegex;
+    private readonly Regex numberRegex;
+
     public Lexer(SourceFile file)
     {
-        m_file = file;
-        m_text = m_file.Text;
+        this.file = file;
+        text = file.Text;
 
-        m_report = new Report("lexer");
+        Report = new Report("lexer");
 
         // Regex patterns
         // \G means "where the last pattern ended" or where we asked the match to start
 
-        m_wsRegex = new Regex(@"\G\s+");
-        m_commentRegex = new Regex(@"\G--[^\n]*");
-        m_identRegex = new Regex(@"\G[_a-zA-Z][_a-zA-Z0-9]*");
-        m_numberRegex = new Regex(@"\G[0-9]+");
+        wsRegex = new Regex(@"\G\s+");
+        commentRegex = new Regex(@"\G--[^\n]*");
+        identRegex = new Regex(@"\G[_a-zA-Z][_a-zA-Z0-9]*");
+        numberRegex = new Regex(@"\G[0-9]+");
     }
 
-    public List<Token> Tokens
-    {
-        get { return m_tokens; }
-    }
-
-    public Report Report
-    {
-        get { return m_report; }
-    }
 
     public bool Lex()
     {
-        m_tokens = new List<Token>();
-        m_headPos = 0;
+        Tokens = new List<Token>();
+        headPos = 0;
 
-        while (m_headPos < m_text.Length)
+        while (headPos < text.Length)
         {
             // Eat white space between tokens
 
-            var match = m_wsRegex.Match(m_text, m_headPos);
+            var match = wsRegex.Match(text, headPos);
             if (match.Success)
             {
-                m_headPos += match.Length;
+                headPos += match.Length;
                 continue;
             }
 
             // Get rid of comments
 
-            match = m_commentRegex.Match(m_text, m_headPos);
+            match = commentRegex.Match(text, headPos);
             if (match.Success)
             {
-                m_headPos += match.Length + 1;
+                headPos += match.Length + 1;
                 continue;
             }
 
             // Identifier or keyword
 
-            char head = m_text[m_headPos];
+            char head = text[headPos];
 
             if (IsLetter(head))
             {
-                match = m_identRegex.Match(m_text, m_headPos);
+                match = identRegex.Match(text, headPos);
 
                 string id = match.Value;
                 Token.Kind kind = Token.keywords.ContainsKey(id) ? Token.keywords[id] : Token.Kind.IDENTIFIER;
@@ -73,13 +77,12 @@ public class Lexer
 
             // Number
 
-            if (Char.IsDigit(head))
+            if (char.IsDigit(head))
             {
-                match = m_numberRegex.Match(m_text, m_headPos);
+                match = numberRegex.Match(text, headPos);
                 if (match.Success)
                 {
-                    long value;
-                    bool success = Int64.TryParse(match.Value, out value);
+                    bool success = long.TryParse(match.Value, out long value);
 
                     if (success)
                     {
@@ -88,8 +91,7 @@ public class Lexer
                     }
                     else
                     {
-                        SourcePos pos = Here;
-                        pos.end = pos.begin + match.Length - 1;
+                        var pos = new SourcePos(Here.File, Here.Begin, Here.Begin + match.Length - 1);
                         AddError("malformed number literal", pos);
                         return false;
                     }
@@ -105,9 +107,9 @@ public class Lexer
 
             string next;
 
-            if (m_headPos < m_text.Length - 1)
+            if (headPos < text.Length - 1)
             {
-                next = m_text.Substring(m_headPos, 2);
+                next = text.Substring(headPos, 2);
                 if (Token.digraphs.ContainsKey(next))
                 {
                     AddToken(Token.digraphs[next], 2);
@@ -117,7 +119,7 @@ public class Lexer
 
             // Symbols
 
-            next = m_text.Substring(m_headPos, 1);
+            next = text.Substring(headPos, 1);
             if (Token.symbols.ContainsKey(next))
             {
                 AddToken(Token.symbols[next], 1);
@@ -132,7 +134,7 @@ public class Lexer
 
         // Once we're done, add the EOF token
 
-        m_headPos--;
+        headPos--;
         AddToken(Token.Kind.EOF, 0);
 
         return true;
@@ -140,20 +142,22 @@ public class Lexer
 
     private void AddToken(Token.Kind kind, int length, long? numberValue = null)
     {
-        SourcePos pos = new SourcePos(m_file, m_headPos, m_headPos + length - 1);
-        m_headPos += length;
+        SourcePos pos = new SourcePos(file, headPos, headPos + length - 1);
+        headPos += length;
 
-        Token t = new Token(kind, pos);
-        t.numberValue = numberValue;
+        Token t = new Token(kind, pos)
+        {
+            numberValue = numberValue
+        };
 
-        m_tokens.Add(t);
+        Tokens.Add(t);
     }
 
     private SourcePos Here
     {
         get
         {
-            return new SourcePos(m_file, m_headPos, m_headPos);
+            return new SourcePos(file, headPos, headPos);
         }
     }
 
@@ -164,19 +168,7 @@ public class Lexer
 
     private void AddError(string message, SourcePos pos)
     {
-        m_report.Add(Diagnostic.Severity.Error, message, pos);
+        Report.Add(Diagnostic.Severity.Error, message, pos);
     }
 
-    private SourceFile m_file;
-    private string m_text;
-
-    private int m_headPos;
-
-    private Regex m_wsRegex;
-    private Regex m_commentRegex;
-    private Regex m_identRegex;
-    private Regex m_numberRegex;
-
-    private List<Token> m_tokens;
-    private Report m_report;
 }
