@@ -111,26 +111,26 @@ public class Report
 {
     public Report(string emitter)
     {
-        m_emitter = emitter;
+        this.emitter = emitter;
     }
 
     public void Add(Diagnostic.Severity severity, string message, SourcePos position)
     {
         Diagnostic d;
-        d.emitter = m_emitter;
+        d.emitter = emitter;
         d.severity = severity;
         d.message = message;
         d.position = position;
 
-        m_diagnostics.Add(d);
+        diagnostics.Add(d);
     }
 
     public void Print()
     {
-        foreach (var d in m_diagnostics)
+        foreach (var d in diagnostics)
             Console.WriteLine(d.PrettyString());
     }
 
-    private readonly List<Diagnostic> m_diagnostics = new List<Diagnostic>();
-    private readonly string m_emitter;
+    private readonly List<Diagnostic> diagnostics = new List<Diagnostic>();
+    private readonly string emitter;
 }

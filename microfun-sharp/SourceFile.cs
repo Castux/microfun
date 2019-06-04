@@ -6,43 +6,32 @@ public class SourceFile
 {
     public SourceFile(string path)
     {
-        m_path = path;
+        Path = path;
     }
 
-    public string Path
-    {
-        get { return m_path; }
-    }
-
-    public string Text
-    {
-        get { return m_text; }
-    }
-
-    public List<SourcePos> Lines
-    {
-        get { return m_lines; }
-    }
+    public string Path { get; }
+    public string Text { get; private set; }
+    public List<SourcePos> Lines { get; private set; }
 
     public bool Load()
     {
-        if (!File.Exists(m_path))
+        if (!File.Exists(Path))
             return false;
 
         // read text
 
-        m_text = File.ReadAllText(m_path);
+        Text = File.ReadAllText(Path);
 
         // compute line positions
 
-        m_lines = new List<SourcePos>();
+        Lines = new List<SourcePos>();
         int begin = 0;
 
-        for (int i = 0; i < m_text.Length; i++)
+        for (int i = 0; i < Text.Length; i++)
         {
-            if (m_text[i] == '\n' || i == m_text.Length - 1)
+            if (Text[i] == '\n' || i == Text.Length - 1)
             {
-                m_lines.Add(new SourcePos(this, begin, i));
+                Lines.Add(new SourcePos(this, begin, i));
                 begin = i + 1;
             }
         }
@@ -56,12 +45,12 @@ public class SourceFile
     {
         var res = new LineCol(0, 0);
 
-        for (int i = 0; i < m_lines.Count; i++)
+        for (int i = 0; i < Lines.Count; i++)
         {
-            if (position >= m_lines[i].begin && position <= m_lines[i].end)
+            if (position >= Lines[i].begin && position <= Lines[i].end)
             {
                 res.line = i + 1;
-                res.col = position - m_lines[i].begin + 1;
+                res.col = position - Lines[i].begin + 1;
 
                 break;
             }
@@ -69,10 +58,6 @@ public class SourceFile
 
         return res;
     }
-
-    private string m_path;
-    private string m_text;
-    private List<SourcePos> m_lines;
 }
 
 public struct SourcePos
@@ -89,7 +74,7 @@ public struct SourcePos
         get
         {
             if (file != null && end < file.Text.Length)
-                return file.Text.Substring(begin, len);
+                return file.Text.Substring(begin, Len);
             else
                 return null;
         }
@@ -107,10 +92,7 @@ public struct SourcePos
     public int begin;
     public int end;
 
-    public int len
-    {
-        get { return end - begin + 1; }
-    }
+    public int Len => end - begin + 1;
 }
 
 public struct LineCol

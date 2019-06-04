@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 
 public struct Token
 {
@@ -89,7 +86,7 @@ public struct Token
             tokenStrings[pair.Value] = pair.Key;
     }
 
-    public static string GetName(Token.Kind k)
+    public static string GetName(Kind k)
     {
         return tokenStrings[k];
     }
@@ -106,16 +103,6 @@ public struct Token
         numberValue = null;
     }
 
-    public string Text
-    {
-        get
-        {
-            return pos.Text;
-        }
-    }
-
-    public string Name
-    {
-        get { return Token.GetName(kind); }
-    }
+    public string Text => pos.Text;
+    public string Name => GetName(kind);
 }
