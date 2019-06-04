@@ -39,25 +39,25 @@ public struct Token
 
     // tokens with special names
 
-    public static Dictionary<Kind, string> tokenStrings = new Dictionary<Kind, string>()
+    public static readonly Dictionary<Kind, string> tokenStrings = new Dictionary<Kind, string>
         {
             {Kind.IDENTIFIER, "identifier"},
             {Kind.NUMBER, "number literal"},
             {Kind.EOF, "end of file"}
         };
 
-    public static Dictionary<string, Kind> keywords = new Dictionary<string, Kind>()
+    public static readonly Dictionary<string, Kind> keywords = new Dictionary<string, Kind>
         {
             {"let", Kind.LET},
             {"in", Kind.IN}
         };
 
-    public static Dictionary<string, Kind> digraphs = new Dictionary<string, Kind>()
+    public static readonly Dictionary<string, Kind> digraphs = new Dictionary<string, Kind>
         {
             {"->", Kind.ARROW}
         };
 
-    public static Dictionary<string, Kind> symbols = new Dictionary<string, Kind>()
+    public static readonly Dictionary<string, Kind> symbols = new Dictionary<string, Kind>
         {
             {"(", Kind.LPARENS},
             {")", Kind.RPARENS},
