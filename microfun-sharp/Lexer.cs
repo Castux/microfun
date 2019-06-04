@@ -142,10 +142,7 @@ public class Lexer
         SourcePos pos = new SourcePos(file, headPos, headPos + length - 1);
         headPos += length;
 
-        Token t = new Token(kind, pos)
-        {
-            numberValue = numberValue
-        };
+        Token t = new Token(kind, pos, numberValue);
 
         Tokens.Add(t);
     }

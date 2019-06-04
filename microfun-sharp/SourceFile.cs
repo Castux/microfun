@@ -4,14 +4,14 @@ using System.IO;
 
 public class SourceFile
 {
+    public string Path { get; private set; }
+    public string Text { get; private set; }
+    public List<SourcePos> Lines { get; private set; }
+
     public SourceFile(string path)
     {
         Path = path;
     }
-
-    public string Path { get; }
-    public string Text { get; private set; }
-    public List<SourcePos> Lines { get; private set; }
 
     public bool Load()
     {
@@ -64,9 +64,9 @@ public struct SourcePos
 {
     public SourcePos(SourceFile file, int begin, int end)
     {
-        this.File = file;
-        this.Begin = begin;
-        this.End = end;
+        File = file;
+        Begin = begin;
+        End = end;
     }
 
     public string Text
@@ -99,8 +99,8 @@ public struct LineCol
 {
     public LineCol(int line, int col)
     {
-        this.Line = line;
-        this.Col = col;
+        Line = line;
+        Col = col;
     }
 
     public int Line;

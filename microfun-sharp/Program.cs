@@ -18,7 +18,7 @@ class Program
         ParseFile("prelude.mf");
         ParseFile(path);
 
-        Console.WriteLine("Success");
+        Console.WriteLine("Done");
 
         return 0;
     }
@@ -40,7 +40,11 @@ class Program
 
         var lexer = new Lexer(file);
         success = lexer.Lex();
-        lexer.Report.Print();
+
+        if (!success)
+        {
+            lexer.Report.Print();
+        }
     }
 
     static void PrintUsage()

@@ -91,18 +91,17 @@ public struct Token
         return tokenStrings[k];
     }
 
-    public Kind kind;
-    public SourcePos pos;
-    public long? numberValue;
+    public Kind Which { get; private set; }
+    public SourcePos Pos { get; private set; }
+    public long? NumberValue { get; private set; }
 
-    public Token(Kind kind, SourcePos pos = new SourcePos())
+    public Token(Kind which, SourcePos pos, long? numberValue)
     {
-        this.kind = kind;
-        this.pos = pos;
-
-        numberValue = null;
+        Which = which;
+        Pos = pos;
+        NumberValue = numberValue;
     }
 
-    public string Text => pos.Text;
-    public string Name => GetName(kind);
+    public string Text => Pos.Text;
+    public string Name => GetName(Which);
 }
