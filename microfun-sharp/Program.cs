@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 
 class Program
 {
     static int Main(string[] args)
     {
-        // Get argument from command line
+        // Get arguments from command line
 
         if (args.Length < 1)
         {
@@ -13,17 +14,31 @@ class Program
             return 1;
         }
 
-        var path = args[0];
+        // Lex files
 
-        ParseFile("prelude.mf");
-        ParseFile(path);
+        var tokens = new List<Token>();
+        var success = true;
 
-        Console.WriteLine("Done");
+        foreach(var path in args)
+        {
+            success = LexFile(path, tokens) && success;
+        }
 
+        if (!success)
+        {
+            Console.WriteLine("Failure");
+            return 1;
+        }
+
+        // Parse stream of tokens
+
+
+
+        Console.WriteLine("Success");
         return 0;
     }
 
-    private static void ParseFile(string path)
+    private static bool LexFile(string path, List<Token> tokens)
     {
         // Load file
 
@@ -33,22 +48,24 @@ class Program
         if (!success)
         {
             Console.WriteLine("Could not load file " + path);
-            return;
+            return false;
         }
 
         // Lex file
 
         var lexer = new Lexer(file);
-        success = lexer.Lex();
+        success = lexer.Lex(tokens);
 
         if (!success)
         {
             lexer.Report.Print();
         }
+
+        return success;
     }
 
     static void PrintUsage()
     {
-        Console.WriteLine("usage: microfun source.mf");
+        Console.WriteLine("usage: microfun source1.mf source2.mf ...");
     }
 }

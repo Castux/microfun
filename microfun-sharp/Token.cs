@@ -30,11 +30,7 @@ public struct Token
         // variable tokens
 
         IDENTIFIER,
-        NUMBER,
-
-        // special
-
-        EOF
+        NUMBER
     }
 
     // tokens with special names
@@ -42,8 +38,7 @@ public struct Token
     public static readonly Dictionary<Kind, string> tokenStrings = new Dictionary<Kind, string>
         {
             {Kind.IDENTIFIER, "identifier"},
-            {Kind.NUMBER, "number literal"},
-            {Kind.EOF, "end of file"}
+            {Kind.NUMBER, "number literal"}
         };
 
     public static readonly Dictionary<string, Kind> keywords = new Dictionary<string, Kind>

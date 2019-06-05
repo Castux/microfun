@@ -137,7 +137,7 @@ takeWhile = f -> [
 		()
 ],
 
-split = p -> 
+split = p ->
 	foldr
 	[ x -> (ts, fs) -> if (p x) ((x,ts), fs) (ts, (x,fs)) ]
 	((),()),

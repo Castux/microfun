@@ -3,12 +3,12 @@ using System.Text.RegularExpressions;
 
 public class Lexer
 {
-    public List<Token> Tokens { get; private set; }
     public Report Report { get; private set; }
 
     private readonly SourceFile file;
     private readonly string text;
 
+    private List<Token> tokens;
     private int headPos;
 
     private readonly Regex wsRegex;
@@ -33,9 +33,9 @@ public class Lexer
     }
 
 
-    public bool Lex()
+    public bool Lex(List<Token> tokens)
     {
-        Tokens = new List<Token>();
+        this.tokens = tokens;
         headPos = 0;
 
         while (headPos < text.Length)
@@ -129,11 +129,6 @@ public class Lexer
             return false;
         }
 
-        // Once we're done, add the EOF token
-
-        headPos--;
-        AddToken(Token.Kind.EOF, 0);
-
         return true;
     }
 
@@ -144,7 +139,7 @@ public class Lexer
 
         Token t = new Token(kind, pos, numberValue);
 
-        Tokens.Add(t);
+        tokens.Add(t);
     }
 
     private SourcePosition Here
