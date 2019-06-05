@@ -2,10 +2,6 @@
 
 public abstract class Expression
 {
-    protected Expression()
-    {
-
-    }
 }
 
 public class Identifier : Expression
