@@ -1,18 +1,8 @@
 ﻿using System.Collections.Generic;
 
-public abstract class ASTNode
+public abstract class Expression
 {
-    public readonly SourcePosition Position;
-
-    protected ASTNode(SourcePosition position)
-    {
-        Position = position;
-    }
-}
-
-public abstract class Expression : ASTNode
-{
-    protected Expression(SourcePosition position) : base(position)
+    protected Expression()
     {
 
     }
@@ -22,7 +12,7 @@ public class Identifier : Expression
 {
     public readonly string Name;
 
-    public Identifier(Token token) : base(token.Position)
+    public Identifier(Token token)
     {
         Name = token.Text;
     }
@@ -32,7 +22,7 @@ public class Number : Expression
 {
     public readonly long Value;
 
-    public Number(Token token) : base(token.Position)
+    public Number(Token token)
     {
         Value = long.Parse(token.Text);
     }
@@ -42,7 +32,7 @@ public class Tuple : Expression
 {
     public readonly List<Expression> Expressions;
 
-    public Tuple(SourcePosition position, List<Expression> expressions) : base(position)
+    public Tuple(List<Expression> expressions)
     {
         Expressions = expressions;
     }
@@ -52,25 +42,21 @@ public class List : Expression
 {
     public readonly List<Expression> Expressions;
 
-    public List(SourcePosition position, List<Expression> expressions) : base(position)
+    public List(List<Expression> expressions)
     {
         Expressions = expressions;
     }
 }
 
-public abstract class PatternElement : ASTNode
+public abstract class PatternElement
 {
-    protected PatternElement(SourcePosition position) : base(position)
-    {
-
-    }
 }
 
 public class NumberPattern : PatternElement
 {
     public readonly long Value;
 
-    public NumberPattern(Token token) : base(token.Position)
+    public NumberPattern(Token token)
     {
         Value = long.Parse(token.Text);
     }
@@ -80,17 +66,17 @@ public class IdentifierPattern : PatternElement
 {
     public readonly string Value;
 
-    public IdentifierPattern(Token token) : base(token.Position)
+    public IdentifierPattern(Token token)
     {
         Value = token.Text;
     }
 }
 
-public class Pattern : ASTNode
+public class Pattern
 {
     public readonly List<PatternElement> Elements;
 
-    public Pattern(SourcePosition position, List<PatternElement> elements) : base(position)
+    public Pattern(List<PatternElement> elements)
     {
         Elements = elements;
     }
@@ -101,7 +87,7 @@ public class Lambda : Expression
     public readonly Pattern Pattern;
     public readonly Expression Body;
 
-    public Lambda(Pattern pattern, Expression body) : base(pattern.Position + body.Position)
+    public Lambda(Pattern pattern, Expression body)
     {
         Pattern = pattern;
         Body = body;
@@ -112,7 +98,7 @@ public class Multilambda : Expression
 {
     public readonly List<Lambda> Lambdas;
 
-    public Multilambda(SourcePosition position, List<Lambda> lambdas) : base(position)
+    public Multilambda(List<Lambda> lambdas)
     {
         Lambdas = lambdas;
     }
@@ -123,7 +109,7 @@ public class Application : Expression
     public readonly Expression Function;
     public readonly Expression Argument;
 
-    public Application(SourcePosition position, Expression function, Expression argument) : base(position)
+    public Application(Expression function, Expression argument)
     {
         Function = function;
         Argument = argument;
@@ -135,19 +121,19 @@ public class Composition : Expression
     public readonly Expression Left;
     public readonly Expression Right;
 
-    public Composition(SourcePosition position, Expression left, Expression right) : base(position)
+    public Composition(Expression left, Expression right)
     {
         Left = left;
         Right = right;
     }
 }
 
-public class Binding : ASTNode
+public class Binding
 {
     public readonly Identifier Name;
     public readonly Expression Body;
 
-    public Binding(Identifier name, Expression body) : base(name.Position + body.Position)
+    public Binding(Identifier name, Expression body)
     {
         Name = name;
         Body = body;
@@ -159,7 +145,7 @@ public class Let : Expression
     public readonly List<Binding> Bindings;
     public readonly Expression Body;
 
-    public Let(List<Binding> bindings, Expression body) : base(bindings[0].Position + body.Position)
+    public Let(List<Binding> bindings, Expression body)
     {
         Bindings = bindings;
         Body = body;

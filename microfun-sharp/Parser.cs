@@ -46,6 +46,8 @@ public class Parser
 
         var atom = ParseAtomic();
 
+        // Lambda
+
         if (Peek == Kind.ARROW)
         {
             headIndex = startIndex;     // backtrack
@@ -122,11 +124,12 @@ public class Parser
             return null;
         }
 
+        var identPos = Prev.Position;
         var ident = new Identifier(Prev);
 
         if (!Expect(Kind.EQUAL))
         {
-            AddInfo("in binding started here:", ident.Position);
+            AddInfo("in binding started here:", identPos);
             stopReporting = true;
             return null;
         }
@@ -134,8 +137,6 @@ public class Parser
         var body = ParseExpression();
         if (body == null)
         {
-            AddInfo("as right hand side of binding started here:", ident.Position);
-            stopReporting = true;
             return null;
         }
 
@@ -180,7 +181,7 @@ public class Parser
 
         if(Accept(Kind.RPARENS))
         {
-            return new Tuple(start + Prev.Position, expressions);
+            return new Tuple(expressions);
         }
 
         do
@@ -205,7 +206,7 @@ public class Parser
         if (expressions.Count == 1)
             return expressions[0];
         else
-            return new Tuple(start + Prev.Position, expressions);
+            return new Tuple(expressions);
     }
 
     private List ParseList()
@@ -218,7 +219,7 @@ public class Parser
 
         if (Accept(Kind.RCURLY))
         {
-            return new List(start + Prev.Position, expressions);
+            return new List(expressions);
         }
 
         do
@@ -240,7 +241,7 @@ public class Parser
             return null;
         }
 
-        return new List(start + Prev.Position, expressions);
+        return new List(expressions);
     }
 
     private Expression ParseMultilambda()
@@ -273,7 +274,7 @@ public class Parser
         if (lambdas.Count == 1)
             return lambdas[0];
         else
-            return new Multilambda(start + Prev.Position, lambdas);
+            return new Multilambda(lambdas);
     }
 
     private Lambda ParseLambda()
@@ -286,7 +287,6 @@ public class Parser
 
         if (!Expect(Kind.ARROW))
         {
-            AddInfo("in lambda with pattern:", pattern.Position);
             return null;
         }
 
@@ -322,7 +322,7 @@ public class Parser
         {
             if(Accept(Kind.RPARENS))
             {
-                return new Pattern(start + Prev.Position, elements);
+                return new Pattern(elements);
             }
 
             do
@@ -352,7 +352,7 @@ public class Parser
             elements.Add(elem);
         }
 
-        return new Pattern(start + Prev.Position, elements);
+        return new Pattern(elements);
     }
 
     private Expression ParseGoesRight(Expression first)
@@ -371,7 +371,7 @@ public class Parser
                 return null;
             }
     
-            var app = new Application(current.Position + function.Position, function, current);
+            var app = new Application(function, current);
             current = app;
         }
 
@@ -401,7 +401,7 @@ public class Parser
             if (rest == null)
                 return null;
 
-            return new Application(left.Position + rest.Position, left, rest);
+            return new Application(left, rest);
         }
 
         if (OperatorError())
@@ -430,7 +430,7 @@ public class Parser
             if (rest == null)
                 return null;
 
-            return new Composition(left.Position + rest.Position, left, rest);
+            return new Composition(left, rest);
         }
 
         if (OperatorError())
@@ -455,7 +455,7 @@ public class Parser
         while (CanStartAtomic())
         {
             var right = ParseAtomic();
-            var app = new Application(left.Position + right.Position, left, right);
+            var app = new Application(left, right);
             left = app;
         }
 
