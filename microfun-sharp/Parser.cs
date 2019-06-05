@@ -52,7 +52,11 @@ public class Parser
             return ParseLambda();
         }
 
+        // Juxtaposed atomics form an application
+
         var expr = TryParseApplication(atom);
+
+        // Operations < > .
 
         if(Peek == Kind.GOESRIGHT)
         {
@@ -64,7 +68,10 @@ public class Parser
             return ParseGoesLeft(expr);
         }
 
-
+        if(Peek == Kind.DOT)
+        {
+            return ParseComposition(expr);
+        }
 
         return expr;
     }
@@ -354,15 +361,22 @@ public class Parser
 
         while(Accept(Kind.GOESRIGHT))
         {
+            var opPos = Prev.Position;
+
             var function = ParseApplication();
+            if (function == null)
+            {
+                AddInfo("after operator:", opPos);
+                stopReporting = true;
+                return null;
+            }
+    
             var app = new Application(current.Position + function.Position, function, current);
             current = app;
         }
 
-        if(Peek == Kind.GOESLEFT || Peek == Kind.DOT)
+        if(OperatorError())
         {
-            AddError("cannot mix operators < > and . in the same expression", Here);
-            stopReporting = true;
             return null;
         }
 
@@ -373,12 +387,55 @@ public class Parser
     {
         if(Accept(Kind.GOESLEFT))
         {
+            var opPos = Prev.Position;
+
             var next = ParseApplication();
             if (next == null)
+            {
+                AddInfo("after operator:", opPos);
+                stopReporting = true;
                 return null;
+            }
 
             var rest = ParseGoesLeft(next);
+            if (rest == null)
+                return null;
+
             return new Application(left.Position + rest.Position, left, rest);
+        }
+
+        if (OperatorError())
+        {
+            return null;
+        }
+
+        return left;
+    }
+
+    private Expression ParseComposition(Expression left)
+    {
+        if(Accept(Kind.DOT))
+        {
+            var opPos = Prev.Position;
+
+            var next = ParseApplication();
+            if (next == null)
+            {
+                AddInfo("after operator:", opPos);
+                stopReporting = true;
+                return null;
+            }
+
+            var rest = ParseComposition(next);
+            if (rest == null)
+                return null;
+
+            return new Composition(left.Position + rest.Position, left, rest);
+        }
+
+        if (OperatorError())
+        {
+            return null;
         }
 
         return left;
@@ -468,5 +525,30 @@ public class Parser
             default:
                 return false;
         }
+    }
+
+    private bool IsOperator()
+    {
+        switch (Peek)
+        {
+            case Kind.GOESLEFT:
+            case Kind.GOESRIGHT:
+            case Kind.DOT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private bool OperatorError()
+    {
+        if(IsOperator())
+        {
+            AddError("cannot mix operators < > and . in the same expression", Here);
+            stopReporting = true;
+            return true;
+        }
+
+        return false;
     }
 }
