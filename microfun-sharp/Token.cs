@@ -30,42 +30,47 @@ public struct Token
         // variable tokens
 
         IDENTIFIER,
-        NUMBER
+        NUMBER,
+
+        // special
+
+        EOS
     }
 
     // tokens with special names
 
     public static readonly Dictionary<Kind, string> tokenStrings = new Dictionary<Kind, string>
-        {
-            {Kind.IDENTIFIER, "identifier"},
-            {Kind.NUMBER, "number literal"}
-        };
+    {
+        {Kind.IDENTIFIER, "identifier"},
+        {Kind.NUMBER, "number literal"},
+        {Kind.EOS, "end of stream"}
+    };
 
     public static readonly Dictionary<string, Kind> keywords = new Dictionary<string, Kind>
-        {
-            {"let", Kind.LET},
-            {"in", Kind.IN}
-        };
+    {
+        {"let", Kind.LET},
+        {"in", Kind.IN}
+    };
 
     public static readonly Dictionary<string, Kind> digraphs = new Dictionary<string, Kind>
-        {
-            {"->", Kind.ARROW}
-        };
+    {
+        {"->", Kind.ARROW}
+    };
 
     public static readonly Dictionary<string, Kind> symbols = new Dictionary<string, Kind>
-        {
-            {"(", Kind.LPARENS},
-            {")", Kind.RPARENS},
-            {"[", Kind.LBRACKET},
-            {"]", Kind.RBRACKET},
-            {"{", Kind.LCURLY},
-            {"}", Kind.RCURLY},
-            {"=", Kind.EQUAL},
-            {",", Kind.COMMA},
-            {">", Kind.GOESRIGHT},
-            {"<", Kind.GOESLEFT},
-            {".", Kind.DOT},
-        };
+    {
+        {"(", Kind.LPARENS},
+        {")", Kind.RPARENS},
+        {"[", Kind.LBRACKET},
+        {"]", Kind.RBRACKET},
+        {"{", Kind.LCURLY},
+        {"}", Kind.RCURLY},
+        {"=", Kind.EQUAL},
+        {",", Kind.COMMA},
+        {">", Kind.GOESRIGHT},
+        {"<", Kind.GOESLEFT},
+        {".", Kind.DOT},
+    };
 
     static Token()
     {
@@ -87,16 +92,16 @@ public struct Token
     }
 
     public Kind Which { get; private set; }
-    public SourcePosition Pos { get; private set; }
+    public SourcePosition Position { get; private set; }
     public long? NumberValue { get; private set; }
 
     public Token(Kind which, SourcePosition pos, long? numberValue)
     {
         Which = which;
-        Pos = pos;
+        Position = pos;
         NumberValue = numberValue;
     }
 
-    public string Text => Pos.Text;
+    public string Text => Position.Text;
     public string Name => GetName(Which);
 }

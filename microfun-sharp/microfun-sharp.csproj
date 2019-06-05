@@ -38,6 +38,7 @@
     <Compile Include="Token.cs" />
     <Compile Include="Lexer.cs" />
     <Compile Include="AST.cs" />
+    <Compile Include="Parser.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ProjectExtensions>

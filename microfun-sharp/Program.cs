@@ -30,9 +30,20 @@ class Program
             return 1;
         }
 
+        var lastTokenPos = tokens[tokens.Count - 1].Position;
+        tokens.Add(new Token(Token.Kind.EOS, lastTokenPos, null));
+
         // Parse stream of tokens
 
+        var parser = new Parser(tokens);
+        var expr = parser.Parse();
 
+        if(expr == null)
+        {
+            parser.Report.Print();
+            Console.WriteLine("Failure");
+            return 0;
+        }
 
         Console.WriteLine("Success");
         return 0;
