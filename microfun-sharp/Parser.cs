@@ -37,14 +37,24 @@ public class Parser
 
     private Expression ParseExpression()
     {
+        var startIndex = headIndex;
+
         if (Peek == Kind.LET)
         {
             return ParseLet();
         }
-        else
+
+        var atom = ParseAtomic();
+
+        if (Peek == Kind.ARROW)
         {
-            return ParseAtomic();
+            headIndex = startIndex;     // backtrack
+            return ParseLambda();
         }
+
+        var app = TryParseApplication(atom);
+
+        return app;
     }
 
     private Let ParseLet()
@@ -313,8 +323,27 @@ public class Parser
             elements.Add(elem);
         }
 
-
         return new Pattern(start + Prev.Position, elements);
+    }
+
+    private Expression ParseGoesRight(Expression first)
+    {
+        var argument = first;
+
+
+        return null;
+    }
+
+    private Expression TryParseApplication(Expression left)
+    {
+        while (CanStartAtomic())
+        {
+            var right = ParseAtomic();
+            var app = new Application(left.Position + right.Position, left, right);
+            left = app;
+        }
+
+        return left;
     }
 
     private Token Lookahead(int i) => tokens[headIndex + i];
@@ -365,5 +394,20 @@ public class Parser
             return;
 
         Report.Add(Severity.Info, message, pos);
+    }
+
+    private bool CanStartAtomic()
+    {
+        switch(Peek)
+        {
+            case Kind.IDENTIFIER:
+            case Kind.NUMBER:
+            case Kind.LPARENS:
+            case Kind.LCURLY:
+            case Kind.LBRACKET:
+                return true;
+            default:
+                return false;
+        }
     }
 }
