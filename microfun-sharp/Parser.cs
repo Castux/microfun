@@ -22,12 +22,12 @@ public class Parser
         stopReporting = false;
 
         var expr = ParseExpression();
-        if(expr == null)
+        if (expr == null)
         {
             return null;
         }
 
-        if(!Expect(Kind.EOS))
+        if (!Expect(Kind.EOS))
         {
             return null;
         }
@@ -70,14 +70,14 @@ public class Parser
         } while (Accept(Kind.COMMA));
 
         var inPos = Here;
-        if(!Expect(Kind.IN))
+        if (!Expect(Kind.IN))
         {
             AddInfo("to complete let started here:", start);
             return null;
         }
 
         var body = ParseExpression();
-        if(body == null)
+        if (body == null)
         {
             AddInfo("after in:", inPos);
             return null;
@@ -88,14 +88,14 @@ public class Parser
 
     private Binding ParseBinding()
     {
-        if(!Expect(Kind.IDENTIFIER))
+        if (!Expect(Kind.IDENTIFIER))
         {
             return null;
         }
 
         var ident = new Identifier(Prev);
 
-        if(!Expect(Kind.EQUAL))
+        if (!Expect(Kind.EQUAL))
         {
             AddInfo("in binding started here:", ident.Position);
             stopReporting = true;
@@ -103,7 +103,7 @@ public class Parser
         }
 
         var body = ParseExpression();
-        if(body == null)
+        if (body == null)
         {
             AddInfo("as right hand side of binding started here:", ident.Position);
             stopReporting = true;
@@ -119,11 +119,11 @@ public class Parser
         {
             return new Identifier(Prev);
         }
-        else if(Accept(Kind.NUMBER))
+        else if (Accept(Kind.NUMBER))
         {
             return new Number(Prev);
         }
-        else if(Peek == Kind.LPARENS)
+        else if (Peek == Kind.LPARENS)
         {
             return ParseParens();
         }
@@ -182,7 +182,7 @@ public class Parser
 
         Expect(Kind.LCURLY);
 
-        if(Accept(Kind.RCURLY))
+        if (Accept(Kind.RCURLY))
         {
             return new List(start + Prev.Position, expressions);
         }
@@ -205,8 +205,8 @@ public class Parser
             stopReporting = true;
             return null;
         }
-     
-       return new List(start + Prev.Position, expressions);
+
+        return new List(start + Prev.Position, expressions);
     }
 
     private Expression ParseMultilambda()
@@ -250,7 +250,7 @@ public class Parser
             return null;
         }
 
-        if(!Expect(Kind.ARROW))
+        if (!Expect(Kind.ARROW))
         {
             AddInfo("in lambda with pattern:", pattern.Position);
             return null;
@@ -284,7 +284,7 @@ public class Parser
         var start = Here;
         var elements = new List<PatternElement>();
 
-        if(Accept(Kind.LPARENS))
+        if (Accept(Kind.LPARENS))
         {
             do
             {
@@ -297,7 +297,7 @@ public class Parser
                 elements.Add(elem);
             } while (Accept(Kind.COMMA));
 
-            if(!Expect(Kind.RPARENS))
+            if (!Expect(Kind.RPARENS))
             {
                 AddInfo("to match:", start);
                 return null;
@@ -306,7 +306,7 @@ public class Parser
         else
         {
             var elem = ParsePatternElement();
-            if(elem == null)
+            if (elem == null)
             {
                 return null;
             }
