@@ -1,20 +1,8 @@
 *microfun* is a toy language developed to learn about compilers, pure functional programming and lazy evaluation.
 
-The current implementation uses either an interpreter that executes the in-memory representation of the program, or transpiles the program into Lua and executes it on the fly.
-
 # Usage
 
-Requirements:
-
-- Lua 5.1 to 5.3
-- lpeg
-- graphviz dot (only for debugging)
-
-`lua main.lua <source> [interpret] [debug] [dot]`
-
- - `interpret`: Use the interpreter instead of the transpiler
- - `debug`: In interpreter mode, print out each execution step of the interpreter to stdout. In transpiler mode, write out the resulting Lua source to `out.lua`.
- - `dot`: When using the interpreter in debug mode, also write out every interpreter state as a `.dot` graph description file, and run `dot` on it to produce a PNG image. Note: the path to `dot` is hardcoded in `dot.lua` as just `"dot"`. Make sure the `dot` utility is in your path.
+`mono Program.exe source1.mf source2.mf ...`
 
 # Language features
 
