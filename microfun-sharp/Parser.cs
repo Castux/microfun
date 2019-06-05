@@ -79,7 +79,7 @@ public class Parser
         var body = ParseExpression();
         if(body == null)
         {
-            AddInfo("after in", inPos);
+            AddInfo("after in:", inPos);
             return null;
         }
 
@@ -136,7 +136,7 @@ public class Parser
             return ParseMultilambda();
         }
 
-        AddError("invalid expression", Here);
+        AddError("invalid expression:", Here);
         return null;
     }
 
@@ -163,7 +163,7 @@ public class Parser
 
         if (!Expect(Kind.RPARENS))
         {
-            AddInfo("to match", start);
+            AddInfo("to match:", start);
             stopReporting = true;
             return null;
         }
@@ -201,7 +201,7 @@ public class Parser
 
         if (!Expect(Kind.RCURLY))
         {
-            AddInfo("to match", start);
+            AddInfo("to match:", start);
             stopReporting = true;
             return null;
         }
@@ -231,7 +231,7 @@ public class Parser
 
         if (!Expect(Kind.RBRACKET))
         {
-            AddInfo("to match", start);
+            AddInfo("to match:", start);
             stopReporting = true;
             return null;
         }
@@ -252,7 +252,7 @@ public class Parser
 
         if(!Expect(Kind.ARROW))
         {
-            AddInfo("in lambda", pattern.Position);
+            AddInfo("in lambda with pattern:", pattern.Position);
             return null;
         }
 
@@ -263,22 +263,58 @@ public class Parser
         return new Lambda(pattern, body);
     }
 
-    private Pattern ParsePattern()
+    private PatternElement ParsePatternElement()
     {
-        if(Accept(Kind.IDENTIFIER))
+        if (Accept(Kind.IDENTIFIER))
         {
-            var elem = new IdentifierPattern(Prev);
-            return new Pattern(elem.Position, new List<PatternElement> { elem });
+            return new IdentifierPattern(Prev);
         }
 
         if (Accept(Kind.NUMBER))
         {
-            var elem = new NumberPattern(Prev);
-            return new Pattern(elem.Position, new List<PatternElement> { elem });
+            return new NumberPattern(Prev);
         }
 
-        AddError("invalid pattern", Here);
+        AddError("invalid pattern element:", Here);
         return null;
+    }
+
+    private Pattern ParsePattern()
+    {
+        var start = Here;
+        var elements = new List<PatternElement>();
+
+        if(Accept(Kind.LPARENS))
+        {
+            do
+            {
+                var elem = ParsePatternElement();
+                if (elem == null)
+                {
+                    return null;
+                }
+
+                elements.Add(elem);
+            } while (Accept(Kind.COMMA));
+
+            if(!Expect(Kind.RPARENS))
+            {
+                AddInfo("to match:", start);
+                return null;
+            }
+        }
+        else
+        {
+            var elem = ParsePatternElement();
+            if(elem == null)
+            {
+                return null;
+            }
+            elements.Add(elem);
+        }
+
+
+        return new Pattern(start + Prev.Position, elements);
     }
 
     private Token Lookahead(int i) => tokens[headIndex + i];
