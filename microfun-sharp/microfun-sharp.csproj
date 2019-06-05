@@ -37,6 +37,7 @@
     <Compile Include="SourceFile.cs" />
     <Compile Include="Token.cs" />
     <Compile Include="Lexer.cs" />
+    <Compile Include="AST.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ProjectExtensions>
