@@ -52,14 +52,21 @@ public class Parser
             return ParseLambda();
         }
 
-        var app = TryParseApplication(atom);
+        var expr = TryParseApplication(atom);
 
         if(Peek == Kind.GOESRIGHT)
         {
-            return ParseGoesRight(app);
+            return ParseGoesRight(expr);
         }
 
-        return app;
+        if(Peek == Kind.GOESLEFT)
+        {
+            return ParseGoesLeft(expr);
+        }
+
+
+
+        return expr;
     }
 
     private Let ParseLet()
@@ -163,6 +170,11 @@ public class Parser
         var expressions = new List<Expression>();
 
         Expect(Kind.LPARENS);
+
+        if(Accept(Kind.RPARENS))
+        {
+            return new Tuple(start + Prev.Position, expressions);
+        }
 
         do
         {
@@ -301,6 +313,11 @@ public class Parser
 
         if (Accept(Kind.LPARENS))
         {
+            if(Accept(Kind.RPARENS))
+            {
+                return new Pattern(start + Prev.Position, elements);
+            }
+
             do
             {
                 var elem = ParsePatternElement();
@@ -342,7 +359,29 @@ public class Parser
             current = app;
         }
 
+        if(Peek == Kind.GOESLEFT || Peek == Kind.DOT)
+        {
+            AddError("cannot mix operators < > and . in the same expression", Here);
+            stopReporting = true;
+            return null;
+        }
+
         return current;
+    }
+
+    private Expression ParseGoesLeft(Expression left)
+    {
+        if(Accept(Kind.GOESLEFT))
+        {
+            var next = ParseApplication();
+            if (next == null)
+                return null;
+
+            var rest = ParseGoesLeft(next);
+            return new Application(left.Position + rest.Position, left, rest);
+        }
+
+        return left;
     }
 
     private Expression ParseApplication()
