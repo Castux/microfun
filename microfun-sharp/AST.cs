@@ -32,9 +32,9 @@ public class Number : Expression
 {
     public readonly long Value;
 
-    public Number(SourcePosition position, long value) : base(position)
+    public Number(Token token) : base(token.Position)
     {
-        Value = value;
+        Value = long.Parse(token.Text);
     }
 }
 
@@ -70,9 +70,9 @@ public class NumberPattern : PatternElement
 {
     public readonly long Value;
 
-    public NumberPattern(SourcePosition position, long value) : base(position)
+    public NumberPattern(Token token) : base(token.Position)
     {
-        Value = value;
+        Value = long.Parse(token.Text);
     }
 }
 
@@ -80,9 +80,9 @@ public class IdentifierPattern : PatternElement
 {
     public readonly string Value;
 
-    public IdentifierPattern(SourcePosition position, string value) : base(position)
+    public IdentifierPattern(Token token) : base(token.Position)
     {
-        Value = value;
+        Value = token.Text;
     }
 }
 
@@ -101,7 +101,7 @@ public class Lambda : Expression
     public readonly Pattern Pattern;
     public readonly Expression Body;
 
-    public Lambda(SourcePosition position, Pattern pattern, Expression body) : base(position)
+    public Lambda(Pattern pattern, Expression body) : base(pattern.Position + body.Position)
     {
         Pattern = pattern;
         Body = body;
