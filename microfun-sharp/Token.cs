@@ -69,7 +69,7 @@ public struct Token
         {",", Kind.COMMA},
         {">", Kind.GOESRIGHT},
         {"<", Kind.GOESLEFT},
-        {".", Kind.DOT},
+        {".", Kind.DOT}
     };
 
     static Token()

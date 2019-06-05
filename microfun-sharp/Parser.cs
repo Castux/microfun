@@ -60,17 +60,17 @@ public class Parser
 
         // Operations < > .
 
-        if(Peek == Kind.GOESRIGHT)
+        if (Peek == Kind.GOESRIGHT)
         {
             return ParseGoesRight(expr);
         }
 
-        if(Peek == Kind.GOESLEFT)
+        if (Peek == Kind.GOESLEFT)
         {
             return ParseGoesLeft(expr);
         }
 
-        if(Peek == Kind.DOT)
+        if (Peek == Kind.DOT)
         {
             return ParseComposition(expr);
         }
@@ -111,6 +111,7 @@ public class Parser
         if (body == null)
         {
             AddInfo("after in:", inPos);
+            stopReporting = true;
             return null;
         }
 
@@ -149,19 +150,23 @@ public class Parser
         {
             return new Identifier(Prev);
         }
-        else if (Accept(Kind.NUMBER))
+
+        if (Accept(Kind.NUMBER))
         {
             return new Number(Prev);
         }
-        else if (Peek == Kind.LPARENS)
+
+        if (Peek == Kind.LPARENS)
         {
             return ParseParens();
         }
-        else if (Peek == Kind.LCURLY)
+
+        if (Peek == Kind.LCURLY)
         {
             return ParseList();
         }
-        else if (Peek == Kind.LBRACKET)
+
+        if (Peek == Kind.LBRACKET)
         {
             return ParseMultilambda();
         }
@@ -179,7 +184,7 @@ public class Parser
 
         Expect(Kind.LPARENS);
 
-        if(Accept(Kind.RPARENS))
+        if (Accept(Kind.RPARENS))
         {
             return new Tuple(expressions);
         }
@@ -320,7 +325,7 @@ public class Parser
 
         if (Accept(Kind.LPARENS))
         {
-            if(Accept(Kind.RPARENS))
+            if (Accept(Kind.RPARENS))
             {
                 return new Pattern(elements);
             }
@@ -359,7 +364,7 @@ public class Parser
     {
         var current = first;
 
-        while(Accept(Kind.GOESRIGHT))
+        while (Accept(Kind.GOESRIGHT))
         {
             var opPos = Prev.Position;
 
@@ -370,12 +375,12 @@ public class Parser
                 stopReporting = true;
                 return null;
             }
-    
+
             var app = new Application(function, current);
             current = app;
         }
 
-        if(OperatorError())
+        if (OperatorError())
         {
             return null;
         }
@@ -385,7 +390,7 @@ public class Parser
 
     private Expression ParseGoesLeft(Expression left)
     {
-        if(Accept(Kind.GOESLEFT))
+        if (Accept(Kind.GOESLEFT))
         {
             var opPos = Prev.Position;
 
@@ -414,7 +419,7 @@ public class Parser
 
     private Expression ParseComposition(Expression left)
     {
-        if(Accept(Kind.DOT))
+        if (Accept(Kind.DOT))
         {
             var opPos = Prev.Position;
 
@@ -465,7 +470,6 @@ public class Parser
     private Token Lookahead(int i) => tokens[headIndex + i];
     private Token Head => Lookahead(0);
     private Token Prev => Lookahead(-1);
-    private Token Next => Lookahead(1);
     private Kind Peek => Head.Which;
     private SourcePosition Here => Head.Position;
 
@@ -514,7 +518,7 @@ public class Parser
 
     private bool CanStartAtomic()
     {
-        switch(Peek)
+        switch (Peek)
         {
             case Kind.IDENTIFIER:
             case Kind.NUMBER:
@@ -542,7 +546,7 @@ public class Parser
 
     private bool OperatorError()
     {
-        if(IsOperator())
+        if (IsOperator())
         {
             AddError("cannot mix operators < > and . in the same expression", Here);
             stopReporting = true;
