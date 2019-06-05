@@ -18,8 +18,20 @@ public class Parser
     public Expression Parse()
     {
         headIndex = 0;
+        stopReporting = false;
 
-        return ParseExpression();
+        var expr = ParseExpression();
+        if(expr == null)
+        {
+            return null;
+        }
+
+        if(!Expect(Kind.EOS))
+        {
+            return null;
+        }
+
+        return expr;
     }
 
     private Expression ParseExpression()
@@ -28,9 +40,14 @@ public class Parser
         {
             return ParseLet();
         }
+        else if(Peek == Kind.IDENTIFIER)
+        {
+            var ident = new Identifier(Head);
+            Expect(Kind.IDENTIFIER);
+            return ident;
+        }
 
-        AddError("expected expression", Here);
-
+        AddError("invalid expression", Here);
         return null;
     }
 
@@ -48,7 +65,7 @@ public class Parser
 
             if (binding == null)
             {
-                AddInfo("in let statement started here:", start);
+                AddInfo("in let started here:", start);
                 return null;
             }
 
@@ -56,14 +73,49 @@ public class Parser
 
         } while (Accept(Kind.COMMA));
 
-        return new Let(start + Prev.Position, bindings);
+        var inPos = Here;
+        if(!Expect(Kind.IN))
+        {
+            AddInfo("to complete let started here:", start);
+            return null;
+        }
+
+        var body = ParseExpression();
+        if(body == null)
+        {
+            AddInfo("after in", inPos);
+            return null;
+        }
+
+        return new Let(bindings, body);
     }
 
     private Binding ParseBinding()
     {
-        AddError("expected binding", Here);
+        if(!Expect(Kind.IDENTIFIER))
+        {
+            AddInfo("to start binding", Here);
+            return null;
+        }
 
-        return null;
+        var ident = new Identifier(Prev);
+
+        if(!Expect(Kind.EQUAL))
+        {
+            AddInfo("in binding started here:", ident.Position);
+            stopReporting = true;
+            return null;
+        }
+
+        var body = ParseExpression();
+        if(body == null)
+        {
+            AddInfo("as right hand side of binding started here:", ident.Position);
+            stopReporting = true;
+            return null;
+        }
+
+        return new Binding(ident, body);
     }
 
     private Token Lookahead(int i) => tokens[headIndex + i];
@@ -72,6 +124,8 @@ public class Parser
     private Token Next => Lookahead(1);
     private Kind Peek => Head.Which;
     private SourcePosition Here => Head.Position;
+
+    private bool stopReporting;
 
     private bool Expect(Kind k)
     {
@@ -100,11 +154,17 @@ public class Parser
 
     private void AddError(string message, SourcePosition pos)
     {
+        if (stopReporting)
+            return;
+
         Report.Add(Severity.Error, message, pos);
     }
 
     private void AddInfo(string message, SourcePosition pos)
     {
+        if (stopReporting)
+            return;
+
         Report.Add(Severity.Info, message, pos);
     }
 }

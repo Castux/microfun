@@ -30,8 +30,11 @@ class Program
             return 1;
         }
 
+        // End of stream token
+
         var lastTokenPos = tokens[tokens.Count - 1].Position;
-        tokens.Add(new Token(Token.Kind.EOS, lastTokenPos, null));
+        var eosPos = new SourcePosition(lastTokenPos.File, lastTokenPos.End + 1, lastTokenPos.End + 1);
+        tokens.Add(new Token(Token.Kind.EOS, eosPos, null));
 
         // Parse stream of tokens
 

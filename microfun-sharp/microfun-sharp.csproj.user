@@ -2,7 +2,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Default' ">
     <StartAction>Project</StartAction>
-    <StartArguments>prelude.mf test.mf</StartArguments>
+    <StartArguments>test.mf</StartArguments>
     <StartWorkingDirectory>..</StartWorkingDirectory>
     <ExternalConsole>false</ExternalConsole>
   </PropertyGroup>

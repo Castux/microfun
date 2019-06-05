@@ -22,9 +22,9 @@ public class Identifier : Expression
 {
     public readonly string Name;
 
-    public Identifier(SourcePosition position, string name) : base(position)
+    public Identifier(Token token) : base(token.Position)
     {
-        Name = name;
+        Name = token.Text;
     }
 }
 
@@ -147,7 +147,7 @@ public class Binding : ASTNode
     public readonly Identifier Name;
     public readonly Expression Body;
 
-    public Binding(SourcePosition position, Identifier name, Expression body) : base(position)
+    public Binding(Identifier name, Expression body) : base(name.Position + body.Position)
     {
         Name = name;
         Body = body;
@@ -157,9 +157,11 @@ public class Binding : ASTNode
 public class Let : Expression
 {
     public readonly List<Binding> Bindings;
+    public readonly Expression Body;
 
-    public Let(SourcePosition position, List<Binding> bindings) : base(position)
+    public Let(List<Binding> bindings, Expression body) : base(bindings[0].Position + body.Position)
     {
         Bindings = bindings;
+        Body = body;
     }
 }
