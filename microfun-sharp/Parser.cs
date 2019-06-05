@@ -54,6 +54,11 @@ public class Parser
 
         var app = TryParseApplication(atom);
 
+        if(Peek == Kind.GOESRIGHT)
+        {
+            return ParseGoesRight(app);
+        }
+
         return app;
     }
 
@@ -328,10 +333,25 @@ public class Parser
 
     private Expression ParseGoesRight(Expression first)
     {
-        var argument = first;
+        var current = first;
 
+        while(Accept(Kind.GOESRIGHT))
+        {
+            var function = ParseApplication();
+            var app = new Application(current.Position + function.Position, function, current);
+            current = app;
+        }
 
-        return null;
+        return current;
+    }
+
+    private Expression ParseApplication()
+    {
+        var first = ParseAtomic();
+        if (first == null)
+            return null;
+
+        return TryParseApplication(first);
     }
 
     private Expression TryParseApplication(Expression left)
