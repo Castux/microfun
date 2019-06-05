@@ -47,28 +47,25 @@ Terminals: `Name` and `Number`, as described above. Operator precedence is descr
 ```
 Program := Expr
 
-Expr := Let | Lambda | GoesRight
+Expr := Let | Lambda | Operation
 
 Let := 'let' ListBinding 'in' Expr
-
 ListBinding := Binding ( ',' Binding )*
 Binding := Name '=' Expr
 
 Lambda := Pattern '->' Expr
-
 Pattern := Name | Number | TuplePattern
-
 TuplePattern := '(' ')' | '(' PatternElem ( ',' PatternElem )* ')'
 PatternElem := Name | Number
 
-GoesRight := GoesLeft ( '>' GoesLeft )*
-GoesLeft := Composition ( '<' Composition )*
-Composition := Composand ( '.' Composand )*
-Composand := Application | AtomicExpr
+Operation := GoesRight | GoesLeft | Composition
+GoesRight := Operand ( '>' Operand )*
+GoesLeft := Operand ( '<' Operand )*
+Composition := Operand ( '.' Operand )*
+Operand := Application | AtomicExpr
 Application := AtomicExpr AtomicExpr+
 
 AtomicExpr := Name | Number | Tuple | MultiLambda | List
-
 Tuple := '(' ')' | '(' Expr ( ',' Expr )* ')'
 MultiLambda := '[' Lambda ( ',' Lambda )* ']'
 List :=  '{' '}' | '{' Expr ( ',' Expr )* '}'
