@@ -28,7 +28,7 @@ primes2 =
 
 fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci)),
 
-let fact = [
+fact = [
 	1 -> 1,
 	n -> mul n (fact < pred n)
 ]
