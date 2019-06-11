@@ -27,6 +27,8 @@ public class Analyzer
         AddBinding("sqrt", new SourcePosition());
         AddBinding("eq", new SourcePosition());
         AddBinding("lt", new SourcePosition());
+        AddBinding("show", new SourcePosition());
+        AddBinding("eval", new SourcePosition());
 
         return Analyze(root as dynamic);
     }
