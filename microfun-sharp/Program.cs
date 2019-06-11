@@ -60,6 +60,17 @@ class Program
             return 0;
         }
 
+        // Interpretation
+
+        var interpreter = new Interpreter(expr);
+        success = interpreter.Evaluate();
+        if(!success)
+        {
+            interpreter.Report.Print();
+            Console.WriteLine("Failure");
+            return 0;
+        }
+
         Console.WriteLine("Success");
         return 0;
     }

@@ -48,6 +48,7 @@
     <Compile Include="AST.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Analyzer.cs" />
+    <Compile Include="Interpreter.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ProjectExtensions>
