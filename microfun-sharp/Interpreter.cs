@@ -117,7 +117,6 @@ public class Interpreter
     {
         stack = new List<Dictionary<string, Value>>();
 
-
         try
         {
             var value = Visit(root as dynamic);
@@ -131,11 +130,6 @@ public class Interpreter
     }
 
     // Tree traversal
-
-    private Value Visit(Expression expr)
-    {
-        throw new Exception("AST node visitation not implemented");
-    }
 
     private Value Visit(Number number)
     {
@@ -215,6 +209,13 @@ public class Interpreter
     private Value Visit(Multilambda multi)
     {
         return new Value(multi);
+    }
+
+    private Value Visit(Composition compose)
+    {
+        var left = new Value(Lookup("compose"), Visit(compose.Left as dynamic));
+
+        return new Value(left, Visit(compose.Right as dynamic));
     }
 
     // Scope stack
