@@ -176,8 +176,18 @@ public class Interpreter
     {
         PushScope();
 
+        // To allow recursive bindings, first allocate them as empty 1-tuples
+        // Then populate them
+
         foreach (var binding in let.Bindings)
-            AddBinding(binding.Name.Name, Visit(binding.Body as dynamic));
+        {
+            AddBinding(binding.Name.Name, new Value(new List<Value> { } ));
+        }
+
+        foreach (var binding in let.Bindings)
+        {
+            Lookup(binding.Name.Name).Values.Add(Visit(binding.Body as dynamic));
+        }
 
         var body = Visit(let.Body as dynamic);
 
