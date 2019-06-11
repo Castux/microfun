@@ -48,6 +48,18 @@ class Program
             return 0;
         }
 
+        // Analysis
+
+        var analyzer = new Analyzer(expr);
+        success = analyzer.Analyze();
+
+        if(!success)
+        {
+            analyzer.Report.Print();
+            Console.WriteLine("Failure");
+            return 0;
+        }
+
         Console.WriteLine("Success");
         return 0;
     }

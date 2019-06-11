@@ -7,9 +7,11 @@ public abstract class Expression
 public class Identifier : Expression
 {
     public readonly string Name;
+    public readonly Token Token;
 
     public Identifier(Token token)
     {
+        Token = token;
         Name = token.Text;
     }
 }
@@ -61,9 +63,11 @@ public class NumberPattern : PatternElement
 public class IdentifierPattern : PatternElement
 {
     public readonly string Value;
+    public readonly Token Token;
 
     public IdentifierPattern(Token token)
     {
+        Token = token;
         Value = token.Text;
     }
 }
