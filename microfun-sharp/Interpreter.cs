@@ -17,7 +17,8 @@ public class Interpreter
         public long Number;
         public List<Value> Values;
         public Expression Function;
-        public string BuiltinFunction;
+        public Unary UnaryBuiltin;
+        public Binary BinaryBuiltin;
 
         public Value(long number)
         {
@@ -49,10 +50,16 @@ public class Interpreter
             Values = new List<Value> { function, argument };
         }
 
-        public Value(string builtin)
+        public Value(Unary builtin)
         {
             Type = Kind.Function;
-            BuiltinFunction = builtin;
+            UnaryBuiltin = builtin;
+        }
+
+        public Value(Binary builtin)
+        {
+            Type = Kind.Function;
+            BinaryBuiltin = builtin;
         }
 
         private Value() { }
@@ -67,8 +74,8 @@ public class Interpreter
 
     // Builtin functions
 
-    private delegate long Unary(long arg);
-    private delegate Unary Binary(long arg);
+    public delegate long Unary(long arg);
+    public delegate Unary Binary(long arg);
 
     private static readonly Dictionary<string, Unary> unaries;
     private static readonly Dictionary<string, Binary> binaries;
@@ -165,10 +172,40 @@ public class Interpreter
         return new Value(Visit(app.Function as dynamic), Visit(app.Argument as dynamic));
     }
 
-    //private Value Visit(Let let)
-    //{
+    private Value Visit(Let let)
+    {
+        PushScope();
 
-    //}
+        foreach (var binding in let.Bindings)
+            AddBinding(binding.Name.Name, Visit(binding.Body as dynamic));
+
+        var body = Visit(let.Body as dynamic);
+
+        PopScope();
+
+        return body;
+    }
+
+    private Value Visit(Identifier identifier)
+    {
+        if (unaries.ContainsKey(identifier.Name))
+            return new Value(unaries[identifier.Name]);
+
+        if (binaries.ContainsKey(identifier.Name))
+            return new Value(binaries[identifier.Name]);
+
+        return Lookup(identifier.Name);
+    }
+
+    private Value Visit(Lambda lambda)
+    {
+        return new Value(lambda);
+    }
+
+    private Value Visit(Multilambda multi)
+    {
+        return new Value(multi);
+    }
 
     // Scope stack
 
@@ -186,5 +223,16 @@ public class Interpreter
     private void AddBinding(string name, Value value)
     {
         stack[stack.Count - 1].Add(name, value);
+    }
+
+    private Value Lookup(string name)
+    {
+        for (var i = stack.Count - 1; i >= 0; i--)
+        {
+            if (stack[i].ContainsKey(name))
+                return stack[i][name];
+        }
+
+        throw new Exception("missing binding");
     }
 }
