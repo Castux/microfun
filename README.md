@@ -6,7 +6,7 @@ The current implementation uses either an interpreter that executes the in-memor
 
 Requirements:
 
-- Lua 5.1 to 5.3
+- Lua 5.1 to 5.4
 - lpeg
 - graphviz dot (only for debugging)
 

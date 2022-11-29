@@ -19,7 +19,7 @@ primeDivisors = [
 
 primes2 =
 	let
-		isPrime = n -> primes2 > takeWhile (flip lte (sqrt n)) > none (divides n),	
+		isPrime = n -> primes2 > takeWhile (flip lte (sqrt n)) > none (divides n),
 		primesUpFrom = n -> if (isPrime n)
 			(n, primesUpFrom (add 2 n))
 			(primesUpFrom (add 2 n))
@@ -34,3 +34,5 @@ fact = [
 ]
 
 in
+
+show < take 100 < primes2
