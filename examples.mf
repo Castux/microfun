@@ -7,7 +7,7 @@ divisors = n -> filter (divides n) < range 1 n,
 digits = reverse . map (flip mod 10) . takeWhile (lt 0) . iterate (flip div 10),
 
 isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte n 2),
-primes = upfrom 1 > filter isPrime,
+primes = upFrom 1 > filter isPrime,
 primeDivisors = [
 	1 -> {},
 	n -> let
@@ -31,8 +31,29 @@ fibonacci = concat {1,1} (zipWith add fibonacci (tail fibonacci)),
 fact = [
 	1 -> 1,
 	n -> mul n (fact < pred n)
-]
+],
+
+pow = a -> n -> if (lte 1 n)
+	(mul a < pow a < pred n)
+	1,
+
+pairWith = f -> [
+	() -> b -> (),
+	(x,xs) -> [
+		() -> (),
+		b -> concat (map (f x) b) (pairWith f xs b)
+	]
+],
+
+randomNext = add 1013904223 . mul 1664525,
+randomFromSeed = iterate randomNext
 
 in
 
-show < take 100 < primes2
+let
+
+ones = concat {1} ones
+
+in
+
+show < take 10000 < map (flip mod 20) < randomFromSeed 1

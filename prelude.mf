@@ -137,7 +137,7 @@ takeWhile = f -> [
 		()
 ],
 
-split = p -> 
+split = p ->
 	foldr
 	[ x -> (ts, fs) -> if (p x) ((x,ts), fs) (ts, (x,fs)) ]
 	((),()),
@@ -151,14 +151,16 @@ range = a -> b ->
 
 sort = [
 	() -> (),
-	(x,xs) -> concat (sort < filter (gt x) < xs) (x, sort < filter (lte x) < xs)
+	(x,xs) -> split (gt x) xs > [
+		(low,high) -> concat (sort low) (x, sort high)
+	]
 ],
 
 -- Infinite lists
 
 iterate = f -> x -> (x, iterate f (f x)),
-downfrom = iterate pred,
-upfrom = iterate succ,
+downFrom = iterate pred,
+upFrom = iterate succ,
 repeat = iterate id
 
 in
