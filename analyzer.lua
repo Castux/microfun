@@ -6,13 +6,13 @@ local builtins =
 {
 	add = {kind = "named", name = "add", builtin = true, arity = 2, func = function(x,y) return x + y end},
 	mul = {kind = "named", name = "mul", builtin = true, arity = 2, func = function(x,y) return x * y end},
-	sub = {kind = "named", name = "sub", builtin = true, arity = 2, func = function(x,y) return x - y end},
-	div = {kind = "named", name = "div", builtin = true, arity = 2, func = function(x,y) return math.floor(x / y) end},
-	mod = {kind = "named", name = "mod", builtin = true, arity = 2, func = function(x,y) return x % y end},
+	sub = {kind = "named", name = "sub", builtin = true, arity = 2, func = function(x,y) return y - x end},
+	div = {kind = "named", name = "div", builtin = true, arity = 2, func = function(x,y) return math.floor(y / x) end},
+	mod = {kind = "named", name = "mod", builtin = true, arity = 2, func = function(x,y) return y % x end},
 	eq = {kind = "named", name = "eq", builtin = true, arity = 2, func = function(x,y) return x == y and 1 or 0 end},
-	lt = {kind = "named", name = "lt", builtin = true, arity = 2, func = function(x,y) return x < y and 1 or 0 end},
+	lt = {kind = "named", name = "lt", builtin = true, arity = 2, func = function(x,y) return y < x and 1 or 0 end},
 	sqrt = {kind = "named", name = "sqrt", builtin = true, arity = 1, func = function(x) return math.floor(math.sqrt(x)) end},
-	
+
 	eval = {kind = "named", name = "eval", builtin = true, arity = 1},
 	show = {kind = "named", name = "show", builtin = true, arity = 1}
 }
@@ -64,7 +64,7 @@ local function resolveScope(ast)
 	local funcTable =
 	{
 		pre =
-		{	
+		{
 			let = function(node)
 				local names = {}
 				table.insert(scope, names)

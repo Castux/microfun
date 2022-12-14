@@ -13,11 +13,11 @@ const = c -> x -> c,
 -- builtin: add, mul, sub, div, mod, sqrt
 
 succ = add 1,
-pred = (flip sub) 1,
-minus = sub 0,
-abs = n -> if (lt n 0) (sub 0 n) n,
-max = a -> b -> if (lt a b) b a,
-min = a -> b -> if (lt a b) a b,
+pred = sub 1,
+minus = n -> sub n 0,
+abs = n -> if (lt 0 n) (minus n) n,
+max = a -> b -> if (lt a b) a b,
+min = a -> b -> if (lt a b) b a,
 
 -- Booleans
 
@@ -145,13 +145,13 @@ split = p ->
 flatten = foldr concat (),
 
 range = a -> b ->
-	if (lte a b)
+	if (lte b a)
 		(a, range (succ a) b)
 		(),
 
 sort = [
 	() -> (),
-	(x,xs) -> split (gt x) xs > [
+	(x,xs) -> split (lt x) xs > [
 		(low,high) -> concat (sort low) (x, sort high)
 	]
 ],
