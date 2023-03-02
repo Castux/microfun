@@ -22,11 +22,11 @@ local recguard = {}
 setmetatable(recguard, {__mode = 'k'})
 
 local function dump(expr)
-	
+
 	if recguard[expr] then
 		return recguard[expr]
 	end
-	
+
 	recguard[expr] = "rec"
 
 	local out = builder()
@@ -72,7 +72,7 @@ local function dump(expr)
 	else
 		error("Undumpable expression")
 	end
-	
+
 	out = out.dump()
 	recguard[expr] = out
 
@@ -93,12 +93,12 @@ function reduce(data, recurseTuples)
 				if type(func) ~= "function" then
 					error("Cannot apply non-function: " .. dump(func))
 				end
-				
+
 				-- save the result, and some memory
 				data.result = func(data[3])
 				data[2] = nil
 				data[3] = nil
-				
+
 				data = data.result
 			end
 
@@ -128,7 +128,7 @@ local function wrapUnary(name, func)
 		end
 
 		return func(a)
-	end	
+	end
 end
 
 local function wrapBinary(name, func)
@@ -171,5 +171,22 @@ function show(expr)
 	expr = reduce(expr, "recurseTuples")
 	print(dump(expr))
 
+	return expr
+end
+
+function showt(expr)
+	expr = reduce(expr, "recurseTuples")
+	if not isList(expr) then
+		error("Cannot apply showt to non-list")
+	end
+
+	local chars = {}
+	local current = expr
+	while #current == 3 do
+		table.insert(chars, utf8.char(current[2]))
+		current = current[3]
+	end
+
+	print(table.concat(chars))
 	return expr
 end
