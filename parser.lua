@@ -40,6 +40,7 @@ local alpha = R("az","AZ")
 local underscore = P "_"
 local identifier = (alpha + underscore) * (alpha + underscore + digit) ^ 0
 local string = P "'" * (P(1) - S "'") ^ 0 * expect(P "'")
+	+ P '"' * (P(1) - S '"') ^ 0 * expect(P '"')
 
 local number = digit ^ 1 * expect( -(alpha + underscore), "digit")
 local comment = P "--" * (P(1) - S "\n\r") ^ 0

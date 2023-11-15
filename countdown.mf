@@ -1,0 +1,61 @@
+let
+	extract = [
+		() -> (),
+		(h,t) -> ((h,t), (extract t > map ((h2, t2) -> (h2, (h, t2)))))
+	],
+
+	extractPairs =
+		flatten .
+		map ((h,t) -> extract t > map ((u,v) -> (h, u, v))) .
+		extract,
+
+	toNode = n -> (n, 'given', (), ()),
+	value = (n, op, left, right) -> n,
+
+	ops = {
+		(add, '+'),
+		(mul, '*'),
+		(x -> y -> abs (sub x y), '-'),
+		(x -> y -> let
+			big = max x y,
+			small = min x y
+		in
+			if (big > mod small > eq 0) (div small big) (), '/')
+	},
+
+	combine = a -> b ->
+		ops
+			> map ((op,c) -> (op (value a) (value b), c, a, b))
+			> filter (not . empty . value),
+
+	step = target -> nodes ->
+		let
+			solved = filter (node -> eq target (value node)) nodes,
+			rec = nodes
+				> extractPairs
+				> filter ((a,b,rest) -> lt (value a) (value b))
+				> map ((a,b,rest) -> map (comb -> (comb, rest)) (combine a b))
+				> flatten
+				> map (step target)
+				> flatten
+		in
+			if (not < empty solved) solved rec,
+
+	solve = target -> numbers -> numbers > map toNode > step target,
+
+	collect = (v, op, left, right) -> if (empty left)
+		{}
+		(flatten {collect left, collect right, {(v, op, left, right)}}),
+
+	solutionToString = s ->
+		s
+			> collect
+			> map ((v, op, left, right) ->
+				join '' {toString < value left, op, toString < value right, '=', toString v})
+			> join ', '
+in
+
+solve 250 {100,25,2,1,8,7}
+	> map solutionToString
+	> map showt
+	> eval

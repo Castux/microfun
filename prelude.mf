@@ -9,6 +9,11 @@ curry = f -> x -> y -> f (x,y),
 uncurry = f -> (x,y) -> f x y,
 const = c -> x -> c,
 
+-- Tuples
+
+first = (a,b) -> a,
+second = (a,b) -> b,
+
 -- Numbers
 -- builtin: add, mul, sub, div, mod, sqrt
 
@@ -22,6 +27,12 @@ min = a -> b -> if (lt a b) b a,
 -- Booleans
 
 if = cond -> t -> f -> cond > [ 1 -> t, 0 -> f ],
+
+ifs = l -> else ->
+	l > filter first > map second >  [
+		(first,rest) -> first,
+		() -> else
+	],
 
 and = a -> b -> if a b 0,
 or = a -> b -> if a 1 b,
@@ -161,6 +172,55 @@ sort = [
 iterate = f -> x -> (x, iterate f (f x)),
 downFrom = iterate pred,
 upFrom = iterate succ,
-repeat = iterate id
+repeat = iterate id,
+
+-- Strings
+
+join = separator -> [
+	() -> (),
+	(h,t) -> t > [
+		() -> h,
+		t2 -> concat h (concat separator (join separator t2))
+	]
+],
+
+toString =
+	let
+		tupleToList = [
+			() -> {},
+			(a,b) -> {a,b},
+			(a,b,c) -> {a,b,c},
+			(a,b,c,d) -> {a,b,c,d},
+			(a,b,c,d,e) -> {a,b,c,d,e},
+			(a,b,c,d,e,f) -> {a,b,c,d,e,f},
+			(a,b,c,d,e,f,g) -> {a,b,c,d,e,f,g},
+			(a,b,c,d,e,f,g,h) -> {a,b,c,d,e,f,g,h},
+			(a,b,c,d,e,f,g,h,i) -> {a,b,c,d,e,f,g,h,i},
+			(a,b,c,d,e,f,g,h,i,j) -> {a,b,c,d,e,f,g,h,i,j},
+			n -> n
+		],
+
+		numberToString = n ->
+			let
+				digit = {n > mod 10 > add (head '0')}
+			in
+				ifs {
+					(lt 0 n, concat '-' (numberToString (minus n))),
+					(lt 10 n, digit)
+				}	(concat (numberToString (div 10 n)) digit),
+
+
+		listToString = l ->
+			flatten {'{', l > map toString > join ',', '}'},
+
+		tupleToString = t ->
+			let
+				asList = tupleToList t
+			in
+				if (isList asList)
+					(flatten {'(', asList > map toString > join ',', ')'})
+					(numberToString asList)
+	in
+		x -> if (isList x) (listToString x) (tupleToString x)
 
 in
