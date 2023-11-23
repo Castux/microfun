@@ -21,11 +21,27 @@ local function loc (str, where)
 	return line, where - linepos
 end
 
+local function printLine(str, pos)
+	local lineStart = 1
+	for i = pos,1,-1 do
+		if str:sub(i,i) == "\n" then
+			lineStart = i
+			break
+		end
+	end
+
+	local lineEnd = str:find("\n", pos) or #str
+
+	print(str:sub(lineStart, lineEnd))
+end
+
 local function expect(patt, ctx)
 
 	return patt + function(s, i)
 		local line, col = loc(s, i)
-		error(string.format("microfun parsing error: expected %s (%d:%d)", ctx, line, col))
+		print(string.format("microfun parsing error: expected %s (%d:%d)", ctx, line, col))
+		printLine(s, i)
+		os.exit(1)
 	end
 end
 
