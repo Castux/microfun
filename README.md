@@ -32,17 +32,20 @@ Requirements:
 
 # Lexical rules
 
+The source code must be encoded in UTF-8.
+
 - Whitespace has no syntactic value other than separating tokens
 - Identifiers follow the usual rule: sequences of alphanumerical characters plus underscores, not starting with a digit: `[a-zA-Z_][a-zA-Z0-9_]*`
 - The `let` and `in` keywords are reserved and cannot be used as identifiers
 - Integers are sequences of digits: `[0-9]+`
+- Strings are sequences of characters enclosed in pairs of single quotes `'` or double quotes `"`
 - A line starting with `--` is a comment and is ignored by the parser
 
 # Grammar
 
 *microfun*'s grammar is described as a [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar):
 
-Terminals: `Name` and `Number`, as described above. Operator precedence is described directly as grammatical rules below.
+Terminals: `Name`, `Number` and `String`, as described above. Operator precedence is described directly as grammatical rules below.
 
 ```
 Program := Expr
@@ -67,7 +70,7 @@ Composition := Composand ( '.' Composand )*
 Composand := Application | AtomicExpr
 Application := AtomicExpr AtomicExpr+
 
-AtomicExpr := Name | Number | Tuple | MultiLambda | List
+AtomicExpr := Name | Number | String | Tuple | MultiLambda | List
 
 Tuple := '(' ')' | '(' Expr ( ',' Expr )* ')'
 MultiLambda := '[' Lambda ( ',' Lambda )* ']'
@@ -83,6 +86,7 @@ List :=  '{' '}' | '{' Expr ( ',' Expr )* '}'
 - Constant numbers
 - Identifiers: must be bound before use: either with a `let .. in` construct, or as parameter of lambdas. Using an unbound identifier generates a runtime error.
 - Tuples: comma separated list of expressions in parentheses: `(expr1, expr2, ...)`. Tuples can be empty: `()`.
+- Strings: sequences of characters enclosed in single or double quotes, which translate to lists of Unicode codepoints (see lists below).
 
 ## Truth values
 
@@ -250,6 +254,10 @@ To simplify inputing lists in source code, the language allows defining a list a
 
 `{a,b,c,d,e}` is equivalent to `(a,(b,(c,(d,(e,())))))`
 
+## Strings
+
+Strings are simply lists of Unicode codepoints, and as such can be manipulated exactly like lists. The `showt` built-in prints a string to stdout.
+
 # Standard library
 
 ## Built-in functions
@@ -258,7 +266,9 @@ The built-in functions are:
 
 - `eval`, which forces the full evaluation of an expression, breaking laziness. It is otherwise equivalent to the identity function `id = x -> x` in that it returns its argument unchanged.
 - `show`, which is similar to `eval` but additionally prints out the value it is passed to stdout.
+- `showt`, which expects a string (list of Unicode codepoints) and prints it.
 - mathematical functions `add, mul, sub, div, mod, sqrt` and comparisons `eq, lt`, defined on integers and in curryfied style for those that take two arguments.
+- `equal`, which checks equality by value of any two expressions, evaluating them as much as needed. Note that functions are considered equal only if they are bound to the same name.
 
 All other arithmetic, logic, functional, list and tree functions are defined in the prelude.
 
