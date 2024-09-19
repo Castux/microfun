@@ -66,14 +66,14 @@ tail = (h,t) -> t,
 
 empty = [ () -> 1, l -> 0 ],
 
-equal = [
-	() -> [ () -> 1, l -> 0 ],
-	(a,as) -> [ (b,bs) -> and (eq a b) (equal as bs), () -> 0]
-],
-
 concat = [
 	() -> v -> v,
 	(h,t) -> v -> (h, concat t v)
+],
+
+remove = e -> [
+	() -> (),
+	(h,t) -> if (equal e h) t (h, remove e t)
 ],
 
 reverse = foldl (flip cons) {},
@@ -165,6 +165,11 @@ sort = [
 	(x,xs) -> split (lt x) xs > [
 		(low,high) -> concat (sort low) (x, sort high)
 	]
+],
+
+pairs = [
+	() -> (),
+	(h,t) -> concat (map (cons h) t) (pairs t)
 ],
 
 -- Infinite lists

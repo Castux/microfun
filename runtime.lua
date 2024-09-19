@@ -163,6 +163,46 @@ for name,v in pairs(builtins) do
 	end
 end
 
+local function deep_compare(t1,t2)
+	if t1 == t2 then
+		return true
+	end
+
+	if type(t1) ~= type(t2) then
+		return false
+	end
+
+	if type(t1) == "table" then
+		if #t1 ~= #t2 then
+			return false
+		end
+
+		for i = 1,#t1 do
+			if not deep_compare(t1[i],t2[i]) then
+				return false
+			end
+		end
+	else
+		return t1 == t2
+	end
+
+	return true
+end
+
+function equal(expr1)
+	return function(expr2)
+
+		if expr1 == expr2 then
+			return 1
+		end
+
+		expr1 = eval(expr1)
+		expr2 = eval(expr2)
+
+		return deep_compare(expr1,expr2) and 1 or 0
+	end
+end
+
 function eval(expr)
 	return reduce(expr, "recurseTuples")
 end
