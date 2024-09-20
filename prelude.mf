@@ -160,17 +160,21 @@ range = a -> b ->
 		(a, range (succ a) b)
 		(),
 
-sort = [
+sortWith = f -> [
 	() -> (),
-	(x,xs) -> split (lt x) xs > [
-		(low,high) -> concat (sort low) (x, sort high)
+	(x,xs) -> split (f x) xs > [
+		(low,high) -> concat (sortWith f low) (x, sortWith f high)
 	]
 ],
+
+sort = sortWith lt,
 
 pairs = [
 	() -> (),
 	(h,t) -> concat (map (cons h) t) (pairs t)
 ],
+
+contains = elem -> any (equal elem),
 
 -- Infinite lists
 
