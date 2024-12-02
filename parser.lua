@@ -54,6 +54,7 @@ end
 local digit = R "09"
 local alpha = R("az","AZ")
 local underscore = P "_"
+local identchar = alpha + underscore + digit
 local identifier = (alpha + underscore) * (alpha + underscore + digit) ^ 0
 local string = P "'" * (P(1) - S "'") ^ 0 * expect(P "'")
 	+ P '"' * (P(1) - S '"') ^ 0 * expect(P '"')
@@ -62,7 +63,7 @@ local number = digit ^ 1 * expect( -(alpha + underscore), "digit")
 local comment = P "--" * (P(1) - S "\n\r") ^ 0
 local ws = (comment + S(" \t\n\r\f")) ^ 0
 
-local keyword = P "let" + P "in"
+local keyword = (P "let" + P "in") * (-identchar)
 
 -- Parser
 
@@ -177,9 +178,9 @@ local Grammar = lpeg.P {
 		+ V "GoesRight",
 
 	Let = rule("let",
-		P "let" * ws *
+		P "let" * -identchar * ws *
 		expect( commaSeparated(V "Binding", "binding"), "bindings after 'let'" ) * ws *
-		expectP "in" * ws *
+		expectP "in" * -identchar * ws *
 		expect( V "Expr", "expression after 'in'" )
 	),
 

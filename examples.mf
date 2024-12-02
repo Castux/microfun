@@ -69,4 +69,4 @@ add3 = a -> b -> c -> sum {a,b,c}
 
 in
 
-show < sort {2,5,8,81,82,2}
+stdin > map (showt . flip cons ()) > eval

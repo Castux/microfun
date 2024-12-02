@@ -16,7 +16,8 @@ local builtins =
 	eval = {kind = "named", name = "eval", builtin = true, arity = 1},
 	show = {kind = "named", name = "show", builtin = true, arity = 1},
 	showt = {kind = "named", name = "showt", builtin = true, arity = 1},
-	equal = {kind = "named", name = "equal", builtin = true, arity = 2}
+	equal = {kind = "named", name = "equal", builtin = true, arity = 2},
+	stdin = {kind = "named", name = "stdin", builtin = true}
 }
 
 local function resolveScope(ast)

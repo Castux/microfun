@@ -113,6 +113,9 @@ function reduce(data, recurseTuples)
 		elseif data[1] == "ref" then
 			data[2] = reduce(data[2])
 			data = data[2]
+
+		elseif data.stdin then
+			return data.eval()
 		end
 	end
 
@@ -230,3 +233,7 @@ function showt(expr)
 	print(table.concat(chars))
 	return expr
 end
+
+stdin = {stdin = true, eval = function()
+	return {"tup", string.byte(io.read(1)), stdin}
+end}
