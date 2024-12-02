@@ -115,7 +115,7 @@ function reduce(data, recurseTuples)
 			data = data[2]
 
 		elseif data.stdin then
-			return data.eval()
+			data = data.eval()
 		end
 	end
 
@@ -235,5 +235,10 @@ function showt(expr)
 end
 
 stdin = {stdin = true, eval = function()
-	return {"tup", string.byte(io.read(1)), stdin}
+	local s = io.read(1)
+	if s then
+		return {"tup", string.byte(s), stdin}
+	else
+		return {'tup'}
+	end
 end}
