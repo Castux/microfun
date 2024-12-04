@@ -3,7 +3,7 @@ local log = require "log"
 local function parse(tokens)
 
 	local head = 1
-	local parseExpression, logError
+	local parseExpression
 
 	local function node(name, ...)
 		local n = {...}
@@ -24,6 +24,11 @@ local function parse(tokens)
 
 	local function peek()
 		return tokens[head]
+	end
+
+	local function logError(msg, ...)
+		log(string.format("parser error: " .. msg, ...), peek().loc)
+		error()
 	end
 
 	local function consume()
@@ -260,11 +265,6 @@ local function parse(tokens)
 		end
 
 		return parseOperation()
-	end
-
-	logError = function(msg, ...)
-		log(string.format("parser error: " .. msg, ...), peek().loc)
-		error()
 	end
 
 	local function parseMain()
