@@ -3,7 +3,6 @@ local log = require "log"
 local function parse(tokens)
 
 	local head = 1
-
 	local parseExpression
 
 	local function node(name, ...)
@@ -16,21 +15,29 @@ local function parse(tokens)
 	end
 
 	local function is(kind)
+		if head > #tokens then
+			return false
+		end
+
 		return tokens[head].kind == kind
 	end
 
 	local function peek()
+		if head > #tokens then
+			return {kind = "eof"}
+		end
+
 		return tokens[head]
 	end
 
 	local function consume()
-		local token = tokens[head]
+		local token = peek()
 		head = head + 1
 		return token
 	end
 
 	local function expect(kind)
-		local tok = tokens[head]
+		local tok = peek()
 		if tok.kind ~= kind then
 			log(string.format("parser error: expected %s, found %s instead", kind, tok.kind), tok.loc)
 			error()
@@ -41,7 +48,7 @@ local function parse(tokens)
 	end
 
 	local function accept(kind)
-		local tok = tokens[head]
+		local tok = peek()
 		if tok.kind == kind then
 			head = head + 1
 			return tok
@@ -94,6 +101,51 @@ local function parse(tokens)
 		return node(name, table.unpack(exps))
 	end
 
+	local function parsePattern()
+
+		if is "identifier" then
+			return node("identifier", consume())
+		end
+
+		if not is "(" then
+			log("parser error: expected pattern", peek().loc)
+			error()
+		end
+
+		local pattern = {}
+		expect "("
+		if not is ")" then
+			repeat
+				table.insert(pattern, expect "identifier")
+			until not accept ","
+		end
+		expect ")"
+
+		return node("pattern", pattern)
+	end
+
+	local function parseLambda()
+
+		local pattern = parsePattern()
+		expect "->"
+		local exp = parseExpression()
+
+		return node("lambda", pattern, exp)
+	end
+
+	local function parseMultiLambda()
+
+		local lambdas = {}
+		expect "["
+
+		repeat
+			table.insert(lambdas, parseLambda())
+		until not accept ","
+
+		expect "]"
+		return node("multilambda", lambdas)
+	end
+
 	local function parseAtomic()
 
 		if is "identifier" then
@@ -119,23 +171,45 @@ local function parse(tokens)
 		log("parser error: expected atomic expression", peek().loc)
 	end
 
+	local operations = {
+		[">"] = "goesright",
+		["<"] = "goesleft",
+		["."] = "compositon"
+	}
+
+	local function parseOperation()
+
+		local operands = {}
+
+		table.insert(operands, parseAtomic())	-- should be application later
+
+		local op = peek().kind
+		if operations[op] then
+			while accept(op) do
+				table.insert(operands, parseAtomic())
+			end
+		end
+
+		return node(operations[op], operands)
+	end
+
 	parseExpression = function()
 
 		if is "let" then
 			return parseLet()
 		end
 
-		local atomic = parseAtomic()
-		-- next:
-		-- atomic: application
-		-- operator: operation
-		-- ->: lambda
-		-- else: done
-
-		return atomic
+		return parseOperation()
 	end
 
-	local success, tree = pcall(parseExpression)
+	local function parseMain()
+		local exp = parseExpression()
+		expect "eof"
+
+		return exp
+	end
+
+	local success, tree = pcall(parseMain)
 	if not success then
 		print(tree)
 	else
