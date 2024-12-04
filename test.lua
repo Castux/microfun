@@ -2,7 +2,7 @@ local lex = require "lexer"
 local log = require "log"
 local parse = require "parser2"
 
-local success, tokens = lex "prelude.mf"
+local success, tokens = lex "test.mf"
 
 if not success then
 	return

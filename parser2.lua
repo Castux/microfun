@@ -107,6 +107,10 @@ local function parse(tokens)
 			return node("identifier", consume())
 		end
 
+		if is "number" then
+			return node("number", consume())
+		end
+
 		if not is "(" then
 			log("parser error: expected pattern", peek().loc)
 			error()
@@ -173,9 +177,41 @@ local function parse(tokens)
 		end
 	end
 
-	local function parseApplication()
+	local function isPattern(node)
+		if node.name == "identifier" or node.name == "number" then
+			return true
+		end
+
+		if node.name == "tuple" then
+			for _,v in ipairs(node) do
+				if not isPattern(v) then
+					return false
+				end
+			end
+			return true
+		end
+
+		return false
+	end
+
+	local function continueLambda(left)
+
+		if not isPattern(left) then
+			log("parser error: invalid pattern in lambda", peek().loc)
+			error()
+		end
+
+		expect "->"
+		local exp = parseExpression()
+		return node("lambda", left, exp)
+	end
+
+	local function parseOperand()
 
 		local atomics = {}
+
+		table.insert(atomics, parseAtomic())
+
 		while true do
 			local atomic = parseAtomic("optional")
 			if atomic then
@@ -183,6 +219,10 @@ local function parse(tokens)
 			else
 				break
 			end
+		end
+
+		if #atomics == 1 and is "->" then
+			return continueLambda(atomics[1])
 		end
 
 		if #atomics == 1 then
@@ -202,12 +242,12 @@ local function parse(tokens)
 
 		local operands = {}
 
-		table.insert(operands, parseApplication())
+		table.insert(operands, parseOperand())
 
 		local op = peek().kind
 		if operations[op] then
 			while accept(op) do
-				table.insert(operands, parseApplication())
+				table.insert(operands, parseOperand())
 			end
 		end
 
