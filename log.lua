@@ -25,7 +25,7 @@ local function log(msg, loc, severity)
 
 	local colored = txt:sub(1, col - 1) ..
 		colorText(txt:sub(col, col + loc.length - 1), color) ..
-		txt.sub(col + loc.length, #txt)
+		txt:sub(col + loc.length, #txt)
 
 	print(string.format("%s:%d:%d: %s", loc.file.path, line.number, col, msg))
 	print(colored)

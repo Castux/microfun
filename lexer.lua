@@ -12,7 +12,7 @@ local function readFile(path)
 	local lines = {}
 	local head = 1
 	while head < #source do
-		local from,to = source:find("[^\n\r]*[\n\r]*", head)
+		local from,to = source:find("[^\n\r]*\n\r?", head)
 		if from and to then
 			table.insert(lines, {from = from, to = to, number = #lines + 1})
 		end
@@ -50,6 +50,8 @@ for i,v in ipairs(keywords) do
 	keywords[v] = true
 end
 
+local symbols = {"->", ">", "<", ".", "(", ")", "{", "}", "[", "]", "=", ","}
+
 local function lex(path)
 
 	local file = readFile(path)
@@ -73,18 +75,58 @@ local function lex(path)
 
 		-- keywords and identifiers
 
-		local ident = source:match("^[_%a][_%w]*", head)
-		if ident then
-			loc = sourcePos(file, head, #ident)
-			kind = keywords[ident] and ident or "identifier"
+		local match = source:match("^[_%a][_%w]*", head)
+		if match then
+			loc = sourcePos(file, head, #match)
+			if keywords[match] then
+				kind = match
+			else
+				kind = "identifier"
+				value = match
+			end
+
+			goto proceed
+		end
+
+		-- symbols
+
+		for _,sym in ipairs(symbols) do
+			if source:sub(head, head + #sym - 1) == sym then
+				kind = sym
+				loc = sourcePos(file, head, #sym)
+
+				goto proceed
+			end
+		end
+
+		-- string literals
+
+		match = source:match("^'[^']*'", head) or source:match('^"[^"]*"', head)
+		if match then
+			kind = "string"
+			loc = sourcePos(file, head, #match)
+			value = source:sub(head + 1, head + #match - 2)
+
+			goto proceed
+		end
+
+		-- number literals
+
+		match = source:match("^%d+", head)
+		if match then
+			kind = "number"
+			loc = sourcePos(file, head, #match)
+			value = tonumber(source:sub(head, head + #match - 1))
 
 			goto proceed
 		end
 
 		-- Fail state
 
-		log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1))
-		break
+		do
+			log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1))
+			return nil
+		end
 
 		::proceed::
 
@@ -97,5 +139,5 @@ end
 
 local tokens = lex "countdown.mf"
 for i,v in ipairs(tokens) do
-	log(v.kind, v.loc, "info")
+	log(v.kind .. " " .. (v.value or ""), v.loc, "info")
 end
