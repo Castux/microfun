@@ -45,7 +45,7 @@ local function token(kind, loc, value)
 	}
 end
 
-local keywords = {"let", "in"}
+local keywords = {"let", "in", "import"}
 for i,v in ipairs(keywords) do
 	keywords[v] = true
 end

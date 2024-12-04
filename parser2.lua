@@ -1,6 +1,6 @@
 local log = require "log"
 
-local function parse(tokens)
+local function parse(tokens, module)
 
 	local head = 1
 	local parseExpression
@@ -69,20 +69,28 @@ local function parse(tokens)
 		expect "let"
 
 		repeat
-			local binding = parseBinding()
-			if not binding then
-				logError("expected binding")
-				error()
-			else
-				table.insert(bindings, binding)
-			end
-
+			table.insert(bindings, parseBinding())
 		until not accept ","
 
 		expect "in"
 		local expr = parseExpression()
 
 		return node("let", bindings, expr)
+	end
+
+	local function parseImport()
+		local modules = {}
+
+		expect "import"
+
+		repeat
+			table.insert(modules, expect "identifier")
+		until not accept ","
+
+		expect "in"
+		local exp = parseExpression()
+
+		return node("import", modules, exp)
 	end
 
 	local function parseExpList(name, open, close)
@@ -264,6 +272,10 @@ local function parse(tokens)
 			return parseLet()
 		end
 
+		if is "import" then
+			return parseImport()
+		end
+
 		return parseOperation()
 	end
 
@@ -274,7 +286,18 @@ local function parse(tokens)
 		return exp
 	end
 
-	local success, tree = pcall(parseMain)
+	local function parseModule()
+
+		local bindings = {}
+		repeat
+			table.insert(bindings, parseBinding())
+		until not accept ","
+
+		expect "eof"
+		return node("module", bindings)
+	end
+
+	local success, tree = pcall(modue and parseModule or parseMain)
 	if not success then
 		print(tree)
 	else
