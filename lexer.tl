@@ -22,19 +22,23 @@ end
 --[[ LOGGING ]]--
 -----------------
 
-local colors: {string:integer} = {
-	red = 31,
-	blue = 34
-}
-
-local function colorText(txt: string, color: string): string
-	return ("\x1b[%d;1m%s\x1b[0m"):format(colors[color], txt)
+local enum Severity
+	"error"
+	"info"
 end
 
-local function log(msg: string, loc: SourcePos, severity?: string)
+local colors: {Severity:integer} = {
+	error = 31,
+	info = 34
+}
+
+local function colorText(txt: string, color: integer): string
+	return ("\x1b[%d;1m%s\x1b[0m"):format(color, txt)
+end
+
+local function log(msg: string, loc: SourcePos, severity?: Severity)
 
 	severity = severity or "error"
-	local color = severity == "error" and "red" or "blue"
 
 	local line: Source.Line
 	for _,v in ipairs(loc.file.lines) do
@@ -48,7 +52,7 @@ local function log(msg: string, loc: SourcePos, severity?: string)
 	local col = loc.start - line.from + 1
 
 	local colored = txt:sub(1, col - 1) ..
-		colorText(txt:sub(col, col + loc.length - 1), color) ..
+		colorText(txt:sub(col, col + loc.length - 1), colors[severity]) ..
 		txt:sub(col + loc.length, #txt)
 
 	print(string.format("%s:%d:%d: %s", loc.file.path, line.number, col, msg))
