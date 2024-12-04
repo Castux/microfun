@@ -6,5 +6,5 @@ if not success then
 end
 
 for _,tok in ipairs(tokens) do
-	lexer.log(tok.kind, tok.loc, "info")
+	lexer.log(tok.kind .. " " .. tostring(tok.value or ""), tok.loc, "info")
 end

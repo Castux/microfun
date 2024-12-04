@@ -97,15 +97,15 @@ end
 
 local record Token
 	kind: string
-	number: number
-	string: string
+	value: integer | string
 	loc: SourcePos
 end
 
-local function token(kind: string, loc: SourcePos): Token
+local function token(kind: string, loc: SourcePos, value?: integer | string): Token
 	return {
 		kind = kind,
-		loc = loc
+		loc = loc,
+		value = value
 	}
 end
 
@@ -130,8 +130,7 @@ local function lex(path: string): boolean, {Token}
 	while head < #source do
 		local kind: string
 		local loc: SourcePos
-		local valueNumber: number
-		local valueString: string
+		local value: integer | string
 
 		-- consume whitespace
 
@@ -158,7 +157,7 @@ local function lex(path: string): boolean, {Token}
 				kind = match
 			else
 				kind = "identifier"
-				valueString = match
+				value = match
 			end
 
 			goto proceed
@@ -181,7 +180,7 @@ local function lex(path: string): boolean, {Token}
 		if match then
 			kind = "string"
 			loc = sourcePos(file, head, #match)
-			valueString = source:sub(head + 1, head + #match - 2)
+			value = source:sub(head + 1, head + #match - 2)
 
 			goto proceed
 		end
@@ -192,7 +191,7 @@ local function lex(path: string): boolean, {Token}
 		if match then
 			kind = "number"
 			loc = sourcePos(file, head, #match)
-			valueNumber = tonumber(source:sub(head, head + #match - 1))
+			value = math.tointeger(tonumber(source:sub(head, head + #match - 1)))
 
 			goto proceed
 		end
@@ -206,12 +205,7 @@ local function lex(path: string): boolean, {Token}
 
 		::proceed::
 
-		local tok = token(kind, loc)
-		if valueNumber then
-			tok.number = valueNumber
-		elseif valueString then
-			tok.string = valueString
-		end
+		local tok = token(kind, loc, value)
 		table.insert(tokens, tok)
 		head = head + loc.length
 
