@@ -68,9 +68,18 @@ local function lex(path)
 
 		-- consume whitespace
 
-		local ws = source:match("^%s*", head)
+		local ws = source:match("^%s+", head)
 		if ws then
 			head = head + #ws
+			goto continue
+		end
+
+		-- consume comments
+
+		local comment = source:match("^%-%-[^\n\r]*\n\r?", head)
+		if comment then
+			head = head + #comment
+			goto continue
 		end
 
 		-- keywords and identifiers
@@ -125,19 +134,18 @@ local function lex(path)
 
 		do
 			log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1))
-			return nil
+			return false, tokens
 		end
 
 		::proceed::
 
 		table.insert(tokens, token(kind, loc, value))
 		head = head + loc.length
+
+		::continue::
 	end
 
-	return tokens
+	return true, tokens
 end
 
-local tokens = lex "countdown.mf"
-for i,v in ipairs(tokens) do
-	log(v.kind .. " " .. (v.value or ""), v.loc, "info")
-end
+return lex
