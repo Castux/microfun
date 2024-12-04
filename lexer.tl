@@ -223,5 +223,6 @@ end
 
 return {
 	lex = lex,
-	log = log
+	log = log,
+	Token = Token
 }

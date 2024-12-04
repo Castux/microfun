@@ -297,7 +297,7 @@ local function parse(tokens, module)
 		return node("module", bindings)
 	end
 
-	local success, tree = pcall(modue and parseModule or parseMain)
+	local success, tree = pcall(module and parseModule or parseMain)
 	if not success then
 		print(tree)
 	else
