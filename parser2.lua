@@ -98,7 +98,7 @@ local function parse(tokens)
 
 		expect(close)
 
-		return node(name, table.unpack(exps))
+		return node(name, exps)
 	end
 
 	local function parsePattern()
@@ -146,7 +146,7 @@ local function parse(tokens)
 		return node("multilambda", lambdas)
 	end
 
-	local function parseAtomic()
+	local function parseAtomic(optional)
 
 		if is "identifier" then
 			return node("identifier", consume())
@@ -168,7 +168,28 @@ local function parse(tokens)
 
 		end
 
-		log("parser error: expected atomic expression", peek().loc)
+		if not optional then
+			log("parser error: expected atomic expression", peek().loc)
+		end
+	end
+
+	local function parseApplication()
+
+		local atomics = {}
+		while true do
+			local atomic = parseAtomic("optional")
+			if atomic then
+				table.insert(atomics, atomic)
+			else
+				break
+			end
+		end
+
+		if #atomics == 1 then
+			return atomics[1]
+		else
+			return node("application", atomics)
+		end
 	end
 
 	local operations = {
@@ -181,16 +202,20 @@ local function parse(tokens)
 
 		local operands = {}
 
-		table.insert(operands, parseAtomic())	-- should be application later
+		table.insert(operands, parseApplication())
 
 		local op = peek().kind
 		if operations[op] then
 			while accept(op) do
-				table.insert(operands, parseAtomic())
+				table.insert(operands, parseApplication())
 			end
 		end
 
-		return node(operations[op], operands)
+		if #operands == 1 then
+			return operands[1]
+		else
+			return node(operations[op], operands)
+		end
 	end
 
 	parseExpression = function()
