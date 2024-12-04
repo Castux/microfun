@@ -145,6 +145,8 @@ local function lex(path)
 		::continue::
 	end
 
+	table.insert(tokens, token("eof", sourcePos(file, head, 0)))
+
 	return true, tokens
 end
 

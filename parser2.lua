@@ -3,7 +3,7 @@ local log = require "log"
 local function parse(tokens)
 
 	local head = 1
-	local parseExpression
+	local parseExpression, logError
 
 	local function node(name, ...)
 		local n = {...}
@@ -23,10 +23,6 @@ local function parse(tokens)
 	end
 
 	local function peek()
-		if head > #tokens then
-			return {kind = "eof"}
-		end
-
 		return tokens[head]
 	end
 
@@ -39,8 +35,7 @@ local function parse(tokens)
 	local function expect(kind)
 		local tok = peek()
 		if tok.kind ~= kind then
-			log(string.format("parser error: expected %s, found %s instead", kind, tok.kind), tok.loc)
-			error()
+			logError("expected %s, found %s instead", kind, tok.kind)
 		end
 
 		head = head + 1
@@ -71,7 +66,7 @@ local function parse(tokens)
 		repeat
 			local binding = parseBinding()
 			if not binding then
-				log("parser error: expected binding", peek().loc)
+				logError("expected binding")
 				error()
 			else
 				table.insert(bindings, binding)
@@ -112,7 +107,7 @@ local function parse(tokens)
 		end
 
 		if not is "(" then
-			log("parser error: expected pattern", peek().loc)
+			logError("expected pattern")
 			error()
 		end
 
@@ -173,7 +168,7 @@ local function parse(tokens)
 		end
 
 		if not optional then
-			log("parser error: expected atomic expression", peek().loc)
+			logError("expected atomic expression")
 		end
 	end
 
@@ -197,7 +192,7 @@ local function parse(tokens)
 	local function continueLambda(left)
 
 		if not isPattern(left) then
-			log("parser error: invalid pattern in lambda", peek().loc)
+			logError("invalid pattern in lambda")
 			error()
 		end
 
@@ -267,6 +262,11 @@ local function parse(tokens)
 		return parseOperation()
 	end
 
+	logError = function(msg, ...)
+		log(string.format("parser error: " .. msg, ...), peek().loc)
+		error()
+	end
+
 	local function parseMain()
 		local exp = parseExpression()
 		expect "eof"
@@ -280,6 +280,7 @@ local function parse(tokens)
 	else
 		return tree
 	end
+
 end
 
 return parse
