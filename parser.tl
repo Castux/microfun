@@ -10,6 +10,7 @@ local interface Node
 	where self.kind ~= nil
 
 	kind: string
+	parent: Node
 	children: {Node}
 	loc: SourcePos
 end
@@ -85,14 +86,19 @@ local operators: {string: Operator} = {
 	["."] = "."
 }
 
-local record Operation is Node
+local record Operation is {Atomic | Application | Lambda}, Node
 	where self.kind == "operation"
 
 	operator: Operator
-	operands: {Atomic | Application}
 end
 
 local type Expression = Let | Import | Operation | Application | Atomic | Lambda
+
+local record Program is Node
+	where self.kind == "program"
+
+	expr: Expression
+end
 
 local enum TopLevel
 	"module"
@@ -357,26 +363,20 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return stop(atomics)
 	end
 
-	local function parseOperation(): Operation | Application | Atomic | Lambda
+	local function parseOperation(): Operation
 		start()
-		local operands = {}
-		local operator: Operator
-
-		table.insert(operands, parseOperand())
+		local operation: Operation = {kind = "operation"}
+		table.insert(operation, parseOperand())
 
 		local opString = peek().kind
-		local op = operators[opString]
-		if op then
+		operation.operator = operators[opString]
+		if operation.operator then
 			while accept(opString) do
-				table.insert(operands, parseOperand())
+				table.insert(operation, parseOperand())
 			end
 		end
 
-		return stop {
-			kind = "operation",
-			operator = operator,
-			operands = operands
-		}
+		return stop(operation)
 	end
 
 	parseExpression = function(): Expression
@@ -392,11 +392,16 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return parseOperation()
 	end
 
-	local function parseMain(): Expression
-		local exp = parseExpression()
+	local function parseProgram(): Program
+		start()
+
+		local expr = parseExpression()
 		expect "eof"
 
-		return exp
+		return stop {
+			kind = "program",
+			expr = expr
+		}
 	end
 
 	local function parseModule(): Module
@@ -412,7 +417,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 	local funcs: {TopLevel: function(): Node} = {
 		module = parseModule,
-		program = parseMain
+		program = parseProgram
 	}
 
 	local success, ast = pcall(funcs[topLevel])
@@ -423,14 +428,20 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 end
 
-local function traverseAST(root: Node, pre: function(n: Node), post: function(n: Node))
+local function traverseAST(root: Node, pre: function(n: Node), post?: function(n: Node))
 
 	local function rec(n: Node)
-		pre(n)
+		if pre then
+			pre(n)
+		end
+
 		for _,child in ipairs(n.children) do
 			rec(child)
 		end
-		post(n)
+
+		if post then
+			post(n)
+		end
 	end
 
 	rec(root)
@@ -439,7 +450,7 @@ end
 local function printAST(root: Node)
 
 	local depth = 0
-	
+
 	local pre = function(node: Node)
 		local indent = string.rep("    ", depth)
 		if node is Atom then
@@ -450,7 +461,7 @@ local function printAST(root: Node)
 		depth = depth + 1
 	end
 
-	local post = function(node: Node)
+	local post = function(_: Node)
 		depth = depth - 1
 	end
 
@@ -458,6 +469,22 @@ local function printAST(root: Node)
 end
 
 return {
+	Node = Node,
+	Let = Let,
+	Import = Import,
+	Binding = Binding,
+	Module = Module,
+	Tuple = Tuple,
+	List = List,
+	Pattern = Pattern,
+	Lambda = Lambda,
+	MultiLambda = MultiLambda,
+	Atom = Atom,
+	Atomic = Atomic,
+	Application = Application,
+	Operation = Operation,
+	Expression = Expression,
+
 	parse = parse,
 	traverseAST = traverseAST,
 	printAST = printAST
