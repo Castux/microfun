@@ -4,6 +4,9 @@ local Node = parser.Node
 local Scope = parser.Scope
 local traverseAST = parser.traverseAST
 
+local compile: function(string): parser.Program
+local compileModule: function(string): parser.Module
+
 local function logError(msg: string, loc: lexer.SourcePos, ...: any)
 	lexer.log(string.format("analyzer error: " .. msg, ...), loc, "error")
 	error()
@@ -170,7 +173,14 @@ local function resolveScopes(ast: Node)
 			local modules = {}
 
 			for _,name in ipairs(node.names) do
-
+				local mod = compileModule(name)
+				if not mod then
+					logError("could not compile module " .. name, node.loc)
+				end
+				table.insert(modules, mod)
+				for _,binding in ipairs(mod) do
+					addName(binding.name, binding.nameToken.loc)
+				end
 			end
 
 
@@ -264,7 +274,7 @@ local function analyze(ast: Node): boolean
 	return success
 end
 
-local function compile(path: string): parser.Program
+compile = function(path: string): parser.Program
 
 	local tokens = lexer.lex(path)
 	if not tokens then
@@ -284,7 +294,13 @@ local function compile(path: string): parser.Program
 	return ast as parser.Program
 end
 
-local function compileModule(name: string): parser.Module
+local loadedModules: {string: parser.Module} = {}
+
+compileModule = function(name: string): parser.Module
+
+	if loadedModules[name] then
+		return loadedModules[name]
+	end
 
 	local path = name .. ".mf"
 
@@ -293,7 +309,7 @@ local function compileModule(name: string): parser.Module
 		return
 	end
 
-	local module = parser.parse(tokens, "module")
+	local module = parser.parse(tokens, "module") as parser.Module
 	if not module then
 		return
 	end
@@ -303,9 +319,10 @@ local function compileModule(name: string): parser.Module
 		return
 	end
 
-	return module as parser.Module
-end
+	loadedModules[name] = module
 
+	return module
+end
 
 return {
 	analyze = analyze,
