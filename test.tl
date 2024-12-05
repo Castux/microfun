@@ -2,7 +2,7 @@ local lexer = require "lexer"
 local parser = require "parser"
 local analyzer = require "analyzer"
 
-local success, tokens = lexer.lex "test.mf"
+local success, tokens = lexer.lex "countdown.mf"
 if not success then
 	return
 end

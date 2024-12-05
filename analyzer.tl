@@ -56,6 +56,7 @@ local function simplify(ast: Node)
 		assert(found)
 	end
 
+	local toDelete = {}
 	traverseAST(ast, function(node: Node)
 
 		local shouldDelete = #node.children == 1 and (
@@ -65,11 +66,13 @@ local function simplify(ast: Node)
 		)
 
 		if shouldDelete then
-			deleteNode(node)
+			table.insert(toDelete, node)
 		end
-
 	end)
 
+	for _,v in ipairs(toDelete) do
+		deleteNode(v)
+	end
 end
 
 
