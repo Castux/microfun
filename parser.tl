@@ -10,6 +10,8 @@ local interface Node
 
 	kind: string
 	children: {Node}
+	first: Token
+	last: Token
 end
 
 local record Let is Node
@@ -102,17 +104,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	local head: integer = 1
 	local parseExpression: function(): Expression
 	local stack: {{Node}} = {{}}
-
-	local function start()
-		table.insert(stack, {})
-	end
-
-	local function stop<N is Node>(node: N): N
-		node.children = table.remove(stack)
-		table.insert(stack[#stack], node)
-
-		return node
-	end
+	local tokStack: {Token} = {}
 
 	local function is(kind: string): boolean
 		if head > #tokens then
@@ -122,8 +114,24 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return tokens[head].kind == kind
 	end
 
-	local function peek(): Token
-		return tokens[head]
+	local function peek(offset?: integer): Token
+		offset = offset or 0
+		return tokens[head + offset]
+	end
+
+	local function start()
+		table.insert(stack, {})
+		table.insert(tokStack, peek())
+	end
+
+	local function stop<N is Node>(node: N): N
+		node.children = table.remove(stack)
+		node.first = table.remove(tokStack)
+		node.last = peek(-1)
+
+		table.insert(stack[#stack], node)
+
+		return node
 	end
 
 	local function logError(msg: string, ...: any)
@@ -420,13 +428,15 @@ local function printAST(root: Node)
 
 		if node is Atom then
 			print(string.format("%satom (%s) %s", indent, node.token.kind, tostring(node.token.value) or ""))
-			return
-		end
+		else
+			print(indent .. node.kind)
 
-		print(indent .. node.kind, node)
+			-- lexer.log("from", node.first.loc, "info")
+			-- lexer.log("to", node.last.loc, "info")
 
-		for _,v in ipairs(node.children) do
-			rec(v, depth + 1)
+			for _,v in ipairs(node.children) do
+				rec(v, depth + 1)
+			end
 		end
 	end
 

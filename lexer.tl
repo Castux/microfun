@@ -216,7 +216,7 @@ local function lex(path: string): boolean, {Token}
 		::continue::
 	end
 
-	table.insert(tokens, token("eof", sourcePos(file, head, 0)))
+	table.insert(tokens, token("eof", sourcePos(file, head - 1, 0)))
 
 	return true, tokens
 end
