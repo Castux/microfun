@@ -423,29 +423,42 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 end
 
+local function traverseAST(root: Node, pre: function(n: Node), post: function(n: Node))
+
+	local function rec(n: Node)
+		pre(n)
+		for _,child in ipairs(n.children) do
+			rec(child)
+		end
+		post(n)
+	end
+
+	rec(root)
+end
+
 local function printAST(root: Node)
 
-	local function rec(node: Node, depth: integer)
-
+	local depth = 0
+	
+	local pre = function(node: Node)
 		local indent = string.rep("    ", depth)
-
 		if node is Atom then
 			print(string.format("%satom (%s) %s", indent, node.token.kind, tostring(node.token.value) or ""))
 		else
 			print(indent .. node.kind)
-
-			-- lexer.log("at", node.loc, "info")
-
-			for _,v in ipairs(node.children) do
-				rec(v, depth + 1)
-			end
 		end
+		depth = depth + 1
 	end
 
-	rec(root, 0)
+	local post = function(node: Node)
+		depth = depth - 1
+	end
+
+	traverseAST(root, pre, post)
 end
 
 return {
 	parse = parse,
+	traverseAST = traverseAST,
 	printAST = printAST
 }
