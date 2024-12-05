@@ -9,8 +9,7 @@ local function logError(msg: string, loc: lexer.SourcePos, ...: any)
 end
 
 local function logInfo(msg: string, loc: lexer.SourcePos, ...: any)
-	lexer.log(string.format("analyzer error: " .. msg, ...), loc, "info")
-	error()
+	lexer.log(string.format("analyzer info: " .. msg, ...), loc, "info")
 end
 
 local function setParents(ast: Node)
@@ -75,18 +74,68 @@ local function simplify(ast: Node)
 	end
 end
 
+local function toPattern(atom: parser.Atomic): parser.Pattern
 
-local function analyze(ast: Node)
+	local pattern: parser.Pattern = {kind = "pattern", loc = atom.loc}
+
+	local function checkElement(elem: Node)
+		if elem is parser.Atom and
+			(elem.token.kind == "identifier" or
+			elem.token.kind == "number") then
+
+			table.insert(pattern, elem.token.value)
+		else
+			logError("invalid pattern element", elem.loc)
+		end
+	end
+
+	if atom is parser.Tuple then
+		for _,v in ipairs(atom) do
+			checkElement(v)
+		end
+	else
+		checkElement(atom)
+	-- else
+	-- 	logError("invalid pattern", atom.loc)
+	end
+
+	return pattern
+end
+
+local function checkPatterns(ast: Node)
+
+	local func = function(n: Node)
+		if not n is parser.Lambda then
+			return
+		end
+
+		local success, left = pcall(toPattern, n.uncheckedPattern)
+		if not success then
+			logInfo("in lambda", n.loc)
+			error()
+		end
+
+		n.pattern = left
+		n.uncheckedPattern = nil
+	end
+
+	traverseAST(ast, func)
+end
+
+local function analyze(ast: Node): boolean
 
 	local passes = function()
 		setParents(ast)
 		simplify(ast)
+		checkPatterns(ast)
 	end
 
 	local success, err = pcall(passes) as (boolean, string)
-	if not success then
+	if not success and err then
 		print(err)
 	end
+
+	return success
 end
 
 

@@ -2,8 +2,8 @@ local lexer = require "lexer"
 local parser = require "parser"
 local analyzer = require "analyzer"
 
-local success, tokens = lexer.lex "countdown.mf"
-if not success then
+local tokens = lexer.lex "test.mf"
+if not tokens then
 	return
 end
 --
@@ -12,6 +12,13 @@ end
 -- end
 
 local ast = parser.parse(tokens, "program")
+if not ast then
+	return
+end
 
-analyzer.analyze(ast)
+local success = analyzer.analyze(ast)
+if not success then
+	return
+end
+
 parser.printAST(ast)

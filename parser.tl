@@ -423,7 +423,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	local success, ast = pcall(funcs[topLevel])
 	if success then
 		return ast
-	else
+	elseif ast then
 		print(ast)
 	end
 end

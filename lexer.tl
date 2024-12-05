@@ -132,7 +132,7 @@ end
 
 local symbols = {"->", ">", "<", ".", "(", ")", "{", "}", "[", "]", "=", ","}
 
-local function lex(path: string): boolean, {Token}
+local function lex(path: string): {Token}
 
 	local file = readFile(path)
 	if not file then
@@ -216,7 +216,7 @@ local function lex(path: string): boolean, {Token}
 
 		do
 			log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1))
-			return false, tokens
+			return nil
 		end
 
 		::proceed::
@@ -230,7 +230,7 @@ local function lex(path: string): boolean, {Token}
 
 	table.insert(tokens, token("eof", sourcePos(file, head - 1, 0)))
 
-	return true, tokens
+	return tokens
 end
 
 return {
