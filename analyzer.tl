@@ -95,8 +95,6 @@ local function toPattern(atom: parser.Atomic): parser.Pattern
 		end
 	else
 		checkElement(atom)
-	-- else
-	-- 	logError("invalid pattern", atom.loc)
 	end
 
 	return pattern
@@ -109,14 +107,17 @@ local function checkPatterns(ast: Node)
 			return
 		end
 
+		assert(n.uncheckedPattern and not n.pattern)
+
 		local success, left = pcall(toPattern, n.uncheckedPattern)
 		if not success then
 			logInfo("in lambda", n.loc)
-			error()
+			error(left)
 		end
 
 		n.pattern = left
 		n.uncheckedPattern = nil
+		table.remove(n.children, 1)
 	end
 
 	traverseAST(ast, func)

@@ -109,6 +109,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 	local head: integer = 1
 	local parseExpression: function(): Expression
+	local parseAtomic: function(optional?: boolean): Atomic
 	local stack: {{Node}} = {{}}
 	local tokStack: {Token} = {}
 
@@ -254,42 +255,16 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return stop(list)
 	end
 
-
-	local function parsePattern(): Pattern
-		start()
-		local pattern: Pattern = {kind = "pattern"}
-
-		if is "identifier" or is "number" then
-			table.insert(pattern, consume().value)
-			return stop(pattern)
-		end
-
-		if not is "(" then
-			logError("expected pattern")
-			error()
-		end
-
-		expect "("
-		if not is ")" then
-			repeat
-				table.insert(pattern, expect("identifier").value)
-			until not accept ","
-		end
-		expect ")"
-
-		return stop(pattern)
-	end
-
 	local function parseLambda(): Lambda
 		start()
 
-		local pattern = parsePattern()
+		local pattern = parseAtomic()
 		expect "->"
 		local expr = parseExpression()
 
 		return stop {
 			kind = "lambda",
-			pattern = pattern,
+			uncheckedPattern = pattern,
 			expr = expr
 		}
 	end
@@ -307,7 +282,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return stop(lambdas)
 	end
 
-	local function parseAtomic(optional?: boolean): Atomic
+	parseAtomic = function(optional?: boolean): Atomic
 
 		if is "identifier" or is "number" or is "string" then
 			start()
