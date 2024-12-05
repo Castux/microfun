@@ -208,6 +208,17 @@ local function resolveScopes(ast: Node)
 	traverseAST(ast, pre, post)
 end
 
+local function addIfNotPresent<T>(array: {T}, elem: T)
+
+	for _,v in ipairs(array) do
+		if v == elem then
+			return
+		end
+	end
+
+	table.insert(array, elem)
+end
+
 local function checkIdentifiers(ast: Node)
 
 	local success = true
@@ -235,7 +246,7 @@ local function checkIdentifiers(ast: Node)
 			end
 
 			if not found then
-				table.insert(scope.upvalues, name)
+				addIfNotPresent(scope.upvalues, name)
 				scope = scope.parentScope
 			else
 				break
