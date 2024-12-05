@@ -125,9 +125,16 @@ local function checkPatterns(ast: Node)
 	traverseAST(ast, func)
 end
 
+local record Builtins is Scope end
+
+local builtins: Builtins = {
+	upvalues = {},
+	locals = {"add", "mul", "sub", "div", "mod", "eq", "lt", "sqrt", "eval", "show", "showt", "equal", "stdin"}
+}
+
 local function resolveScopes(ast: Node)
 
-	local stack: {Scope} = {}
+	local stack: {Scope} = {builtins}
 
 	local pre = function(node: Node)
 		local names = {}
@@ -173,6 +180,7 @@ local function resolveScopes(ast: Node)
 		local scope = node as parser.Scope
 		scope.parentScope = stack[#stack]
 		scope.locals = names
+		scope.upvalues = {}
 		table.insert(stack, scope)
 	end
 
@@ -194,23 +202,35 @@ local function checkIdentifiers(ast: Node)
 			return
 		end
 
+		local value = node.token.value
+		if not value is string then
+			return
+		end
+
+		local name = node.token.value as string
+
 		local found = false
 		local scope: Scope = node.scope
-		while scope and not found do
+		while scope do
 			for _,v in ipairs(scope.locals) do
-				if v == node.token.value as string then
+				if v == name then
 					found = true
 					break
 				end
 			end
 
-			scope = scope.parentScope
+			if not found then
+				table.insert(scope.upvalues, name)
+				scope = scope.parentScope
+			else
+				break
+			end
 		end
 
 		if found then
 			node.scope = scope
 		else
-			logInfo("no definition for " .. node.token.value as string, node.loc)
+			logInfo("no definition for " .. name, node.loc)
 			success = false
 		end
 	end

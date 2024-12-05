@@ -450,6 +450,10 @@ local function printAST(root: Node)
 				names = "[" .. table.concat(tmp.locals, ",") .. "]"
 			end
 
+			if tmp.upvalues then
+				names = names .. "^[" .. table.concat(tmp.upvalues, ",") .. "]"
+			end
+
 			print(indent .. node.kind .. " " .. names)
 		end
 		depth = depth + 1
