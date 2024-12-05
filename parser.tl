@@ -21,14 +21,14 @@ end
 local record Import is Node
 	where self.kind == "import"
 
-	modules: {Token}
+	modules: {string}
 	expr: Expression
 end
 
 local record Binding is Node
 	where self.kind == "binding"
 
-	name: Token
+	name: string
 	expr: Expression
 end
 
@@ -44,7 +44,7 @@ local record List is {Expression}, Node
 	where self.kind == "list"
 end
 
-local record Pattern is {Token}, Node
+local record Pattern is {string | integer}, Node
 	where self.kind == "pattern"
 end
 
@@ -148,7 +148,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 		return {
 			kind = "binding",
-			name = name,
+			name = name.value as string,
 			expr = expr
 		}
 	end
@@ -176,7 +176,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 		expect "import"
 		repeat
-			table.insert(modules, expect "identifier")
+			table.insert(modules, expect("identifier").value as string)
 		until not accept ","
 		expect "in"
 		local expr = parseExpression()
@@ -222,7 +222,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		local pattern: Pattern = {kind = "pattern"}
 
 		if is "identifier" or is "number" then
-			table.insert(pattern, consume())
+			table.insert(pattern, consume().value)
 			return pattern
 		end
 
@@ -234,7 +234,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		expect "("
 		if not is ")" then
 			repeat
-				table.insert(pattern, expect "identifier")
+				table.insert(pattern, expect("identifier").value)
 			until not accept ","
 		end
 		expect ")"
@@ -297,7 +297,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		if node is Atom then
 			local token = node.token
 			if token.kind == "identifier" or token.kind == "number" then
-				table.insert(pattern, token)
+				table.insert(pattern, token.value)
 				return pattern
 			end
 		end
@@ -307,7 +307,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 				if v is Atom then
 					local token = v.token
 					if token.kind == "identifier" or token.kind == "number" then
-						table.insert(pattern, token)
+						table.insert(pattern, token.value)
 					else
 						return nil
 					end
@@ -422,17 +422,47 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return module
 	end
 
-	local func: function(): Node
-	if topLevel == "module" then
-		func = parseModule
-	elseif topLevel == "program" then
-		func = parseMain
-	end
+	local funcs: {TopLevel: function(): Node} = {
+		module = parseModule,
+		program = parseMain
+	}
 
-	local success, ast = pcall(func)
+	local success, ast = pcall(funcs[topLevel])
 	if success then
 		return ast
 	end
 end
 
-return parse
+local function printAST(root: Node)
+
+
+	local function rec(node: Node, depth: integer)
+		local indent = string.rep("    ", depth)
+
+		if node is Atom then
+			print(string.format("%satom (%s) %s", indent, node.token.kind, tostring(node.token.value) or ""))
+			return
+		end
+
+		print(indent .. node.kind)
+
+		for k,v in pairs(node as {string: any}) do
+			if v is string and k ~= "kind" then
+				print(indent .. v)
+			elseif v is Node then
+				rec(v, depth + 1)
+			elseif type(v) == "table" then
+				for _,w in ipairs(v as {Node}) do
+					rec(w, depth + 1)
+				end
+			end
+		end
+	end
+
+	rec(root, 0)
+end
+
+return {
+	parse = parse,
+	printAST = printAST
+}

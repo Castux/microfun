@@ -1,5 +1,5 @@
 local lexer = require "lexer"
-local parse = require "parser"
+local parser = require "parser"
 
 local success, tokens = lexer.lex "countdown.mf"
 if not success then
@@ -10,5 +10,5 @@ end
 -- 	lexer.log(tok.kind .. " " .. tostring(tok.value or ""), tok.loc, "info")
 -- end
 
-local ast = parse(tokens, "program")
-print(ast)
+local ast = parser.parse(tokens, "program")
+parser.printAST(ast)
