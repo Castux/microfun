@@ -15,14 +15,21 @@ local interface Node
 	loc: SourcePos
 end
 
-local record Let is Node
+local interface Scope
+
+	parentScope: Scope
+	locals: {string}
+	upvalues: {string}
+end
+
+local record Let is Node, Scope
 	where self.kind == "let"
 
 	bindings: {Binding}
 	expr: Expression
 end
 
-local record Import is Node
+local record Import is Node, Scope
 	where self.kind == "import"
 
 	modules: {string}
@@ -33,10 +40,12 @@ local record Binding is Node
 	where self.kind == "binding"
 
 	name: string
+	nameToken: Token
+
 	expr: Expression
 end
 
-local record Module is {Binding}, Node
+local record Module is {Binding}, Node, Scope
 	where self.kind == "module"
 end
 
@@ -50,9 +59,11 @@ end
 
 local record Pattern is {string | integer}, Node
 	where self.kind == "pattern"
+
+	nameTokens: {Token}
 end
 
-local record Lambda is Node
+local record Lambda is Node, Scope
 	where self.kind == "lambda"
 
 	uncheckedPattern: Atomic
@@ -183,6 +194,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return stop {
 			kind = "binding",
 			name = name.value as string,
+			nameToken = name,
 			expr = expr
 		}
 	end
@@ -431,7 +443,13 @@ local function printAST(root: Node)
 		if node is Atom then
 			print(string.format("%satom (%s) %s", indent, node.token.kind, tostring(node.token.value) or ""))
 		else
-			print(indent .. node.kind)
+			local names = ""
+			local tmp = node as Scope
+			if tmp.locals then
+				names = "[" .. table.concat(tmp.locals, ",") .. "]"
+			end
+
+			print(indent .. node.kind .. " " .. names)
 		end
 		depth = depth + 1
 	end
@@ -459,6 +477,8 @@ return {
 	Application = Application,
 	Operation = Operation,
 	Expression = Expression,
+
+	Scope = Scope,
 
 	parse = parse,
 	traverseAST = traverseAST,

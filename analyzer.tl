@@ -1,6 +1,7 @@
 local lexer = require "lexer"
 local parser = require "parser"
 local Node = parser.Node
+local Scope = parser.Scope
 local traverseAST = parser.traverseAST
 
 local function logError(msg: string, loc: lexer.SourcePos, ...: any)
@@ -76,7 +77,7 @@ end
 
 local function toPattern(atom: parser.Atomic): parser.Pattern
 
-	local pattern: parser.Pattern = {kind = "pattern", loc = atom.loc}
+	local pattern: parser.Pattern = {kind = "pattern", loc = atom.loc, nameTokens = {}}
 
 	local function checkElement(elem: Node)
 		if elem is parser.Atom and
@@ -84,6 +85,7 @@ local function toPattern(atom: parser.Atomic): parser.Pattern
 			elem.token.kind == "number") then
 
 			table.insert(pattern, elem.token.value)
+			table.insert(pattern.nameTokens, elem.token)
 		else
 			logError("invalid pattern element", elem.loc)
 		end
@@ -123,12 +125,97 @@ local function checkPatterns(ast: Node)
 	traverseAST(ast, func)
 end
 
+local function asScope(node: Node): Scope
+	if node is parser.Let or
+	 	node is parser.Import or
+		node is parser.Module or
+		node is parser.Lambda then
+
+		return node
+	else
+		return nil
+	end
+end
+
+local function resolveScopes(ast: Node)
+
+	local stack: {Scope} = {}
+
+	local pre = function(node: Node)
+		local names = {}
+		local seen: {string: lexer.SourcePos} = {}
+
+		local function addName(name: string, loc: lexer.SourcePos)
+			if seen[name] then
+				logInfo(name .. " was already defined", loc)
+				logError("here", seen[name])
+			end
+			seen[name] = loc
+			table.insert(names, name)
+		end
+
+		if node is parser.Let then
+			for _,binding in ipairs(node.bindings) do
+				addName(binding.name, binding.nameToken.loc)
+			end
+
+		elseif node is parser.Module then
+			for _,binding in ipairs(node) do
+				addName(binding.name, binding.nameToken.loc)
+			end
+
+		elseif node is parser.Lambda then
+			for i,elem in ipairs(node.pattern) do
+				if elem is string then
+					addName(elem, node.pattern.nameTokens[i].loc)
+				end
+			end
+
+		elseif node is parser.Import then
+			error("Not implemented yet")
+
+		else
+			return
+		end
+
+		local scope = node as parser.Scope
+		scope.parentScope = stack[#stack]
+		scope.locals = names
+		table.insert(stack, scope)
+	end
+
+	local post = function(node: Node)
+		if stack[#stack] as Node == node then
+			table.remove(stack)
+		end
+	end
+
+	traverseAST(ast, pre, post)
+end
+
+local function checkIdentifiers(ast: Node)
+
+	local scope: Scope
+
+	local pre = function(node: Node)
+		scope = asScope(node) or scope
+
+		if node is parser.Atom and node.token.kind == "identifier" then
+
+
+
+		end
+	end
+
+end
+
 local function analyze(ast: Node): boolean
 
 	local passes = function()
 		setParents(ast)
 		simplify(ast)
 		checkPatterns(ast)
+		resolveScopes(ast)
 	end
 
 	local success, err = pcall(passes) as (boolean, string)
