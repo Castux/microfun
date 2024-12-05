@@ -2,7 +2,7 @@ local lexer = require "lexer"
 local parser = require "parser"
 local analyzer = require "analyzer"
 
-local tokens = lexer.lex "test.mf"
+local tokens = lexer.lex "prelude.mf"
 if not tokens then
 	return
 end
@@ -11,7 +11,7 @@ end
 -- 	lexer.log(tok.kind .. " " .. tostring(tok.value or ""), tok.loc, "info")
 -- end
 
-local ast = parser.parse(tokens, "program")
+local ast = parser.parse(tokens, "module")
 if not ast then
 	return
 end

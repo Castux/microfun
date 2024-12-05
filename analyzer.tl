@@ -125,18 +125,6 @@ local function checkPatterns(ast: Node)
 	traverseAST(ast, func)
 end
 
-local function asScope(node: Node): Scope
-	if node is parser.Let or
-	 	node is parser.Import or
-		node is parser.Module or
-		node is parser.Lambda then
-
-		return node
-	else
-		return nil
-	end
-end
-
 local function resolveScopes(ast: Node)
 
 	local stack: {Scope} = {}
@@ -171,6 +159,10 @@ local function resolveScopes(ast: Node)
 				end
 			end
 
+		elseif node is parser.Atom and node.token.kind == "identifier" then
+			node.scope = stack[#stack]
+			return
+
 		elseif node is parser.Import then
 			error("Not implemented yet")
 
@@ -195,18 +187,38 @@ end
 
 local function checkIdentifiers(ast: Node)
 
-	local scope: Scope
+	local success = true
 
 	local pre = function(node: Node)
-		scope = asScope(node) or scope
+		if not node is parser.Atom or not node.scope then
+			return
+		end
 
-		if node is parser.Atom and node.token.kind == "identifier" then
+		local found = false
+		local scope: Scope = node.scope
+		while scope and not found do
+			for _,v in ipairs(scope.locals) do
+				if v == node.token.value as string then
+					found = true
+					break
+				end
+			end
 
+			scope = scope.parentScope
+		end
 
-
+		if found then
+			node.scope = scope
+		else
+			logInfo("no definition for " .. node.token.value as string, node.loc)
+			success = false
 		end
 	end
 
+	traverseAST(ast, pre)
+	if not success then
+		error()
+	end
 end
 
 local function analyze(ast: Node): boolean
@@ -216,6 +228,7 @@ local function analyze(ast: Node): boolean
 		simplify(ast)
 		checkPatterns(ast)
 		resolveScopes(ast)
+		checkIdentifiers(ast)
 	end
 
 	local success, err = pcall(passes) as (boolean, string)

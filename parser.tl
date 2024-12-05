@@ -79,6 +79,7 @@ local record Atom is Node
 	where self.kind == "atom"
 
 	token: Token
+	scope: Scope
 end
 
 local type Atomic = Atom | Tuple | List | MultiLambda
