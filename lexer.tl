@@ -94,10 +94,13 @@ local function readFile(path: string): Source
 	local head = 1
 	while head < #text do
 		local from,to = text:find("[^\n\r]*\n\r?", head)
-		if from and to then
-			local line: Source.Line = {from = from, to = to, number = #lines + 1}
-			table.insert(lines, line)
+		if not from or not to then
+			from,to = text:find("[^\n\r]*", head)
 		end
+		assert(from and to)
+
+		local line: Source.Line = {from = from, to = to, number = #lines + 1}
+		table.insert(lines, line)
 		head = to + 1
 	end
 
@@ -126,7 +129,7 @@ local function token(kind: string, loc: SourcePos, value?: integer | string): To
 end
 
 local keywords: {string:boolean} = {}
-for _,v in ipairs {"let", "in", "import"} do
+for _,v in ipairs {"let", "in", "import", "module"} do
 	keywords[v] = true
 end
 

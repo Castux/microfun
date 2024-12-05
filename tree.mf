@@ -1,4 +1,6 @@
-let
+import prelude in
+
+module
 
 tree = a -> left -> right -> (a,left,right),
 
@@ -27,5 +29,3 @@ treeInsertBy = comp -> new -> [
 
 treeInsert = treeInsertBy lt,
 treeFromList = foldr treeInsert ()
-
-in

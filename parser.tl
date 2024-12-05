@@ -104,20 +104,15 @@ local record Operation is {Atomic | Application | Lambda}, Node
 	operator: Operator
 end
 
-local type Expression = Let | Import | Operation | Application | Atomic | Lambda
+local type Expression = Let | Module | Import | Operation | Application | Atomic | Lambda
 
-local record Program is Node
-	where self.kind == "program"
+local record Chunk is Node
+	where self.kind == "chunk"
 
 	expr: Expression
 end
 
-local enum TopLevel
-	"module"
-	"program"
-end
-
-local function parse(tokens: {Token}, topLevel: TopLevel): Node
+local function parse(tokens: {Token}): Chunk
 
 	local head: integer = 1
 	local parseExpression: function(): Expression
@@ -367,6 +362,23 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		return stop(operation)
 	end
 
+	local function parseModule(): Module
+		start()
+		local module: Module = {kind = "module"}
+
+		expect "module"
+
+		repeat
+			table.insert(module, parseBinding())
+		until not accept ","
+
+		if not is "eof" then
+			logError("module definition can only appear at the end of a file", peek().loc)
+		end
+
+		return stop(module)
+	end
+
 	parseExpression = function(): Expression
 
 		if is "let" then
@@ -377,38 +389,26 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 			return parseImport()
 		end
 
+		if is "module" then
+			return parseModule()
+		end
+
 		return parseOperation()
 	end
 
-	local function parseProgram(): Program
+	local function parseChunk(): Chunk
 		start()
 
 		local expr = parseExpression()
 		expect "eof"
 
 		return stop {
-			kind = "program",
+			kind = "chunk",
 			expr = expr
 		}
 	end
 
-	local function parseModule(): Module
-		start()
-		local module: Module = {kind = "module"}
-		repeat
-			table.insert(module, parseBinding())
-		until not accept ","
-
-		expect "eof"
-		return stop(module)
-	end
-
-	local funcs: {TopLevel: function(): Node} = {
-		module = parseModule,
-		program = parseProgram
-	}
-
-	local success, ast = pcall(funcs[topLevel])
+	local success, ast = pcall(parseChunk)
 	if success then
 		return ast
 	elseif ast then
@@ -469,9 +469,9 @@ end
 return {
 	Node = Node,
 	Let = Let,
+	Module = Module,
 	Import = Import,
 	Binding = Binding,
-	Module = Module,
 	Tuple = Tuple,
 	List = List,
 	Pattern = Pattern,
@@ -482,7 +482,7 @@ return {
 	Application = Application,
 	Operation = Operation,
 	Expression = Expression,
-	Program = Program,
+	Chunk = Chunk,
 
 	Scope = Scope,
 

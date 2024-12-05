@@ -1,4 +1,4 @@
--- let
+module
 
 -- Functions
 
@@ -231,5 +231,3 @@ toString =
 					(numberToString asList)
 	in
 		x -> if (isList x) (listToString x) (tupleToString x)
-
--- in

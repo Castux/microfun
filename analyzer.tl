@@ -4,7 +4,7 @@ local Node = parser.Node
 local Scope = parser.Scope
 local traverseAST = parser.traverseAST
 
-local compile: function(string): parser.Program
+local compile: function(string): parser.Chunk
 local compileModule: function(string): parser.Module
 
 local function logError(msg: string, loc: lexer.SourcePos, ...: any)
@@ -285,14 +285,14 @@ local function analyze(ast: Node): boolean
 	return success
 end
 
-compile = function(path: string): parser.Program
+compile = function(path: string): parser.Chunk
 
 	local tokens = lexer.lex(path)
 	if not tokens then
 		return
 	end
 
-	local ast = parser.parse(tokens, "program")
+	local ast = parser.parse(tokens)
 	if not ast then
 		return
 	end
@@ -302,7 +302,7 @@ compile = function(path: string): parser.Program
 		return
 	end
 
-	return ast as parser.Program
+	return ast
 end
 
 local loadedModules: {string: parser.Module} = {}
@@ -314,20 +314,20 @@ compileModule = function(name: string): parser.Module
 	end
 
 	local path = name .. ".mf"
-
-	local tokens = lexer.lex(path)
-	if not tokens then
+	local chunk = compile(path)
+	if not chunk then
 		return
 	end
 
-	local module = parser.parse(tokens, "module") as parser.Module
+	local module: parser.Module
+	traverseAST(chunk, function(node: Node)
+		if node is parser.Module then
+			module = node
+		end
+	end)
+
 	if not module then
-		return
-	end
-
-	local success = analyze(module)
-	if not success then
-		return
+		error("no module found in " .. path)
 	end
 
 	loadedModules[name] = module
@@ -337,6 +337,5 @@ end
 
 return {
 	analyze = analyze,
-	compile = compile,
-	compileModule = compileModule
+	compile = compile
 }
