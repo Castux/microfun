@@ -1,4 +1,4 @@
-let
+-- let
 
 -- Functions
 
@@ -232,4 +232,4 @@ toString =
 	in
 		x -> if (isList x) (listToString x) (tupleToString x)
 
-in
+-- in

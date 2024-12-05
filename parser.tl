@@ -9,6 +9,7 @@ local interface Node
 	where self.kind ~= nil
 
 	kind: string
+	children: {Node}
 end
 
 local record Let is Node
@@ -51,6 +52,7 @@ end
 local record Lambda is Node
 	where self.kind == "lambda"
 
+	uncheckedPattern: Atomic
 	pattern: Pattern
 	expr: Expression
 end
@@ -99,6 +101,18 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 	local head: integer = 1
 	local parseExpression: function(): Expression
+	local stack: {{Node}} = {{}}
+
+	local function start()
+		table.insert(stack, {})
+	end
+
+	local function stop<N is Node>(node: N): N
+		node.children = table.remove(stack)
+		table.insert(stack[#stack], node)
+
+		return node
+	end
 
 	local function is(kind: string): boolean
 		if head > #tokens then
@@ -142,11 +156,13 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseBinding(): Binding
+		start()
+
 		local name = expect "identifier"
 		expect "="
 		local expr = parseExpression()
 
-		return {
+		return stop {
 			kind = "binding",
 			name = name.value as string,
 			expr = expr
@@ -154,6 +170,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseLet(): Let
+		start()
 
 		local bindings = {}
 
@@ -164,7 +181,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		expect "in"
 		local expr = parseExpression()
 
-		return {
+		return stop {
 			kind = "let",
 			bindings = bindings,
 			expr = expr
@@ -172,6 +189,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseImport(): Import
+		start()
 		local modules = {}
 
 		expect "import"
@@ -181,7 +199,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		expect "in"
 		local expr = parseExpression()
 
-		return {
+		return stop {
 			kind = "import",
 			modules = modules,
 			expr = expr
@@ -189,6 +207,8 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseTuple(): Tuple
+		start()
+
 		local tuple: Tuple = {kind = "tuple"}
 
 		expect "("
@@ -199,10 +219,11 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		end
 		expect ")"
 
-		return tuple
+		return stop(tuple)
 	end
 
 	local function parseList(): List
+		start()
 		local list: List = {kind = "list"}
 
 		expect "{"
@@ -213,17 +234,17 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		end
 		expect "}"
 
-		return list
+		return stop(list)
 	end
 
 
 	local function parsePattern(): Pattern
-
+		start()
 		local pattern: Pattern = {kind = "pattern"}
 
 		if is "identifier" or is "number" then
 			table.insert(pattern, consume().value)
-			return pattern
+			return stop(pattern)
 		end
 
 		if not is "(" then
@@ -239,16 +260,17 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		end
 		expect ")"
 
-		return pattern
+		return stop(pattern)
 	end
 
 	local function parseLambda(): Lambda
+		start()
 
 		local pattern = parsePattern()
 		expect "->"
 		local expr = parseExpression()
 
-		return {
+		return stop {
 			kind = "lambda",
 			pattern = pattern,
 			expr = expr
@@ -256,7 +278,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseMultiLambda(): MultiLambda
-
+		start()
 		local lambdas: MultiLambda = {kind = "multilambda"}
 
 		expect "["
@@ -265,14 +287,15 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		until not accept ","
 		expect "]"
 
-		return lambdas
+		return stop(lambdas)
 	end
 
 	local function parseAtomic(optional?: boolean): Atomic
 
 		if is "identifier" or is "number" or is "string" then
+			start()
 			local atom: Atom = {kind = "atom", token = consume()}
-			return atom
+			return stop(atom)
 
 		elseif is "(" then
 			return parseTuple()
@@ -290,57 +313,19 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		end
 	end
 
-	local function toPattern(node: Atomic): Pattern
-
-		local pattern: Pattern = {kind = "pattern"}
-
-		if node is Atom then
-			local token = node.token
-			if token.kind == "identifier" or token.kind == "number" then
-				table.insert(pattern, token.value)
-				return pattern
-			end
-		end
-
-		if node is Tuple then
-			for _,v in ipairs(node) do
-				if v is Atom then
-					local token = v.token
-					if token.kind == "identifier" or token.kind == "number" then
-						table.insert(pattern, token.value)
-					else
-						return nil
-					end
-				else
-					return nil
-				end
-			end
-
-			return pattern
-		end
-
-		return nil
-	end
-
 	local function continueLambda(left: Atomic): Lambda
-
-		local pattern = toPattern(left)
-		if not pattern then
-			logError("invalid pattern in lambda")
-			error()
-		end
 
 		expect "->"
 		local expr = parseExpression()
 		return {
 			kind = "lambda",
-			pattern = pattern,
+			uncheckedPattern = left,
 			expr = expr
 		}
 	end
 
 	local function parseOperand(): Atomic | Application | Lambda
-
+		start()
 		local atomics: Application = {kind = "application"}
 
 		table.insert(atomics, parseAtomic())
@@ -355,18 +340,14 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 		end
 
 		if #atomics == 1 and is "->" then
-			return continueLambda(atomics[1])
+			return stop(continueLambda(atomics[1]))
 		end
 
-		if #atomics == 1 then
-			return atomics[1]
-		else
-			return atomics
-		end
+		return stop(atomics)
 	end
 
 	local function parseOperation(): Operation | Application | Atomic | Lambda
-
+		start()
 		local operands = {}
 		local operator: Operator
 
@@ -380,15 +361,11 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 			end
 		end
 
-		if #operands == 1 then
-			return operands[1]
-		else
-			return {
-				kind = "operation",
-				operator = operator,
-				operands = operands
-			}
-		end
+		return stop {
+			kind = "operation",
+			operator = operator,
+			operands = operands
+		}
 	end
 
 	parseExpression = function(): Expression
@@ -412,14 +389,14 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	end
 
 	local function parseModule(): Module
-
+		start()
 		local module: Module = {kind = "module"}
 		repeat
 			table.insert(module, parseBinding())
 		until not accept ","
 
 		expect "eof"
-		return module
+		return stop(module)
 	end
 
 	local funcs: {TopLevel: function(): Node} = {
@@ -430,13 +407,15 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 	local success, ast = pcall(funcs[topLevel])
 	if success then
 		return ast
+	else
+		print(ast)
 	end
 end
 
 local function printAST(root: Node)
 
-
 	local function rec(node: Node, depth: integer)
+
 		local indent = string.rep("    ", depth)
 
 		if node is Atom then
@@ -444,18 +423,10 @@ local function printAST(root: Node)
 			return
 		end
 
-		print(indent .. node.kind)
+		print(indent .. node.kind, node)
 
-		for k,v in pairs(node as {string: any}) do
-			if v is string and k ~= "kind" then
-				print(indent .. v)
-			elseif v is Node then
-				rec(v, depth + 1)
-			elseif type(v) == "table" then
-				for _,w in ipairs(v as {Node}) do
-					rec(w, depth + 1)
-				end
-			end
+		for _,v in ipairs(node.children) do
+			rec(v, depth + 1)
 		end
 	end
 
