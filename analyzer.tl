@@ -166,12 +166,17 @@ local function resolveScopes(ast: Node)
 				end
 			end
 
+		elseif node is parser.Import then
+			local modules = {}
+
+			for _,name in ipairs(node.names) do
+
+			end
+
+
 		elseif node is parser.Atom and node.token.kind == "identifier" then
 			node.scope = stack[#stack]
 			return
-
-		elseif node is parser.Import then
-			error("Not implemented yet")
 
 		else
 			return
@@ -259,7 +264,51 @@ local function analyze(ast: Node): boolean
 	return success
 end
 
+local function compile(path: string): parser.Program
+
+	local tokens = lexer.lex(path)
+	if not tokens then
+		return
+	end
+
+	local ast = parser.parse(tokens, "program")
+	if not ast then
+		return
+	end
+
+	local success = analyze(ast)
+	if not success then
+		return
+	end
+
+	return ast as parser.Program
+end
+
+local function compileModule(name: string): parser.Module
+
+	local path = name .. ".mf"
+
+	local tokens = lexer.lex(path)
+	if not tokens then
+		return
+	end
+
+	local module = parser.parse(tokens, "module")
+	if not module then
+		return
+	end
+
+	local success = analyze(module)
+	if not success then
+		return
+	end
+
+	return module as parser.Module
+end
+
 
 return {
-	analyze = analyze
+	analyze = analyze,
+	compile = compile,
+	compileModule = compileModule
 }

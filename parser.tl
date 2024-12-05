@@ -32,7 +32,7 @@ end
 local record Import is Node, Scope
 	where self.kind == "import"
 
-	modules: {string}
+	names: {string}
 	expr: Expression
 end
 
@@ -232,7 +232,7 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 		return stop {
 			kind = "import",
-			modules = modules,
+			names = modules,
 			expr = expr
 		}
 	end
@@ -482,6 +482,7 @@ return {
 	Application = Application,
 	Operation = Operation,
 	Expression = Expression,
+	Program = Program,
 
 	Scope = Scope,
 
