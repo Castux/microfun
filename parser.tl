@@ -1,5 +1,6 @@
 local lexer = require "lexer"
 local Token = lexer.Token
+local SourcePos = lexer.SourcePos
 
 -----------------
 --[[ PARSING ]]--
@@ -10,8 +11,7 @@ local interface Node
 
 	kind: string
 	children: {Node}
-	first: Token
-	last: Token
+	loc: SourcePos
 end
 
 local record Let is Node
@@ -126,8 +126,11 @@ local function parse(tokens: {Token}, topLevel: TopLevel): Node
 
 	local function stop<N is Node>(node: N): N
 		node.children = table.remove(stack)
-		node.first = table.remove(tokStack)
-		node.last = peek(-1)
+
+		local first = table.remove(tokStack)
+		local last = peek(-1)
+
+		node.loc = lexer.merge(first.loc, last.loc)
 
 		table.insert(stack[#stack], node)
 
@@ -431,8 +434,7 @@ local function printAST(root: Node)
 		else
 			print(indent .. node.kind)
 
-			-- lexer.log("from", node.first.loc, "info")
-			-- lexer.log("to", node.last.loc, "info")
+			-- lexer.log("at", node.loc, "info")
 
 			for _,v in ipairs(node.children) do
 				rec(v, depth + 1)

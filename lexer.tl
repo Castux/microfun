@@ -18,6 +18,12 @@ local record SourcePos
 	length: integer
 end
 
+local record Token
+	kind: string
+	value: integer | string
+	loc: SourcePos
+end
+
 -----------------
 --[[ LOGGING ]]--
 -----------------
@@ -59,6 +65,18 @@ local function log(msg: string, loc: SourcePos, severity?: Severity)
 	io.write(colored)
 end
 
+local function merge(a: SourcePos, b: SourcePos): SourcePos
+	if a.file ~= b.file then
+		error("Cannot merge SourcePos from different files")
+	end
+
+	return {
+		file = a.file,
+		start = a.start,
+		length = b.start + b.length - a.start
+	}
+end
+
 ----------------
 --[[ LEXING ]]--
 ----------------
@@ -97,12 +115,6 @@ local function sourcePos(file: Source, start: integer, length: integer): SourceP
 		start = start,
 		length = length
 	}
-end
-
-local record Token
-	kind: string
-	value: integer | string
-	loc: SourcePos
 end
 
 local function token(kind: string, loc: SourcePos, value?: integer | string): Token
@@ -224,5 +236,7 @@ end
 return {
 	lex = lex,
 	log = log,
-	Token = Token
+	Token = Token,
+	SourcePos = SourcePos,
+	merge = merge
 }
