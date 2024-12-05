@@ -42,7 +42,7 @@ local function colorText(txt: string, color: integer): string
 	return ("\x1b[%d;1m%s\x1b[0m"):format(color, txt)
 end
 
-local function log(msg: string, loc: SourcePos, severity?: Severity)
+local function log(msg: string, loc: SourcePos, severity: Severity)
 
 	severity = severity or "error"
 
@@ -218,7 +218,7 @@ local function lex(path: string): {Token}
 		-- Fail state
 
 		do
-			log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1))
+			log("lexer error: unexpected character '" .. source:sub(head,head) .. "'", sourcePos(file, head, 1), "error")
 			return nil
 		end
 

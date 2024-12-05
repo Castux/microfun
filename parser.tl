@@ -152,7 +152,7 @@ local function parse(tokens: {Token}): Chunk
 	end
 
 	local function logError(msg: string, ...: any)
-		lexer.log(string.format("parser error: " .. msg, ...), peek().loc)
+		lexer.log(string.format("parser error: " .. msg, ...), peek().loc, "error")
 		error()
 	end
 
