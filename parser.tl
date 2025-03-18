@@ -454,7 +454,19 @@ local function printAST(root: Node)
 				names = names .. "^[" .. table.concat(tmp.upvalues, ",") .. "]"
 			end
 
-			print(indent .. node.kind .. " " .. names)
+			local header = indent .. node.kind
+
+			if node is Binding then
+				header = header .. " " .. node.name
+			elseif node is Lambda then
+				header = header .. " (" .. table.concat(node.pattern, ",") .. ")"
+			end
+
+			if names ~= "" then
+				header = header .. " " .. names
+			end
+
+			print(header)
 		end
 		depth = depth + 1
 	end
