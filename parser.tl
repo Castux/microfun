@@ -456,7 +456,9 @@ local function printAST(root: Node)
 
 			local header = indent .. node.kind
 
-			if node is Binding then
+			if node is Operation then
+				header = header .. " " .. node.operator
+			elseif node is Binding then
 				header = header .. " " .. node.name
 			elseif node is Lambda then
 				header = header .. " (" .. table.concat(node.pattern, ",") .. ")"
