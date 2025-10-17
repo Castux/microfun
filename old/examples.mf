@@ -69,4 +69,5 @@ add3 = a -> b -> c -> sum {a,b,c}
 
 in
 
-stdin > map (showt . flip cons ()) > eval
+-- stdin > map (showt . flip cons ()) > eval
+primes > take 1000 > show
