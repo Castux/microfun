@@ -1,4 +1,3 @@
-
 local record Source
 
 	record Line
@@ -20,7 +19,7 @@ end
 
 local record Token
 	kind: string
-	value: integer | string
+	value: number | string
 	loc: SourcePos
 end
 
@@ -120,7 +119,7 @@ local function sourcePos(file: Source, start: integer, length: integer): SourceP
 	}
 end
 
-local function token(kind: string, loc: SourcePos, value?: integer | string): Token
+local function token(kind: string, loc: SourcePos, value?: number | string): Token
 	return {
 		kind = kind,
 		loc = loc,
@@ -133,7 +132,7 @@ for _,v in ipairs {"let", "in", "import", "module"} do
 	keywords[v] = true
 end
 
-local symbols = {"->", ">", "<", ".", "(", ")", "{", "}", "[", "]", "=", ","}
+local symbols = {"->", ">", "<", ".", "<*", "*>", "(", ")", "{", "}", "[", "]", "=", ","}
 
 local function lex(path: string): {Token}
 
@@ -149,7 +148,7 @@ local function lex(path: string): {Token}
 	while head < #source do
 		local kind: string
 		local loc: SourcePos
-		local value: integer | string
+		local value: number | string
 
 		-- consume whitespace
 
@@ -206,11 +205,11 @@ local function lex(path: string): {Token}
 
 		-- number literals
 
-		match = source:match("^%d+", head)
+		match = source:match("^%d+%.%d+", head) or source:match("^%d+", head)
 		if match then
 			kind = "number"
 			loc = sourcePos(file, head, #match)
-			value = math.tointeger(tonumber(source:sub(head, head + #match - 1)))
+			value = tonumber(source:sub(head, head + #match - 1))
 
 			goto proceed
 		end

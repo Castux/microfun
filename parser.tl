@@ -57,7 +57,7 @@ local record List is {Expression}, Node
 	where self.kind == "list"
 end
 
-local record Pattern is {string | integer}, Node
+local record Pattern is {string | number}, Node
 	where self.kind == "pattern"
 
 	nameTokens: {Token}
