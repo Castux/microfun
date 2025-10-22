@@ -1,31 +1,27 @@
 package main
 
-type Node struct {
-	// Pos      SourcePos
-	// Parent   *Node
-	// Children []*Node
+type Program struct {
+	Imports []*Name
+	Body    Expression
+
+	Start SourcePos
 }
 
 type Module struct {
-	Node
 	Imports         []*Name
 	PrivateBindings []*Binding
 	PublicBindings  []*Binding
-}
 
-type Program struct {
-	Node
-	Imports []*Name
-	Body    Expression
+	Start SourcePos
 }
 
 type Binding struct {
-	Node
 	Name       *Name
 	Expression Expression
 }
 
 type Expression interface {
+	Node
 	isExpr()
 }
 
@@ -41,23 +37,25 @@ func (x Tuple) isExpr()         {}
 func (x List) isExpr()          {}
 
 type Let struct {
-	Node
 	Bindings   []*Binding
 	Expression Expression
+
+	Start SourcePos
 }
 
 type Lambda struct {
-	Node
 	Pattern    Pattern
 	Expression Expression
 }
 
 type MultiLambda struct {
-	Node
 	Lambdas []*Lambda
+
+	Start, End SourcePos
 }
 
 type Pattern interface {
+	Node
 	isPattern()
 }
 
@@ -68,48 +66,54 @@ func (x NumberLiteral) isPattern() {}
 func (x StringLiteral) isPattern() {}
 
 type TuplePattern struct {
-	Node
 	SubPatterns []Pattern
+
+	Start, End SourcePos
 }
 
 type ListPattern struct {
-	Node
 	SubPatterns []Pattern
+
+	Start, End SourcePos
 }
 
 type Operation struct {
-	Node
 	Operator string
 	Operands []Expression
 }
 
 type Name struct {
-	Node
 	Value string
+	Pos   SourcePos
 }
 
 type QualifiedName struct {
-	Node
 	Module string
 	Value  string
+
+	Start, End SourcePos
 }
 
 type NumberLiteral struct {
-	Node
 	Value float64
+
+	Pos SourcePos
 }
 
 type StringLiteral struct {
-	Node
 	Value string
+
+	Pos SourcePos
 }
 
 type Tuple struct {
-	Node
 	SubExpressions []Expression
+
+	Start, End SourcePos
 }
 
 type List struct {
-	Node
 	SubExpressions []Expression
+
+	Start, End SourcePos
 }

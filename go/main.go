@@ -1,32 +1,24 @@
 package main
 
-import "fmt"
-import "bytes"
-import "encoding/json"
 
 func main() {
 
-	tokens := Lex("test.mf")
+	tokens := Lex("prelude.mf")
 
 	if tokens == nil {
 		return
 	}
 
+//	prog := ParseProgram(tokens)
+	prog := ParseModule(tokens)
+
+	// var b bytes.Buffer
+	// enc := json.NewEncoder(&b)
+	// enc.SetEscapeHTML(false)
+	// enc.SetIndent("", "  ")
+	// enc.Encode(prog)
 	//
-	// for i, tok := range tokens {
-	// 	fmt.Println(i, tok.Kind, tok.Value)
-	// 	if tok.Kind == "number" {
-	// 		fmt.Println("\t", tok.Number())
-	// 	}
-	// }
+	// fmt.Println(b.String())
 
-	prog := ParseProgram(tokens)
-
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	enc.Encode(prog)
-
-	fmt.Println(b.String())
+	PrintAST(prog)
 }

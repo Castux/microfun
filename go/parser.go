@@ -3,8 +3,9 @@ package main
 import "fmt"
 
 type Parser struct {
-	Tokens []Token
-	Head   int
+	Tokens   []Token
+	Head     int
+	PosStack []SourcePos
 }
 
 func (p *Parser) Is(kind string) bool {
@@ -16,6 +17,14 @@ func (p *Parser) Is(kind string) bool {
 
 func (p *Parser) Peek(offset int) Token {
 	return p.Tokens[p.Head+offset]
+}
+
+func (p *Parser) Pos() SourcePos {
+	return p.Peek(0).Pos
+}
+
+func (p *Parser) PrevPos() SourcePos {
+	return p.Peek(-1).Pos
 }
 
 func (p *Parser) Consume() Token {
@@ -44,6 +53,8 @@ func (p *Parser) Expect(kind string) Token {
 }
 
 func (p *Parser) ParseProgram() *Program {
+	start := p.Pos()
+
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
@@ -54,15 +65,15 @@ func (p *Parser) ParseProgram() *Program {
 		}
 		p.Expect("in")
 	}
-
 	expr := p.ParseExpression()
-
 	p.Expect("eof")
 
-	return &Program{Imports: imports, Body: expr}
+	return &Program{Imports: imports, Body: expr, Start: start}
 }
 
 func (p *Parser) ParseModule() *Module {
+	start := p.Pos()
+
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
@@ -94,15 +105,19 @@ func (p *Parser) ParseModule() *Module {
 			break
 		}
 	}
-
 	p.Expect("eof")
 
-	return &Module{Imports: imports, PrivateBindings: private, PublicBindings: public}
+	return &Module{
+		Imports:         imports,
+		PrivateBindings: private,
+		PublicBindings:  public,
+		Start:           start,
+	}
 }
 
 func (p *Parser) ParseName() *Name {
 	ident := p.Expect("identifier")
-	return &Name{Value: ident.Value}
+	return &Name{Value: ident.Value, Pos: ident.Pos}
 }
 
 func (p *Parser) ParseQualifiedName() Expression {
@@ -110,14 +125,20 @@ func (p *Parser) ParseQualifiedName() Expression {
 
 	if p.Accept(".") {
 		ident2 := p.Expect("identifier")
-		return &QualifiedName{Module: ident.Value, Value: ident2.Value}
+		return &QualifiedName{
+			Module: ident.Value,
+			Value:  ident2.Value,
+			Start:  ident.Pos,
+			End:    ident2.Pos,
+		}
 	}
 
-	return &Name{Value: ident.Value}
+	return &Name{Value: ident.Value, Pos: ident.Pos}
 }
 
 func (p *Parser) ParseExpression() Expression {
 
+	start := p.Pos()
 	bindings := []*Binding{}
 
 	if p.Accept("let") {
@@ -140,7 +161,7 @@ func (p *Parser) ParseExpression() Expression {
 	}
 
 	if len(bindings) > 0 {
-		return &Let{Bindings: bindings, Expression: expr}
+		return &Let{Bindings: bindings, Expression: expr, Start: start}
 	}
 	return expr
 }
@@ -219,6 +240,7 @@ func (p *Parser) ParseApplication() Expression {
 }
 
 func (p *Parser) ParseAtomic(mandatory bool) Expression {
+	start := p.Pos()
 
 	if p.Is("identifier") {
 		return p.ParseQualifiedName()
@@ -226,12 +248,12 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 
 	if p.Is("number") {
 		tok := p.Consume()
-		return &NumberLiteral{Value: tok.Number()}
+		return &NumberLiteral{Value: tok.Number(), Pos: start}
 	}
 
 	if p.Is("string") {
 		tok := p.Consume()
-		return &StringLiteral{Value: tok.Value}
+		return &StringLiteral{Value: tok.Value, Pos: start}
 	}
 
 	if p.Accept("(") {
@@ -244,13 +266,13 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 		exprs := []Expression{}
 
 		if p.Accept("]") {
-			return &Tuple{SubExpressions: exprs}
+			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		exprs = append(exprs, p.ParseExpression())
 
 		if p.Accept("]") {
-			return &Tuple{SubExpressions: exprs}
+			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		if p.Accept(",") {
@@ -261,12 +283,12 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 				}
 			}
 			p.Expect("]")
-			return &Tuple{SubExpressions: exprs}
+			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		if p.Accept(";") {
 			if p.Accept("]") {
-				return &List{SubExpressions: exprs}
+				return &List{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 			}
 
 			for {
@@ -276,7 +298,7 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 				}
 			}
 			p.Expect("]")
-			return &List{SubExpressions: exprs}
+			return &List{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 	}
 
@@ -284,11 +306,13 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 		lambdas := []*Lambda{}
 		for {
 			lambdas = append(lambdas, p.ParseLambda())
-			if !p.Accept(",") {break}
+			if !p.Accept(",") {
+				break
+			}
 		}
 		p.Expect("}")
 
-		return &MultiLambda{Lambdas: lambdas}
+		return &MultiLambda{Lambdas: lambdas, Start: start, End: p.PrevPos()}
 	}
 
 	if mandatory {
@@ -320,7 +344,7 @@ func ToPattern(expr Expression) Pattern {
 			}
 			subs = append(subs, tmp)
 		}
-		return &TuplePattern{SubPatterns: subs}
+		return &TuplePattern{SubPatterns: subs, Start: tup.Start, End: tup.End}
 	}
 
 	if list, ok := expr.(*List); ok {
@@ -332,12 +356,11 @@ func ToPattern(expr Expression) Pattern {
 			}
 			subs = append(subs, tmp)
 		}
-		return &ListPattern{SubPatterns: subs}
+		return &ListPattern{SubPatterns: subs, Start: list.Start, End: list.End}
 	}
 
 	return nil
 }
-
 
 // ----------- //
 
