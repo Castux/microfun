@@ -5,13 +5,15 @@ import "fmt"
 func main() {
 
 	tokens := Lex("prelude.mf")
-
 	if tokens == nil {
 		return
 	}
 
 	//	prog := ParseProgram(tokens)
 	prog := ParseModule(tokens)
+	if prog == nil {
+		return
+	}
 
 	// var b bytes.Buffer
 	// enc := json.NewEncoder(&b)
