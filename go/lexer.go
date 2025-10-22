@@ -63,7 +63,11 @@ func Log(msg string, loc SourcePos, severity Severity) {
 
 	breaks := reLineBreak.FindAllStringIndex(text[:loc.Start], -1)
 	lineIndex := len(breaks)
-	lineStart := breaks[len(breaks)-1][0] + 1
+
+	lineStart := 0
+	if lineIndex > 0 {
+		lineStart = breaks[len(breaks)-1][0] + 1
+	}
 	column := loc.Start - lineStart
 
 	nextBreak := reLineBreak.FindStringIndex(text[loc.Start:])
@@ -100,7 +104,7 @@ var keywords = map[string]bool{
 
 var symbols = []string{
 	"->", "<*", "*>",
-	">", "<", ".", "=", ",",
+	">", "<", ".", "=", ",", ";",
 	"(", ")", "{", "}", "[", "]",
 }
 
