@@ -195,7 +195,7 @@ join = separator -> {
 
 toString =
 	let
-		tupleToList = [
+		tupleToList = {
 			[] -> [],
 			[a] -> [a;],
 			[a,b] -> [a;b],
@@ -208,7 +208,7 @@ toString =
 			[a,b,c,d,e,f,g,h,i] -> [a;b;c;d;e;f;g;h;i],
 			[a,b,c,d,e,f,g,h,i,j] -> [a;b;c;d;e;f;g;h;i;j],
 			n -> n
-		],
+		},
 
 		numberToString = n ->
 			let

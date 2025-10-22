@@ -1,9 +1,11 @@
 package main
 
-import "strings"
-import "reflect"
-import "fmt"
-import "regexp"
+import (
+	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+)
 
 type Node interface {
 	FirstPos() SourcePos
@@ -12,6 +14,12 @@ type Node interface {
 
 func NodePos(node Node) SourcePos {
 	return node.FirstPos().To(node.LastPos())
+}
+
+var reName = regexp.MustCompile(`\w+$`)
+
+func NodeType(node Node) string {
+	return reName.FindString(reflect.TypeOf(node).String())
 }
 
 func (x *Program) FirstPos() SourcePos { return x.Start }
@@ -117,17 +125,11 @@ func Traverse(node Node, pre, post func(n Node)) {
 	}
 }
 
-var reName = regexp.MustCompile(`\w+$`)
-
 func PrintAST(root Node) {
 
 	depth := 0
 	pre := func(node Node) {
-		fmt.Printf("%s", strings.Repeat(".  ", depth))
-
-		name := reName.FindString(reflect.TypeOf(node).String())
-
-		fmt.Printf("%s", name)
+		fmt.Printf("%s%s", strings.Repeat(".  ", depth), NodeType(node))
 
 		switch n := node.(type) {
 		case *Operation:
@@ -145,8 +147,6 @@ func PrintAST(root Node) {
 
 		depth++
 	}
-
 	post := func(node Node) { depth-- }
-
 	Traverse(root, pre, post)
 }

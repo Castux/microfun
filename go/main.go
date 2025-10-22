@@ -1,5 +1,6 @@
 package main
 
+import "fmt"
 
 func main() {
 
@@ -9,7 +10,7 @@ func main() {
 		return
 	}
 
-//	prog := ParseProgram(tokens)
+	//	prog := ParseProgram(tokens)
 	prog := ParseModule(tokens)
 
 	// var b bytes.Buffer
@@ -21,4 +22,11 @@ func main() {
 	// fmt.Println(b.String())
 
 	PrintAST(prog)
+
+	n := 0
+	Traverse(prog, func(node Node) {
+		Log(fmt.Sprintf("%d: %s", n, NodeType(node)), NodePos(node), SeverityInfo)
+		n++
+	}, nil)
+
 }
