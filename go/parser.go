@@ -94,10 +94,35 @@ func (p *Parser) ParseExpression() Expression {
 
 	expr := p.ParseOperation()
 
+	if patt := ToPattern(expr); patt != nil {
+		if p.Accept("->") {
+			body := p.ParseExpression()
+			expr = &Lambda{Pattern: patt, Expression: body}
+		}
+	}
+
 	if len(bindings) > 0 {
 		return &Let{Bindings: bindings, Expression: expr}
 	}
 	return expr
+}
+
+func (p *Parser) ParseLambda() *Lambda {
+
+	start := p.Peek(0).Pos
+
+	expr := p.ParseOperation()
+	patt := ToPattern(expr)
+
+	if patt == nil {
+		Log(fmt.Sprintf("invalid pattern for lambda"), start.To(p.Peek(-1).Pos), SeverityError)
+		panic("expect")
+	}
+
+	p.Expect("->")
+
+	body := p.ParseExpression()
+	return &Lambda{Pattern: patt, Expression: body}
 }
 
 func (p *Parser) ParseBinding() *Binding {
@@ -217,6 +242,17 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 		}
 	}
 
+	if p.Accept("{") {
+		lambdas := []*Lambda{}
+		for {
+			lambdas = append(lambdas, p.ParseLambda())
+			if !p.Accept(",") {break}
+		}
+		p.Expect("}")
+
+		return &MultiLambda{Lambdas: lambdas}
+	}
+
 	if mandatory {
 		Log("expected expression", p.Peek(0).Pos, SeverityError)
 		panic("expect")
@@ -224,6 +260,46 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 
 	return nil
 }
+
+func ToPattern(expr Expression) Pattern {
+
+	if name, ok := expr.(*Name); ok {
+		return name
+	}
+	if number, ok := expr.(*NumberLiteral); ok {
+		return number
+	}
+	if str, ok := expr.(*StringLiteral); ok {
+		return str
+	}
+
+	if tup, ok := expr.(*Tuple); ok {
+		var subs []Pattern
+		for _, tsub := range tup.SubExpressions {
+			tmp := ToPattern(tsub)
+			if tmp == nil {
+				return nil
+			}
+			subs = append(subs, tmp)
+		}
+		return &TuplePattern{SubPatterns: subs}
+	}
+
+	if list, ok := expr.(*List); ok {
+		var subs []Pattern
+		for _, sub := range list.SubExpressions {
+			tmp := ToPattern(sub)
+			if tmp == nil {
+				return nil
+			}
+			subs = append(subs, tmp)
+		}
+		return &ListPattern{SubPatterns: subs}
+	}
+
+	return nil
+}
+
 
 // ----------- //
 

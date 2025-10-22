@@ -10,7 +10,7 @@ import (
 
 var (
 	reWhitespace = regexp.MustCompile(`^\s+`)
-	reComment    = regexp.MustCompile(`^--[^\n\r]*\n\r?`)
+	reComment    = regexp.MustCompile(`^--[^\n\r]*\r?\n`)
 	reLineBreak  = regexp.MustCompile(`\n\r?`)
 	reIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	reString     = regexp.MustCompile(`^('[^']*'|"[^"]*")`)
@@ -83,7 +83,7 @@ func Log(msg string, loc SourcePos, severity Severity) {
 	fmt.Println(coloredLine)
 }
 
-func merge(a SourcePos, b SourcePos) SourcePos {
+func (a SourcePos) To(b SourcePos) SourcePos {
 	if a.File != b.File {
 		panic("Cannot merge SourcePos from different files")
 	}

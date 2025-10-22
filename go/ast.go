@@ -48,7 +48,7 @@ type Let struct {
 
 type Lambda struct {
 	Node
-	Pattern    *Pattern
+	Pattern    Pattern
 	Expression Expression
 }
 
@@ -69,12 +69,12 @@ func (x StringLiteral) isPattern() {}
 
 type TuplePattern struct {
 	Node
-	SubPatterns []*Pattern
+	SubPatterns []Pattern
 }
 
 type ListPattern struct {
 	Node
-	SubPatterns []*Pattern
+	SubPatterns []Pattern
 }
 
 type Operation struct {
