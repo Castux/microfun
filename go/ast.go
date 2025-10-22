@@ -42,7 +42,7 @@ func (x List) isExpr()          {}
 
 type Let struct {
 	Node
-	Bindings []*Binding
+	Bindings   []*Binding
 	Expression Expression
 }
 

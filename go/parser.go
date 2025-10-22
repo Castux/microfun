@@ -4,7 +4,7 @@ import "fmt"
 
 type Parser struct {
 	Tokens []Token
-	Head int
+	Head   int
 }
 
 func (p *Parser) Is(kind string) bool {
@@ -15,7 +15,7 @@ func (p *Parser) Is(kind string) bool {
 }
 
 func (p *Parser) Peek(offset int) Token {
-	return p.Tokens[p.Head + offset]
+	return p.Tokens[p.Head+offset]
 }
 
 func (p *Parser) Consume() Token {
@@ -48,7 +48,9 @@ func (p *Parser) ParseProgram() *Program {
 	if p.Accept("import") {
 		for {
 			imports = append(imports, p.ParseName())
-			if !p.Accept(",") { break }
+			if !p.Accept(",") {
+				break
+			}
 		}
 		p.Expect("in")
 	}
@@ -57,7 +59,7 @@ func (p *Parser) ParseProgram() *Program {
 
 	p.Expect("eof")
 
-	return &Program{Imports: imports,Body: expr	}
+	return &Program{Imports: imports, Body: expr}
 }
 
 func (p *Parser) ParseName() *Name {
@@ -83,7 +85,9 @@ func (p *Parser) ParseExpression() Expression {
 	if p.Accept("let") {
 		for {
 			bindings = append(bindings, p.ParseBinding())
-			if !p.Accept(",") {break}
+			if !p.Accept(",") {
+				break
+			}
 		}
 		p.Expect("in")
 	}
@@ -106,8 +110,8 @@ func (p *Parser) ParseBinding() *Binding {
 }
 
 var operators = map[string]bool{
-	">": true,
-	"<": true,
+	">":  true,
+	"<":  true,
 	"*>": true,
 	"<*": true,
 }
@@ -136,9 +140,11 @@ func (p *Parser) ParseApplication() Expression {
 	atoms := []Expression{}
 	atoms = append(atoms, p.ParseAtomic(true))
 
-	for{
+	for {
 		atom := p.ParseAtomic(false)
-		if atom == nil {break}
+		if atom == nil {
+			break
+		}
 		atoms = append(atoms, atom)
 	}
 
@@ -187,7 +193,9 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 		if p.Accept(",") {
 			for {
 				exprs = append(exprs, p.ParseExpression())
-				if !p.Accept(",") {break}
+				if !p.Accept(",") {
+					break
+				}
 			}
 			p.Expect("]")
 			return &Tuple{SubExpressions: exprs}
@@ -200,7 +208,9 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 
 			for {
 				exprs = append(exprs, p.ParseExpression())
-				if !p.Accept(";") {break}
+				if !p.Accept(";") {
+					break
+				}
 			}
 			p.Expect("]")
 			return &List{SubExpressions: exprs}
@@ -219,7 +229,9 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 
 func Recover() {
 	if r := recover(); r != nil {
-		if r != "expect" { panic(r) }
+		if r != "expect" {
+			panic(r)
+		}
 	}
 }
 

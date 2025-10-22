@@ -1,6 +1,7 @@
 package main
 
 import "fmt"
+import "bytes"
 import "encoding/json"
 
 func main() {
@@ -8,7 +9,6 @@ func main() {
 	tokens := Lex("test.mf")
 
 	if tokens == nil {
-		fmt.Errorf("wat")
 		return
 	}
 
@@ -22,7 +22,11 @@ func main() {
 
 	prog := ParseProgram(tokens)
 
-	j,_ := json.MarshalIndent(prog, "", "  ")
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	enc.Encode(prog)
 
-	fmt.Println(string(j))
+	fmt.Println(b.String())
 }
