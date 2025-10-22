@@ -208,7 +208,7 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 	}
 
 	if mandatory {
-		Log("expected atomic expression", p.Peek(0).Pos, SeverityError)
+		Log("expected expression", p.Peek(0).Pos, SeverityError)
 		panic("expect")
 	}
 

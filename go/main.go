@@ -9,6 +9,7 @@ func main() {
 
 	if tokens == nil {
 		fmt.Errorf("wat")
+		return
 	}
 
 	//

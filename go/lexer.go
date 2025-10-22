@@ -191,7 +191,7 @@ lexLoop:
 		// 7. Fail state (unexpected character)
 		pos := SourcePos{file, head, 1}
 		Log(fmt.Sprintf("lexer error: unexpected character '%s'", source[head:head+1]), pos, SeverityError)
-		return tokens
+		return nil
 	}
 
 	// Append "eof" token at the end of the file.
