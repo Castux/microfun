@@ -76,9 +76,10 @@ func Log(msg string, loc SourcePos, severity Severity) {
 	fmt.Printf("%s:%d:%d: %s\n", loc.File.Path, lineIndex+1, column+1, msg)
 
 	line := text[lineStart:lineEnd]
+	colorEnd := min(len(line), column+loc.Length)
 	coloredLine := line[:column] +
-		colorText(line[column:column+loc.Length], colors[severity]) +
-		line[column+loc.Length:]
+		colorText(line[column:colorEnd], colors[severity]) +
+		line[colorEnd:]
 
 	fmt.Println(coloredLine)
 }
