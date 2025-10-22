@@ -62,6 +62,44 @@ func (p *Parser) ParseProgram() *Program {
 	return &Program{Imports: imports, Body: expr}
 }
 
+func (p *Parser) ParseModule() *Module {
+	imports := []*Name{}
+	if p.Accept("import") {
+		for {
+			imports = append(imports, p.ParseName())
+			if !p.Accept(",") {
+				break
+			}
+		}
+		p.Expect("in")
+	}
+
+	private := []*Binding{}
+	if p.Accept("let") {
+		for {
+			private = append(private, p.ParseBinding())
+			if !p.Accept(",") {
+				break
+			}
+		}
+		p.Expect("in")
+	}
+
+	p.Expect("module")
+
+	public := []*Binding{}
+	for {
+		public = append(public, p.ParseBinding())
+		if !p.Accept(",") {
+			break
+		}
+	}
+
+	p.Expect("eof")
+
+	return &Module{Imports: imports, PrivateBindings: private, PublicBindings: public}
+}
+
 func (p *Parser) ParseName() *Name {
 	ident := p.Expect("identifier")
 	return &Name{Value: ident.Value}
@@ -314,12 +352,13 @@ func Recover() {
 func ParseProgram(tokens []Token) *Program {
 	defer Recover()
 
-	parser := Parser{Tokens: tokens, Head: 0}
+	parser := Parser{Tokens: tokens}
 	return parser.ParseProgram()
 }
 
 func ParseModule(tokens []Token) *Module {
 	defer Recover()
 
-	return nil
+	parser := Parser{Tokens: tokens}
+	return parser.ParseModule()
 }

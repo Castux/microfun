@@ -1,5 +1,4 @@
-
-let
+module
 
 -- Functions
 
@@ -89,15 +88,15 @@ filter = f -> {
 	[h,t] -> if (f h) [h, filter f t] (filter f t)
 },
 
-foldr = f -> acc -> [
+foldr = f -> acc -> {
 	[] -> acc,
 	[h,t] -> f h (foldr f acc t)
-],
+},
 
-foldl = f -> acc -> [
+foldl = f -> acc -> {
 	[] -> acc,
 	[h,t] -> foldl f (f acc h) t
-],
+},
 
 sum = foldr add 0,
 product = foldr mul 1,
@@ -198,6 +197,7 @@ toString =
 	let
 		tupleToList = [
 			[] -> [],
+			[a] -> [a;],
 			[a,b] -> [a;b],
 			[a,b,c] -> [a;b;c],
 			[a,b,c,d] -> [a;b;c;d],
@@ -232,6 +232,3 @@ toString =
 					(numberToString asList)
 	in
 		x -> if (isList x) (listToString x) (tupleToString x)
-
-in
-0
