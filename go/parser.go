@@ -138,17 +138,8 @@ func (p *Parser) ParseQualifiedName() Expression {
 
 func (p *Parser) ParseExpression() Expression {
 
-	start := p.Pos()
-	bindings := []*Binding{}
-
-	if p.Accept("let") {
-		for {
-			bindings = append(bindings, p.ParseBinding())
-			if !p.Accept(",") {
-				break
-			}
-		}
-		p.Expect("in")
+	if p.Is("let") {
+		return p.ParseLet()
 	}
 
 	expr := p.ParseOperation()
@@ -159,11 +150,24 @@ func (p *Parser) ParseExpression() Expression {
 			expr = &Lambda{Pattern: patt, Expression: body}
 		}
 	}
-
-	if len(bindings) > 0 {
-		return &Let{Bindings: bindings, Expression: expr, Start: start}
-	}
 	return expr
+}
+
+func (p *Parser) ParseLet() *Let {
+	start := p.Pos()
+	bindings := []*Binding{}
+
+	p.Expect("let")
+	for {
+		bindings = append(bindings, p.ParseBinding())
+		if !p.Accept(",") {
+			break
+		}
+	}
+	p.Expect("in")
+	expr := p.ParseExpression()
+
+	return &Let{Bindings: bindings, Expression: expr, Start: start}
 }
 
 func (p *Parser) ParseLambda() *Lambda {

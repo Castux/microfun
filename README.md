@@ -28,7 +28,7 @@ Let := 'let' ListBinding 'in'
 ListBinding := Binding ( ',' Binding )*
 Binding := Name '=' Expr
 
-Expr := Let? ( Lambda | Operation )
+Expr := Let Expr | Lambda | Operation
 Lambda := Pattern '->' Expr
 Pattern := Name | Number | String | TuplePattern | ListPattern
 TuplePattern := '[' ']' | '[' Pattern ( ',' Pattern )* ']'
