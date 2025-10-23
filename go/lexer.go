@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -58,6 +59,13 @@ func colorText(txt string, color int) string {
 	return fmt.Sprintf("\x1b[%d;1m%s\x1b[0m", color, txt)
 }
 
+func toSpace(r rune) rune {
+	if !unicode.IsSpace(r) {
+		return ' '
+	}
+	return r
+}
+
 func Log(msg string, loc SourcePos, severity Severity) {
 	text := loc.File.Text
 
@@ -81,7 +89,11 @@ func Log(msg string, loc SourcePos, severity Severity) {
 		colorText(line[column:colorEnd], colors[severity]) +
 		line[colorEnd:]
 
+	underline := strings.Map(toSpace, line[:column]) +
+		colorText(strings.Repeat("^", colorEnd-column), colors[severity])
+
 	fmt.Println(coloredLine)
+	fmt.Println(underline)
 }
 
 func (a SourcePos) To(b SourcePos) SourcePos {
