@@ -90,7 +90,7 @@ func Log(msg string, loc SourcePos, severity Severity) {
 		line[colorEnd:]
 
 	underline := strings.Map(toSpace, line[:column]) +
-		colorText(strings.Repeat("^", colorEnd-column), colors[severity])
+		colorText(strings.Repeat("^", colorEnd - column), colors[severity])
 
 	fmt.Println(coloredLine)
 	fmt.Println(underline)
@@ -203,7 +203,7 @@ lexLoop:
 
 		// 7. Fail state (unexpected character)
 		pos := SourcePos{file, head, 1}
-		Log(fmt.Sprintf("lexer error: unexpected character '%s'", source[head:head+1]), pos, SeverityError)
+		Log(fmt.Sprintf("unexpected character '%s'", source[head:head+1]), pos, SeverityError)
 		return nil
 	}
 
