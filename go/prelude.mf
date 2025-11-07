@@ -169,10 +169,10 @@ sortWith = f -> {
 
 sort = sortWith lt,
 
-pairs = [
+pairs = {
 	[] -> [],
 	[h,t] -> concat (map (cons h) t) (pairs t)
-],
+},
 
 contains = elem -> any (equal elem),
 
