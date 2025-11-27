@@ -178,7 +178,7 @@ func (p *Parser) ParseLambda() *Lambda {
 	patt := ToPattern(expr)
 
 	if patt == nil {
-		Log(fmt.Sprintf("invalid pattern for lambda"), start.To(p.Peek(-1).Pos), SeverityError)
+		Log("invalid pattern for lambda", start.To(p.Peek(-1).Pos), SeverityError)
 		panic("expect")
 	}
 
