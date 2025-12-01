@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"slices"
 )
 
@@ -141,7 +142,7 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 
 func (a *Analyzer) Run() {
 	a.PushScope(nil)
-	for _, builtin := range []string{"add", "mul", "sub", "div", "mod", "eq", "lt", "sqrt", "eval", "show", "showt", "equal", "stdin"} {
+	for builtin := range maps.Keys(Builtins) {
 		a.AddName(builtin, nil)
 	}
 

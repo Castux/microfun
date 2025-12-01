@@ -18,13 +18,17 @@ type RuntimeComposition struct {
 	Function2 RuntimeValue
 }
 
+type RuntimeLambda []*Lambda
+type RuntimeBuiltin func(RuntimeValue) RuntimeValue
+
 type Environment map[string]*NamedValue
 
 type Interpreter struct {
 	Program *Program
 	Modules map[string]*Module
 
-	Stack []Environment
+	ModuleEnvironments map[string]Environment
+	Stack              []Environment
 }
 
 func (i *Interpreter) PushEnvironment() Environment {
@@ -37,26 +41,26 @@ func (i *Interpreter) PopEnvironment() {
 	i.Stack = i.Stack[:len(i.Stack)-1]
 }
 
-func (i *Interpreter) GetNamedValue(name string) *NamedValue {
+func (i *Interpreter) ResolveName(name string) RuntimeValue {
 
-	for _,env := range slices.Backward(i.Stack) {
+	for _, env := range slices.Backward(i.Stack) {
 		if value, found := env[name]; found {
 			return value
 		}
+	}
+
+	if builtin, found := Builtins[name]; found {
+		return builtin
 	}
 
 	panic("could not find name " + name)
 }
 
 func (i *Interpreter) Run() RuntimeValue {
-	for _, module := range i.Modules {
-		i.RunModule(module)
-	}
-
 	return i.RunProgram(i.Program)
 }
 
-func (i *Interpreter) TreatBindings(bindings []*Binding) {
+func (i *Interpreter) TreatBindings(bindings []*Binding) Environment {
 
 	env := i.PushEnvironment()
 	for _, binding := range bindings {
@@ -66,18 +70,22 @@ func (i *Interpreter) TreatBindings(bindings []*Binding) {
 	for _, binding := range bindings {
 		env[binding.Name.Value].Value = i.RunExpression(binding.Expression)
 	}
+
+	return env
 }
 
-func (i *Interpreter) RunModule(module *Module) {
-	for _, modName := range module.Imports {
-		i.RunModule(i.Modules[modName.Value])
+func (i *Interpreter) RunModule(modName string) {
+	module := i.Modules[modName]
+	for _, modName2 := range module.Imports {
+		i.RunModule(modName2.Value)
 	}
-	i.TreatBindings(module.PublicBindings)
+	env := i.TreatBindings(module.PublicBindings)
+	i.ModuleEnvironments[modName] = env
 }
 
 func (i *Interpreter) RunProgram(program *Program) RuntimeValue {
 	for _, modName := range program.Imports {
-		i.RunModule(i.Modules[modName.Value])
+		i.RunModule(modName.Value)
 	}
 
 	return i.RunExpression(program.Body)
@@ -112,10 +120,19 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return value
 
 	case *Name:
-		return i.GetNamedValue(e.Value)
+		return i.ResolveName(e.Value)
+
+	case *QualifiedName:
+		return i.ModuleEnvironments[e.Module][e.Value]
+
+	case *MultiLambda:
+		return RuntimeLambda(e.Lambdas)
+
+	case *Lambda:
+		return RuntimeLambda{e}
 
 	default:
-		panic("unimplemented expression")
+		panic("unimplemented expression " + NodeType(expression))
 	}
 }
 
@@ -130,7 +147,7 @@ func (i *Interpreter) FoldList(list *List) RuntimeValue {
 func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 	var subs []RuntimeValue
-	for _,operand := range op.Operands {
+	for _, operand := range op.Operands {
 		subs = append(subs, i.RunExpression(operand))
 	}
 
@@ -151,7 +168,7 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 	case "<":
 		current := RuntimeApplication{subs[len(subs)-2], subs[len(subs)-1]}
-		for k := len(subs)-3; k >= 0; k-- {
+		for k := len(subs) - 3; k >= 0; k-- {
 			current = RuntimeApplication{subs[k], current}
 		}
 		return current
@@ -165,7 +182,7 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 	case "<*":
 		current := RuntimeComposition{subs[len(subs)-2], subs[len(subs)-1]}
-		for k := len(subs)-3; k >= 0; k-- {
+		for k := len(subs) - 3; k >= 0; k-- {
 			current = RuntimeComposition{subs[k], current}
 		}
 		return current
@@ -177,8 +194,9 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 func Interpret(analyzer *Analyzer) RuntimeValue {
 	interpreter := &Interpreter{
-		Program: analyzer.Program,
-		Modules: analyzer.Modules,
+		Program:            analyzer.Program,
+		Modules:            analyzer.Modules,
+		ModuleEnvironments: make(map[string]Environment),
 	}
 
 	return interpreter.Run()
