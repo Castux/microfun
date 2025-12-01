@@ -58,7 +58,9 @@ func (p *Parser) ParseProgram() *Program {
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
-			imports = append(imports, p.ParseName())
+			name := p.ParseName()
+			name.InImport = true
+			imports = append(imports, name)
 			if !p.Accept(",") {
 				break
 			}
@@ -77,7 +79,9 @@ func (p *Parser) ParseModule() *Module {
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
-			imports = append(imports, p.ParseName())
+			name := p.ParseName()
+			name.InImport = true
+			imports = append(imports, name)
 			if !p.Accept(",") {
 				break
 			}
@@ -85,16 +89,16 @@ func (p *Parser) ParseModule() *Module {
 		p.Expect("in")
 	}
 
-	private := []*Binding{}
-	if p.Accept("let") {
-		for {
-			private = append(private, p.ParseBinding())
-			if !p.Accept(",") {
-				break
-			}
-		}
-		p.Expect("in")
-	}
+	// private := []*Binding{}
+	// if p.Accept("let") {
+	// 	for {
+	// 		private = append(private, p.ParseBinding())
+	// 		if !p.Accept(",") {
+	// 			break
+	// 		}
+	// 	}
+	// 	p.Expect("in")
+	// }
 
 	p.Expect("module")
 
@@ -108,10 +112,10 @@ func (p *Parser) ParseModule() *Module {
 	p.Expect("eof")
 
 	return &Module{
-		Imports:         imports,
-		PrivateBindings: private,
-		PublicBindings:  public,
-		Start:           start,
+		Imports: imports,
+		//PrivateBindings: private,
+		PublicBindings: public,
+		Start:          start,
 	}
 }
 

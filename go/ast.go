@@ -9,7 +9,7 @@ type Program struct {
 
 type Module struct {
 	Imports         []*Name
-	PrivateBindings []*Binding
+//	PrivateBindings []*Binding
 	PublicBindings  []*Binding
 
 	Start SourcePos
@@ -85,6 +85,7 @@ type Operation struct {
 type Name struct {
 	Value     string
 	InPattern bool
+	InImport  bool
 	Pos       SourcePos
 }
 

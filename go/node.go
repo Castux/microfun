@@ -86,7 +86,7 @@ func Traverse(node Node, pre, post func(n Node)) {
 
 	case *Module:
 		TraverseList(n.Imports, pre, post)
-		TraverseList(n.PrivateBindings, pre, post)
+//		TraverseList(n.PrivateBindings, pre, post)
 		TraverseList(n.PublicBindings, pre, post)
 
 	case *Binding:
