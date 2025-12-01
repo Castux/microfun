@@ -78,8 +78,11 @@ func Log(msg string, loc SourcePos, severity Severity) {
 	}
 	column := loc.Start - lineStart
 
+	lineEnd := loc.Start
 	nextBreak := reLineBreak.FindStringIndex(text[loc.Start:])
-	lineEnd := loc.Start + nextBreak[0]
+	if len(nextBreak) != 0 {
+		lineEnd += nextBreak[0]
+	}
 
 	fmt.Printf("%s:%d:%d: %s\n", loc.File.Path, lineIndex+1, column+1, msg)
 

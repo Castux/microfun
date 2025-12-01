@@ -28,10 +28,10 @@ func LoadModules(imports []*Name) map[string]*Module {
 	var load func(*Name)
 	load = func(name *Name) {
 		if loaded[name.Value] != nil {
-			return
+			Log("recursive import", name.Pos, SeverityError)
+			os.Exit(1)
 		}
 
-		loaded[name.Value] = &Module{}	// recursive guard
 		tokens := Lex(name.Value + ".mf")
 		if tokens == nil {
 			Log("imported here", name.Pos, SeverityInfo)
