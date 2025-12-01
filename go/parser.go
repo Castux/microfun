@@ -144,11 +144,15 @@ func (p *Parser) ParseExpression() Expression {
 
 	expr := p.ParseOperation()
 
-	if patt := ToPattern(expr); patt != nil {
-		if p.Accept("->") {
-			body := p.ParseExpression()
-			expr = &Lambda{Pattern: patt, Expression: body}
+	if p.Accept("->") {
+		patt := ToPattern(expr)
+		if patt == nil {
+			Log("invalid pattern for lambda", expr.FirstPos().To(expr.LastPos()), SeverityError)
+			panic("expect")
 		}
+		body := p.ParseExpression()
+		expr = &Lambda{Pattern: patt, Expression: body}
+
 	}
 	return expr
 }
@@ -330,12 +334,15 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 func ToPattern(expr Expression) Pattern {
 
 	if name, ok := expr.(*Name); ok {
+		name.InPattern = true
 		return name
 	}
 	if number, ok := expr.(*NumberLiteral); ok {
+		number.InPattern = true
 		return number
 	}
 	if str, ok := expr.(*StringLiteral); ok {
+		str.InPattern = true
 		return str
 	}
 

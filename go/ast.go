@@ -83,8 +83,9 @@ type Operation struct {
 }
 
 type Name struct {
-	Value string
-	Pos   SourcePos
+	Value     string
+	InPattern bool
+	Pos       SourcePos
 }
 
 type QualifiedName struct {
@@ -95,13 +96,15 @@ type QualifiedName struct {
 }
 
 type NumberLiteral struct {
-	Value float64
+	Value     float64
+	InPattern bool
 
 	Pos SourcePos
 }
 
 type StringLiteral struct {
-	Value string
+	Value     string
+	InPattern bool
 
 	Pos SourcePos
 }
