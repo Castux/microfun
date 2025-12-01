@@ -5,9 +5,9 @@ import (
 )
 
 type Scope struct {
+	Node
 	Parent      *Scope
 	Definitions map[string]Node
-	Node        Node
 }
 
 type Analyzer struct {
