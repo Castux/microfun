@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"encoding/json"
 )
 
 func LoadProgram(path string) *Program {
@@ -81,5 +82,10 @@ func main() {
 	analyzer := Analyze(program, modules)
 	if analyzer.Errors > 0 {
 		fmt.Printf("Analyzer found %d errors\n", analyzer.Errors)
+		os.Exit(1)
 	}
+
+	value := Interpret(analyzer)
+	bytes, _ := json.Marshal(value)
+	fmt.Println(string(bytes))
 }
