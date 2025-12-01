@@ -97,9 +97,7 @@ func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
 }
 
 func (a *Analyzer) AnalyzeTopLevel(root Node) {
-
 	pre := func(n Node) {
-
 		switch node := n.(type) {
 		case *Program:
 			a.HandleImports(node.Imports)
@@ -121,14 +119,12 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 			}
 		case *Name:
 			if !node.InImport && !node.InPattern {
-				found := a.CheckName(node)
-				if found != nil {
+				if found := a.CheckName(node); found != nil {
 					a.Names[node] = found
 				}
 			}
 		case *QualifiedName:
-			found := a.CheckQualifiedName(node)
-			if found != nil {
+			if found := a.CheckQualifiedName(node); found != nil {
 				a.Names[node] = found
 			}
 		}
@@ -144,21 +140,18 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 }
 
 func (a *Analyzer) Run() {
-
 	a.PushScope(nil)
 	for _, builtin := range []string{"add", "mul", "sub", "div", "mod", "eq", "lt", "sqrt", "eval", "show", "showt", "equal", "stdin"} {
 		a.AddName(builtin, nil)
 	}
 
 	a.AnalyzeTopLevel(a.Program)
-
 	for _, module := range a.Modules {
 		a.AnalyzeTopLevel(module)
 	}
 }
 
 func Analyze(program *Program, modules map[string]*Module) *Analyzer {
-
 	analyzer := &Analyzer{
 		Scopes:  make(map[Node]*Scope),
 		Names:   make(map[Node]Node),
