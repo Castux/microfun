@@ -90,7 +90,7 @@ func Log(msg string, loc SourcePos, severity Severity) {
 		line[colorEnd:]
 
 	underline := strings.Map(toSpace, line[:column]) +
-		colorText(strings.Repeat("^", colorEnd - column), colors[severity])
+		colorText(strings.Repeat("^", colorEnd-column), colors[severity])
 
 	fmt.Println(coloredLine)
 	fmt.Println(underline)
@@ -144,13 +144,13 @@ lexLoop:
 		// 1. Consume whitespace
 		if match := reWhitespace.FindString(source[head:]); len(match) > 0 {
 			head += len(match)
-			continue
+			continue lexLoop
 		}
 
 		// 2. Consume comments
 		if match := reComment.FindString(source[head:]); len(match) > 0 {
 			head += len(match)
-			continue
+			continue lexLoop
 		}
 
 		// 3. Keywords and identifiers
@@ -166,7 +166,7 @@ lexLoop:
 
 			tokens = append(tokens, token)
 			head += len(match)
-			continue
+			continue lexLoop
 		}
 
 		// 4. Symbols (Check for multi-character symbols first)
@@ -188,7 +188,7 @@ lexLoop:
 
 			tokens = append(tokens, token)
 			head += len(match)
-			continue
+			continue lexLoop
 		}
 
 		// 6. Number literals
@@ -198,7 +198,7 @@ lexLoop:
 
 			tokens = append(tokens, token)
 			head += len(match)
-			continue
+			continue lexLoop
 		}
 
 		// 7. Fail state (unexpected character)
