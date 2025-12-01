@@ -10,16 +10,13 @@ type Scope struct {
 	Node        Node
 }
 
-type Analysis struct {
-	Scopes        map[Node]*Scope
-	ResolvedNames map[Node]Node
-}
+type Analyzer struct {
+	Program *Program
+	Modules map[string]*Module
+	Scopes  map[Node]*Scope
+	Names   map[Node]Node
 
-func NewScope(node Node) *Scope {
-	return &Scope{
-		Definitions: make(map[string]Node),
-		Node:        node,
-	}
+	Stack []*Scope
 }
 
 func GetNamesInPattern(patt Pattern) []*Name {
@@ -32,113 +29,135 @@ func GetNamesInPattern(patt Pattern) []*Name {
 	return names
 }
 
-func AnalyzeTopLevel(root Node, modules map[string]*Module) {
-
-	builtins := NewScope(nil)
-	for _, builtin := range []string{"add", "mul", "sub", "div", "mod", "eq", "lt", "sqrt", "eval", "show", "showt", "equal", "stdin"} {
-		builtins.Definitions[builtin] = nil
+func (a *Analyzer) PushScope(node Node) {
+	scope := &Scope{
+		Definitions: make(map[string]Node),
+		Node:        node,
 	}
+	a.Stack = append(a.Stack, scope)
+	a.Scopes[node] = scope
+}
 
-	stack := []*Scope{builtins}
-	scopeMapping := make(map[Node]*Scope)
-	nameMapping := make(map[Node]Node)
+func (a *Analyzer) PopScope() {
+	a.Stack = a.Stack[:len(a.Stack)-1]
+}
 
-	handleImports := func(imports []*Name) {
-		for _, modName := range imports {
-			module := modules[modName.Value]
-			scope := NewScope(module)
-			for _, export := range module.PublicBindings {
-				scope.Definitions[export.Name.Value] = export
-			}
-			stack = append(stack, scope)
-		}
+func (a *Analyzer) AddName(name string, node Node) {
+	scope := a.Stack[len(a.Stack)-1]
+
+	if defNode, found := scope.Definitions[name]; found {
+		Log(name+" was already defined", node.FirstPos(), SeverityInfo)
+		Log("here", defNode.FirstPos(), SeverityError)
 	}
+	scope.Definitions[name] = node
+}
 
-	checkName := func(name *Name) Node {
-		for _, scope := range slices.Backward(stack) {
-			if def, found := scope.Definitions[name.Value]; found {
-				return def
-			}
-		}
-		Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
-		return nil
-	}
-
-	checkQualifiedName := func(name *QualifiedName) Node {
-		module, ok := modules[name.Module]
-		if !ok {
-			Log("unknown module "+name.Module, name.FirstPos(), SeverityError)
-			return nil
-		}
+func (a *Analyzer) HandleImports(node Node, imports []*Name) {
+	for _, modName := range imports {
+		module := a.Modules[modName.Value]
+		a.PushScope(node)
 		for _, export := range module.PublicBindings {
-			if export.Name.Value == name.Value {
-				return export
-			}
+			a.AddName(export.Name.Value, export)
 		}
-		Log("no definition for "+name.Value+" in module "+name.Module, name.LastPos(), SeverityError)
+	}
+}
+
+func (a *Analyzer) CheckName(name *Name) Node {
+	for _, scope := range slices.Backward(a.Stack) {
+		if def, found := scope.Definitions[name.Value]; found {
+			return def
+		}
+	}
+	Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
+	return nil
+}
+
+func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
+	module, ok := a.Modules[name.Module]
+	if !ok {
+		Log("unknown module "+name.Module, name.FirstPos(), SeverityError)
 		return nil
 	}
+	for _, export := range module.PublicBindings {
+		if export.Name.Value == name.Value {
+			return export
+		}
+	}
+	Log("no definition for "+name.Value+" in module "+name.Module, name.LastPos(), SeverityError)
+	return nil
+}
+
+func (a *Analyzer) AnalyzeTopLevel(root Node) {
 
 	pre := func(n Node) {
-		scope := NewScope(n)
-
-		addName := func(name string, node Node) {
-			if defNode, found := scope.Definitions[name]; found {
-				Log(name+" was already defined", node.FirstPos(), SeverityInfo)
-				Log("here", defNode.FirstPos(), SeverityError)
-			}
-			scope.Definitions[name] = node
-		}
 
 		switch node := n.(type) {
 		case *Program:
-			handleImports(node.Imports)
+			a.HandleImports(node, node.Imports)
 		case *Module:
-			handleImports(node.Imports)
+			a.HandleImports(node, node.Imports)
+			a.PushScope(node)
 			for _, binding := range node.PublicBindings {
-				addName(binding.Name.Value, binding)
+				a.AddName(binding.Name.Value, binding)
 			}
 		case *Let:
+			a.PushScope(node)
 			for _, binding := range node.Bindings {
-				addName(binding.Name.Value, binding)
+				a.AddName(binding.Name.Value, binding)
 			}
 		case *Lambda:
+			a.PushScope(node)
 			for _, name := range GetNamesInPattern(node.Pattern) {
-				addName(name.Value, name)
+				a.AddName(name.Value, name)
 			}
 		case *Name:
 			if !node.InImport && !node.InPattern {
-				found := checkName(node)
+				found := a.CheckName(node)
 				if found != nil {
-					nameMapping[node] = found
+					a.Names[node] = found
 				}
 			}
 		case *QualifiedName:
-			found := checkQualifiedName(node)
+			found := a.CheckQualifiedName(node)
 			if found != nil {
-				nameMapping[node] = found
+				a.Names[node] = found
 			}
-		default:
-			return
 		}
-
-		scopeMapping[n] = scope
-		stack = append(stack, scope)
 	}
 
 	post := func(n Node) {
-		if stack[len(stack)-1].Node == n {
-			stack = stack[:len(stack)-1]
+		for a.Stack[len(a.Stack)-1].Node == n {
+			a.PopScope()
 		}
 	}
 
 	Traverse(root, pre, post)
 }
 
-func Analyze(program *Program, modules map[string]*Module) {
+func (a *Analyzer) Run() {
 
-	AnalyzeTopLevel(program, modules)
-	for _, module := range modules {
-		AnalyzeTopLevel(module, modules)
+	a.PushScope(nil)
+	for _, builtin := range []string{"add", "mul", "sub", "div", "mod", "eq", "lt", "sqrt", "eval", "show", "showt", "equal", "stdin"} {
+		a.AddName(builtin, nil)
 	}
+
+	a.AnalyzeTopLevel(a.Program)
+
+	for _, module := range a.Modules {
+		a.AnalyzeTopLevel(module)
+	}
+}
+
+func Analyze(program *Program, modules map[string]*Module) *Analyzer {
+
+	analyzer := &Analyzer{
+		Scopes:  make(map[Node]*Scope),
+		Names:   make(map[Node]Node),
+		Program: program,
+		Modules: modules,
+	}
+
+	analyzer.Run()
+
+	return analyzer
 }
