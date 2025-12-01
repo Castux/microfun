@@ -36,6 +36,10 @@ func (a *Analyzer) PushScope(node Node) {
 	}
 	a.Stack = append(a.Stack, scope)
 	a.Scopes[node] = scope
+
+	if len(a.Stack) >= 2 {
+		a.Stack[len(a.Stack) - 1].Parent = 	a.Stack[len(a.Stack) - 2]
+	}
 }
 
 func (a *Analyzer) PopScope() {
@@ -52,10 +56,10 @@ func (a *Analyzer) AddName(name string, node Node) {
 	scope.Definitions[name] = node
 }
 
-func (a *Analyzer) HandleImports(node Node, imports []*Name) {
+func (a *Analyzer) HandleImports(imports []*Name) {
 	for _, modName := range imports {
 		module := a.Modules[modName.Value]
-		a.PushScope(node)
+		a.PushScope(module)
 		for _, export := range module.PublicBindings {
 			a.AddName(export.Name.Value, export)
 		}
@@ -93,9 +97,9 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 
 		switch node := n.(type) {
 		case *Program:
-			a.HandleImports(node, node.Imports)
+			a.HandleImports(node.Imports)
 		case *Module:
-			a.HandleImports(node, node.Imports)
+			a.HandleImports(node.Imports)
 			a.PushScope(node)
 			for _, binding := range node.PublicBindings {
 				a.AddName(binding.Name.Value, binding)
