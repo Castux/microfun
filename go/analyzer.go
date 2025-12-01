@@ -15,6 +15,7 @@ type Analyzer struct {
 	Modules map[string]*Module
 	Scopes  map[Node]*Scope
 	Names   map[Node]Node
+	Errors  int
 
 	Stack []*Scope
 }
@@ -38,7 +39,7 @@ func (a *Analyzer) PushScope(node Node) {
 	a.Scopes[node] = scope
 
 	if len(a.Stack) >= 2 {
-		a.Stack[len(a.Stack) - 1].Parent = 	a.Stack[len(a.Stack) - 2]
+		a.Stack[len(a.Stack)-1].Parent = a.Stack[len(a.Stack)-2]
 	}
 }
 
@@ -52,6 +53,7 @@ func (a *Analyzer) AddName(name string, node Node) {
 	if defNode, found := scope.Definitions[name]; found {
 		Log(name+" was already defined", node.FirstPos(), SeverityInfo)
 		Log("here", defNode.FirstPos(), SeverityError)
+		a.Errors++
 	}
 	scope.Definitions[name] = node
 }
@@ -73,6 +75,7 @@ func (a *Analyzer) CheckName(name *Name) Node {
 		}
 	}
 	Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
+	a.Errors++
 	return nil
 }
 
@@ -80,6 +83,7 @@ func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
 	module, ok := a.Modules[name.Module]
 	if !ok {
 		Log("unknown module "+name.Module, name.FirstPos(), SeverityError)
+		a.Errors++
 		return nil
 	}
 	for _, export := range module.PublicBindings {
@@ -88,6 +92,7 @@ func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
 		}
 	}
 	Log("no definition for "+name.Value+" in module "+name.Module, name.LastPos(), SeverityError)
+	a.Errors++
 	return nil
 }
 

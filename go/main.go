@@ -78,5 +78,8 @@ func main() {
 	// }, nil)
 	//
 
-	Analyze(program, modules)
+	analyzer := Analyze(program, modules)
+	if analyzer.Errors > 0 {
+		fmt.Printf("Analyzer found %d errors\n", analyzer.Errors)
+	}
 }
