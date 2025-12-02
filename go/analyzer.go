@@ -1,7 +1,6 @@
 package main
 
 import (
-	"maps"
 	"slices"
 )
 
@@ -12,11 +11,12 @@ type Scope struct {
 }
 
 type Analyzer struct {
-	Program *Program
-	Modules map[string]*Module
-	Scopes  map[Node]*Scope
-	Names   map[Node]Node
-	Errors  int
+	Program      *Program
+	Modules      map[string]*Module
+	Scopes       map[Node]*Scope
+	Definitions  map[Node]Node
+	ExportedFrom map[*Binding]*Module
+	Errors       int
 
 	Stack []*Scope
 }
@@ -107,6 +107,7 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 			a.PushScope(node)
 			for _, binding := range node.PublicBindings {
 				a.AddName(binding.Name.Value, binding)
+				a.ExportedFrom[binding] = node
 			}
 		case *Let:
 			a.PushScope(node)
@@ -121,12 +122,12 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 		case *Name:
 			if !node.InImport && !node.InPattern {
 				if found := a.CheckName(node); found != nil {
-					a.Names[node] = found
+					a.Definitions[node] = found
 				}
 			}
 		case *QualifiedName:
 			if found := a.CheckQualifiedName(node); found != nil {
-				a.Names[node] = found
+				a.Definitions[node] = found
 			}
 		}
 	}
@@ -140,24 +141,31 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 	Traverse(root, pre, post)
 }
 
-func (a *Analyzer) Run() {
+func (a *Analyzer) ResetToBuiltins() {
+	a.Stack = nil
 	a.PushScope(nil)
-	for builtin := range maps.Keys(Builtins) {
+	for builtin, _ := range Builtins {
 		a.AddName(builtin, nil)
 	}
+}
 
+func (a *Analyzer) Run() {
+	a.ResetToBuiltins()
 	a.AnalyzeTopLevel(a.Program)
+
 	for _, module := range a.Modules {
+		a.ResetToBuiltins()
 		a.AnalyzeTopLevel(module)
 	}
 }
 
 func Analyze(program *Program, modules map[string]*Module) *Analyzer {
 	analyzer := &Analyzer{
-		Scopes:  make(map[Node]*Scope),
-		Names:   make(map[Node]Node),
-		Program: program,
-		Modules: modules,
+		Scopes:       make(map[Node]*Scope),
+		Definitions:  make(map[Node]Node),
+		Program:      program,
+		Modules:      modules,
+		ExportedFrom: make(map[*Binding]*Module),
 	}
 
 	analyzer.Run()

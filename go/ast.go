@@ -8,9 +8,10 @@ type Program struct {
 }
 
 type Module struct {
-	Imports         []*Name
-//	PrivateBindings []*Binding
-	PublicBindings  []*Binding
+	Name    string
+	Imports []*Name
+	//	PrivateBindings []*Binding
+	PublicBindings []*Binding
 
 	Start SourcePos
 }

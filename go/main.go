@@ -6,7 +6,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"encoding/json"
 )
 
 func LoadProgram(path string) *Program {
@@ -44,14 +43,15 @@ func LoadModules(imports []*Name) map[string]*Module {
 			Log("imported here", name.Pos, SeverityInfo)
 			os.Exit(1)
 		}
+		module.Name = name.Value
 
 		loaded[name.Value] = module
-		for _,name := range module.Imports {
+		for _, name := range module.Imports {
 			load(name)
 		}
 	}
 
-	for _,name := range imports {
+	for _, name := range imports {
 		load(name)
 	}
 	return loaded
@@ -85,7 +85,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	value := Interpret(analyzer)
-	bytes, _ := json.Marshal(value)
-	fmt.Println(string(bytes))
+	out := Transpile(program, modules, analyzer)
+	fmt.Println(out)
 }
