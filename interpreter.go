@@ -126,6 +126,7 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.ModuleEnvironments[e.Module][e.Value]
 
 	case *MultiLambda:
+		// THIS SOHUD BE ACLOSURE
 		return RuntimeLambda(e.Lambdas)
 
 	case *Lambda:

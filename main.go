@@ -70,7 +70,7 @@ func main() {
 	modules := LoadModules(program.Imports)
 	fmt.Println("Loaded modules: " + strings.Join(slices.Collect(maps.Keys(modules)), ", "))
 
-	PrintAST(program)
+	//PrintAST(program)
 
 	// n := 0
 	// Traverse(program, func(node Node) {
@@ -85,6 +85,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// out := Transpile(program, modules, analyzer)
-	// fmt.Println(out)
+	value := Interpret(analyzer)
+	fmt.Println(value)
 }
