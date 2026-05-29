@@ -33,13 +33,12 @@ type RuntimeApplication struct {
 	Argument RuntimeValue
 }
 
-func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
+func (app RuntimeApplication) Apply(i *Interpreter) RuntimeValue {
 
 	switch left := app.Function.(type) {
 	case *NamedValue:
-		left.Value.Evaluate(i)
 		app.Function = left.Value
-		return app.Evaluate(i)
+		return app.Apply(i)
 
 	case RuntimeBuiltin:
 		return left(app.Argument.Evaluate(i))
@@ -52,7 +51,7 @@ func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 				Argument: app.Argument,
 			},
 		}
-		return app.Evaluate(i)
+		return app.Apply(i)
 
 	case RuntimeClosure:
 		i.PushEnvironment(left.Upvalues)
@@ -78,11 +77,11 @@ func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 		}
 
 		i.PopEnvironment()
-		return returned.Evaluate(i)
+		return returned
 
 	case RuntimeApplication:
-		app.Function = app.Function.Evaluate(i)
-		return app.Evaluate(i)
+		app.Function = left.Apply(i)
+		return app.Apply(i)
 
 	case RuntimeNumber:
 		panic("Cannot apply number")
@@ -92,6 +91,11 @@ func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 	default:
 		panic(app.Function)
 	}
+}
+
+func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
+	result := app.Apply(i)
+	return result.Evaluate(i)
 }
 
 type RuntimeComposition struct {

@@ -215,12 +215,15 @@ func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool)
 			return v, true
 
 		case *NamedValue:
-			v.Evaluate(i)
-			return i.EvaluateToNumber(v.Value)
+			num, ok := i.EvaluateToNumber(v.Value)
+			if ok {
+				v.Value = num
+			}
+			return num, ok
 
 		case RuntimeApplication:
-			value = v.Evaluate(i)
-			return i.EvaluateToNumber(value)
+			res := v.Apply(i)
+			return i.EvaluateToNumber(res)
 
 		default:
 			return 0, false
@@ -233,12 +236,15 @@ func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
 			return v, true
 
 		case *NamedValue:
-			v.Evaluate(i)
-			return i.EvaluateToTuple(v.Value)
+			tup, ok := i.EvaluateToTuple(v.Value)
+			if ok {
+				v.Value = tup
+			}
+			return tup, true
 
 		case RuntimeApplication:
-			value = v.Evaluate(i)
-			return i.EvaluateToTuple(value)
+			res := v.Apply(i)
+			return i.EvaluateToTuple(res)
 
 		default:
 			return nil, false
