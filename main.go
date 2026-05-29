@@ -28,8 +28,7 @@ func LoadModules(imports []*Name) map[string]*Module {
 	var load func(*Name)
 	load = func(name *Name) {
 		if loaded[name.Value] != nil {
-			Log("recursive import", name.Pos, SeverityError)
-			os.Exit(1)
+			return
 		}
 
 		tokens := Lex(name.Value + ".mf")
