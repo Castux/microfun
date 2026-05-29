@@ -6,7 +6,6 @@ import (
 
 type Scope struct {
 	Node
-	Parent      *Scope
 	Definitions map[string]Node
 }
 
@@ -38,10 +37,6 @@ func (a *Analyzer) PushScope(node Node) {
 	}
 	a.Stack = append(a.Stack, scope)
 	a.Scopes[node] = scope
-
-	if len(a.Stack) >= 2 {
-		a.Stack[len(a.Stack)-1].Parent = a.Stack[len(a.Stack)-2]
-	}
 }
 
 func (a *Analyzer) PopScope() {
@@ -72,6 +67,13 @@ func (a *Analyzer) HandleImports(imports []*Name) {
 func (a *Analyzer) CheckName(name *Name) Node {
 	for _, scope := range slices.Backward(a.Stack) {
 		if def, found := scope.Definitions[name.Value]; found {
+
+			if scope.Node == nil {
+				name.ResolvedToBuiltin = true
+			} else if module, isModule := scope.Node.(*Module); isModule {
+				name.ResolvedModule = module
+			}
+
 			return def
 		}
 	}

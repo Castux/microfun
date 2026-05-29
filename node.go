@@ -86,7 +86,7 @@ func Traverse(node Node, pre, post func(n Node)) {
 
 	case *Module:
 		TraverseList(n.Imports, pre, post)
-//		TraverseList(n.PrivateBindings, pre, post)
+		//		TraverseList(n.PrivateBindings, pre, post)
 		TraverseList(n.PublicBindings, pre, post)
 
 	case *Binding:
@@ -135,7 +135,13 @@ func PrintAST(root Node) {
 		case *Operation:
 			fmt.Printf(" (%s)", n.Operator)
 		case *Name:
-			fmt.Printf(" (%s)", n.Value)
+			if n.ResolvedModule != nil {
+				fmt.Printf(" (%s.%s)", n.ResolvedModule.Name, n.Value)
+			} else if n.ResolvedToBuiltin {
+				fmt.Printf(" (<builtin>.%s)", n.Value)
+			} else {
+				fmt.Printf(" (%s)", n.Value)
+			}
 		case *QualifiedName:
 			fmt.Printf(" (%s.%s)", n.Module, n.Value)
 		case *NumberLiteral:

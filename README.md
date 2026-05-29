@@ -51,3 +51,13 @@ MultiLambda := '{' Lambda ( ',' Lambda )* '}'
 ```
 
 Note that there is no operator precedence, as mixing operators within a single chain of operation is not allowed. Parentheses are used for that effect.
+
+# Semantics
+
+microfun is dynamically typed
+
+Evaluation is **lazy**: the code only builds expression trees at runtime, which are evaluated only when required, and then only as much as required:
+
+- when pattern matching
+- when calling arithmetic built-ins
+- when using the special built-in "eval"

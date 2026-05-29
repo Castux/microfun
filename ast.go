@@ -84,10 +84,12 @@ type Operation struct {
 }
 
 type Name struct {
-	Value     string
-	InPattern bool
-	InImport  bool
-	Pos       SourcePos
+	Value             string
+	InPattern         bool
+	InImport          bool
+	ResolvedModule    *Module // added by analyzer
+	ResolvedToBuiltin bool    // added by analyzer
+	Pos               SourcePos
 }
 
 type QualifiedName struct {

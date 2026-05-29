@@ -70,20 +70,19 @@ func main() {
 	modules := LoadModules(program.Imports)
 	fmt.Println("Loaded modules: " + strings.Join(slices.Collect(maps.Keys(modules)), ", "))
 
-	//PrintAST(program)
-
 	// n := 0
 	// Traverse(program, func(node Node) {
 	// 	Log(fmt.Sprintf("%d: %s", n, NodeType(node)), NodePos(node), SeverityInfo)
 	// 	n++
 	// }, nil)
 
-
 	analyzer := Analyze(program, modules)
 	if analyzer.Errors > 0 {
 		fmt.Printf("Analyzer found %d errors\n", analyzer.Errors)
 		os.Exit(1)
 	}
+
+	PrintAST(program)
 
 	value := Interpret(analyzer)
 	fmt.Println(value)
