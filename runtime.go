@@ -19,8 +19,11 @@ type NamedValue struct {
 	Value RuntimeValue
 }
 
-func (named *NamedValue) IsFinal() bool                        { return named.Value.IsFinal() }
-func (named *NamedValue) Evaluate(i *Interpreter) RuntimeValue { return named.Value.Evaluate(i) }
+func (named NamedValue) IsFinal() bool                        { return named.Value.IsFinal() }
+func (named NamedValue) Evaluate(i *Interpreter) RuntimeValue {
+	named.Value = named.Value.Evaluate(i)
+	return named.Value
+}
 
 type RuntimeTuple []RuntimeValue
 
@@ -50,11 +53,60 @@ type RuntimeApplication struct {
 func (app RuntimeApplication) IsFinal() bool { return false }
 func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 
-	switch app.Function.(type) {
+	switch left := app.Function.(type) {
+	case *NamedValue:
+		left.Value.Evaluate(i)
+		app.Function = left.Value
+		return app.Evaluate(i)
 
+	case RuntimeBuiltin:
+		return left(app.Argument.Evaluate(i))
+
+	case RuntimeComposition:
+		app = RuntimeApplication{
+			Function: left.Function1,
+			Argument: RuntimeApplication{
+				Function: left.Function2,
+				Argument: app.Argument,
+			},
+		}
+		return app.Evaluate(i)
+
+	case RuntimeClosure:
+		i.PushEnvironment(left.Upvalues)
+		var returned RuntimeValue
+
+		for _,lambda := range left.Lambdas {
+			matched := i.MatchPattern(lambda.Pattern, app.Argument)
+			if matched != nil {
+				i.PushEnvironment(matched)
+				returned = i.RunExpression(lambda.Expression)
+				i.PopEnvironment()
+				break
+			}
+		}
+
+		if returned == nil {
+			panic("Could not match value to patterns")
+		}
+
+		i.PopEnvironment()
+		return returned
+
+	case RuntimeApplication:
+		app.Function = app.Function.Evaluate(i)
+		return app.Evaluate(i)
+
+	case RuntimeNumber:
+		panic("Cannot apply number")
+	case RuntimeString:
+		panic("Cannot apply tuple")
+	case RuntimeTuple:
+		panic("Cannot apply tuple")
+
+	default:
+		panic(app.Function)
 	}
-
-	return app
 }
 
 type RuntimeComposition struct {

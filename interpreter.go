@@ -64,7 +64,11 @@ func (i *Interpreter) Run() RuntimeValue {
 
 	mainValue := i.RunExpression(i.Program.Body)
 
-	return mainValue.Evaluate(i)
+	for !mainValue.IsFinal() {
+		mainValue = mainValue.Evaluate(i)
+	}
+
+	return mainValue
 }
 
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
@@ -194,6 +198,10 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 	default:
 		panic("unimplemented operator " + op.Operator)
 	}
+}
+
+func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Environment {
+	return nil
 }
 
 func Interpret(analyzer *Analyzer) RuntimeValue {
