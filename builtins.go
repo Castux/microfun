@@ -42,11 +42,15 @@ func WrapBinop(op Binop, name string) RuntimeBuiltin {
 }
 
 var Builtins = map[string]RuntimeBuiltin{
-	"add": WrapBinop(func(a, b float64) float64 { return a + b }, "add"),
-	"mul": WrapBinop(func(a, b float64) float64 { return a * b }, "mul"),
-	"sub": WrapBinop(func(a, b float64) float64 { return a - b }, "sub"),
-	"div": WrapBinop(func(a, b float64) float64 { return a / b }, "div"),
-	"mod": WrapBinop(func(a, b float64) float64 { return math.Mod(a, b) }, "mod"),
+	"add": WrapBinop(func(a, b float64) float64 { return b + a }, "add"),
+	"mul": WrapBinop(func(a, b float64) float64 { return b * a }, "mul"),
+	"sub": WrapBinop(func(a, b float64) float64 { return b - a }, "sub"),
+	"fdiv": WrapBinop(func(a, b float64) float64 { return b / a }, "fdiv"),
+	"div": WrapBinop(func(a, b float64) float64 { return float64(int(b) / int(a)) }, "div"),
+	"mod": WrapBinop(func(a, b float64) float64 { return float64(int(b) % int(a)) }, "mod"),
+
+
+	"fmod": WrapBinop(func(a, b float64) float64 { return math.Mod(b, a) }, "fmod"),
 	"eq": WrapBinop(func(a, b float64) float64 {
 		if a == b {
 			return 1
@@ -55,7 +59,7 @@ var Builtins = map[string]RuntimeBuiltin{
 		}
 	}, "eq"),
 	"lt":    WrapBinop(func(a, b float64) float64 {
-		if a < b {
+		if b < a {
 			return 1
 		} else {
 			return 0

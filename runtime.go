@@ -1,25 +1,19 @@
 package main
 
+import "fmt"
+
 type RuntimeValue interface {
-	IsFinal() bool
 	Evaluate(*Interpreter) RuntimeValue
 }
 
 type RuntimeNumber float64
 
-func (number RuntimeNumber) IsFinal() bool                      { return true }
 func (number RuntimeNumber) Evaluate(*Interpreter) RuntimeValue { return number }
-
-type RuntimeString string
-
-func (str RuntimeString) IsFinal() bool                      { return true }
-func (str RuntimeString) Evaluate(*Interpreter) RuntimeValue { return str }
 
 type NamedValue struct {
 	Value RuntimeValue
 }
 
-func (named NamedValue) IsFinal() bool                        { return named.Value.IsFinal() }
 func (named NamedValue) Evaluate(i *Interpreter) RuntimeValue {
 	named.Value = named.Value.Evaluate(i)
 	return named.Value
@@ -27,20 +21,9 @@ func (named NamedValue) Evaluate(i *Interpreter) RuntimeValue {
 
 type RuntimeTuple []RuntimeValue
 
-func (tuple RuntimeTuple) IsFinal() bool {
-	for _, sub := range tuple {
-		if !sub.IsFinal() {
-			return false
-		}
-	}
-	return true
-}
-
 func (tuple RuntimeTuple) Evaluate(i *Interpreter) RuntimeValue {
 	for j, sub := range tuple {
-		if !sub.IsFinal() {
-			tuple[j] = sub.Evaluate(i)
-		}
+		tuple[j] = sub.Evaluate(i)
 	}
 	return tuple
 }
@@ -50,7 +33,6 @@ type RuntimeApplication struct {
 	Argument RuntimeValue
 }
 
-func (app RuntimeApplication) IsFinal() bool { return false }
 func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 
 	switch left := app.Function.(type) {
@@ -87,11 +69,16 @@ func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 		}
 
 		if returned == nil {
-			panic("Could not match value to patterns")
+			valueStr :=  fmt.Sprintf("%+v", app.Argument)
+			for _,lambda := range left.Lambdas {
+				pos := lambda.Pattern.FirstPos().To(lambda.Pattern.LastPos())
+				Log("Could not match value to pattern (" + valueStr + ")", pos, SeverityError)
+			}
+			panic("")
 		}
 
 		i.PopEnvironment()
-		return returned
+		return returned.Evaluate(i)
 
 	case RuntimeApplication:
 		app.Function = app.Function.Evaluate(i)
@@ -99,8 +86,6 @@ func (app RuntimeApplication) Evaluate(i *Interpreter) RuntimeValue {
 
 	case RuntimeNumber:
 		panic("Cannot apply number")
-	case RuntimeString:
-		panic("Cannot apply tuple")
 	case RuntimeTuple:
 		panic("Cannot apply tuple")
 
@@ -114,7 +99,6 @@ type RuntimeComposition struct {
 	Function2 RuntimeValue
 }
 
-func (comp RuntimeComposition) IsFinal() bool                      { return true }
 func (comp RuntimeComposition) Evaluate(*Interpreter) RuntimeValue { return comp }
 
 type RuntimeClosure struct {
@@ -122,10 +106,8 @@ type RuntimeClosure struct {
 	Lambdas  []*Lambda
 }
 
-func (closure RuntimeClosure) IsFinal() bool                      { return true }
 func (closure RuntimeClosure) Evaluate(*Interpreter) RuntimeValue { return closure }
 
 type RuntimeBuiltin func(RuntimeValue) RuntimeValue
 
-func (builtin RuntimeBuiltin) IsFinal() bool                      { return true }
 func (builtin RuntimeBuiltin) Evaluate(*Interpreter) RuntimeValue { return builtin }

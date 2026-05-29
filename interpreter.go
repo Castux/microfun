@@ -1,6 +1,9 @@
 package main
 
-import "slices"
+import (
+	"maps"
+	"slices"
+)
 
 type Environment map[string]*NamedValue
 
@@ -63,12 +66,7 @@ func (i *Interpreter) Run() RuntimeValue {
 	// Then run program itself
 
 	mainValue := i.RunExpression(i.Program.Body)
-
-	for !mainValue.IsFinal() {
-		mainValue = mainValue.Evaluate(i)
-	}
-
-	return mainValue
+	return mainValue.Evaluate(i)
 }
 
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
@@ -90,7 +88,7 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return RuntimeNumber(e.Value)
 
 	case *StringLiteral:
-		return RuntimeString(e.Value)
+		return i.FoldString(e.Value)
 
 	case *Tuple:
 		var tup RuntimeTuple
@@ -152,6 +150,17 @@ func (i *Interpreter) FoldList(list *List) RuntimeValue {
 	return current
 }
 
+func (i *Interpreter) FoldString(str string) RuntimeValue {
+	var current RuntimeTuple
+	for _, elem := range slices.Backward([]rune(str)) {
+		current = RuntimeTuple{
+			RuntimeNumber(elem),
+			current,
+		}
+	}
+	return current
+}
+
 func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 	var subs []RuntimeValue
@@ -200,7 +209,103 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 	}
 }
 
+func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool) {
+	switch v := value.(type) {
+		case RuntimeNumber:
+			return v, true
+
+		case *NamedValue:
+			v.Evaluate(i)
+			return i.EvaluateToNumber(v.Value)
+
+		case RuntimeApplication:
+			value = v.Evaluate(i)
+			return i.EvaluateToNumber(value)
+
+		default:
+			return 0, false
+	}
+}
+
+func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
+	switch v := value.(type) {
+		case RuntimeTuple:
+			return v, true
+
+		case *NamedValue:
+			v.Evaluate(i)
+			return i.EvaluateToTuple(v.Value)
+
+		case RuntimeApplication:
+			value = v.Evaluate(i)
+			return i.EvaluateToTuple(value)
+
+		default:
+			return nil, false
+	}
+}
+
 func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Environment {
+
+	switch patt := pattern.(type) {
+	case *NumberLiteral:
+		right, ok := i.EvaluateToNumber(argument)
+		if !ok || float64(right) != patt.Value {
+			return nil
+		}
+		return make(Environment)
+
+	case *Name:
+		return Environment{
+			patt.Value: &NamedValue{argument},
+		}
+
+	case *TuplePattern:
+		right, ok := i.EvaluateToTuple(argument)
+		if !ok || len(right) != len(patt.SubPatterns) {
+			return nil
+		}
+		env := make(Environment)
+		for j, subPatt := range patt.SubPatterns {
+			subEnv := i.MatchPattern(subPatt, right[j])
+			if subEnv == nil {
+				return nil
+			}
+			maps.Copy(env, subEnv)
+		}
+		return env
+
+	case *ListPattern:
+		right, ok := i.EvaluateToTuple(argument)
+		if !ok {
+			return nil
+		}
+		leftEnv := i.MatchPattern(patt.SubPatterns[0], right[0])
+		print("left ")
+		println(leftEnv != nil)
+		if leftEnv == nil {
+			return nil
+		}
+		rightEnv := i.MatchPattern(&ListPattern{
+			SubPatterns: patt.SubPatterns[1:],
+			Start: patt.Start,
+			End: patt.End,
+		}, right[1])
+		print("right ")
+		println(rightEnv != nil)
+		if rightEnv == nil {
+			return nil
+		}
+		maps.Copy(leftEnv, rightEnv)
+		return leftEnv
+
+
+	case *StringLiteral:
+
+
+	}
+
+
 	return nil
 }
 
