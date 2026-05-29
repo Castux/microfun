@@ -148,6 +148,10 @@ func PrintAST(root Node) {
 			fmt.Printf(" (%f)", n.Value)
 		case *StringLiteral:
 			fmt.Printf(" (%s)", n.Value)
+		case *Lambda:
+			if len(n.Upvalues) > 0 {
+				fmt.Printf(" (↑ %s)", strings.Join(n.Upvalues, ","))
+			}
 		}
 		fmt.Printf("\n")
 

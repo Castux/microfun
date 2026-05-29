@@ -82,7 +82,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	PrintAST(program)
+	PrintAST(modules["prelude"])
 
 	value := Interpret(analyzer)
 	fmt.Println(value)

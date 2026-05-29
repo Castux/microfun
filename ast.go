@@ -47,6 +47,8 @@ type Let struct {
 type Lambda struct {
 	Pattern    Pattern
 	Expression Expression
+
+	Upvalues []string // added by analyzer
 }
 
 type MultiLambda struct {
@@ -87,6 +89,7 @@ type Name struct {
 	Value             string
 	InPattern         bool
 	InImport          bool
+	InBinding         bool
 	ResolvedModule    *Module // added by analyzer
 	ResolvedToBuiltin bool    // added by analyzer
 	Pos               SourcePos

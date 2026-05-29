@@ -1,4 +1,4 @@
 module
 
 foo = 1,
-bar = prelude.filter
+bar = prelude.filter foo bar

@@ -199,6 +199,7 @@ func (p *Parser) ParseLambda() *Lambda {
 func (p *Parser) ParseBinding() *Binding {
 
 	name := p.ParseName()
+	name.InBinding = true
 	p.Expect("=")
 	expr := p.ParseExpression()
 

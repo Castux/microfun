@@ -10,12 +10,10 @@ type Scope struct {
 }
 
 type Analyzer struct {
-	Program      *Program
-	Modules      map[string]*Module
-	Scopes       map[Node]*Scope
-	Definitions  map[Node]Node
-	ExportedFrom map[*Binding]*Module
-	Errors       int
+	Program *Program
+	Modules map[string]*Module
+	Scopes  map[Node]*Scope
+	Errors  int
 
 	Stack []*Scope
 }
@@ -64,9 +62,11 @@ func (a *Analyzer) HandleImports(imports []*Name) {
 	}
 }
 
-func (a *Analyzer) CheckName(name *Name) Node {
-	for _, scope := range slices.Backward(a.Stack) {
-		if def, found := scope.Definitions[name.Value]; found {
+func (a *Analyzer) CheckName(name *Name) {
+	foundIndex := -1
+
+	for i, scope := range slices.Backward(a.Stack) {
+		if _, ok := scope.Definitions[name.Value]; ok {
 
 			if scope.Node == nil {
 				name.ResolvedToBuiltin = true
@@ -74,12 +74,26 @@ func (a *Analyzer) CheckName(name *Name) Node {
 				name.ResolvedModule = module
 			}
 
-			return def
+			foundIndex = i
+			break
 		}
 	}
-	Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
-	a.Errors++
-	return nil
+
+	if foundIndex < 0 {
+		Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
+		a.Errors++
+		return
+	}
+
+	if name.ResolvedModule == nil && !name.ResolvedToBuiltin {
+		for _, scope := range a.Stack[foundIndex+1:] {
+			if lambda, ok := scope.Node.(*Lambda); ok {
+				if !slices.Contains(lambda.Upvalues, name.Value) {
+					lambda.Upvalues = append(lambda.Upvalues, name.Value)
+				}
+			}
+		}
+	}
 }
 
 func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
@@ -109,7 +123,6 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 			a.PushScope(node)
 			for _, binding := range node.PublicBindings {
 				a.AddName(binding.Name.Value, binding)
-				a.ExportedFrom[binding] = node
 			}
 		case *Let:
 			a.PushScope(node)
@@ -122,15 +135,11 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 				a.AddName(name.Value, name)
 			}
 		case *Name:
-			if !node.InImport && !node.InPattern {
-				if found := a.CheckName(node); found != nil {
-					a.Definitions[node] = found
-				}
+			if !node.InImport && !node.InPattern && !node.InBinding {
+				a.CheckName(node)
 			}
 		case *QualifiedName:
-			if found := a.CheckQualifiedName(node); found != nil {
-				a.Definitions[node] = found
-			}
+			a.CheckQualifiedName(node)
 		}
 	}
 
@@ -164,10 +173,8 @@ func (a *Analyzer) Run() {
 func Analyze(program *Program, modules map[string]*Module) *Analyzer {
 	analyzer := &Analyzer{
 		Scopes:       make(map[Node]*Scope),
-		Definitions:  make(map[Node]Node),
 		Program:      program,
 		Modules:      modules,
-		ExportedFrom: make(map[*Binding]*Module),
 	}
 
 	analyzer.Run()
