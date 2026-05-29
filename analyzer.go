@@ -172,9 +172,9 @@ func (a *Analyzer) Run() {
 
 func Analyze(program *Program, modules map[string]*Module) *Analyzer {
 	analyzer := &Analyzer{
-		Scopes:       make(map[Node]*Scope),
-		Program:      program,
-		Modules:      modules,
+		Scopes:  make(map[Node]*Scope),
+		Program: program,
+		Modules: modules,
 	}
 
 	analyzer.Run()

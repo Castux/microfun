@@ -2,29 +2,6 @@ package main
 
 import "slices"
 
-type RuntimeValue any
-type NamedValue struct {
-	Value RuntimeValue
-}
-type RuntimeTuple []RuntimeValue
-
-type RuntimeApplication struct {
-	Function RuntimeValue
-	Argument RuntimeValue
-}
-
-type RuntimeComposition struct {
-	Function1 RuntimeValue
-	Function2 RuntimeValue
-}
-
-type RuntimeClosure struct {
-	Upvalues Environment
-	Lambdas  []*Lambda
-}
-
-type RuntimeBuiltin func(RuntimeValue) RuntimeValue
-
 type Environment map[string]*NamedValue
 
 type Interpreter struct {
@@ -35,10 +12,14 @@ type Interpreter struct {
 	Stack              []Environment
 }
 
-func (i *Interpreter) PushEnvironment() Environment {
+func (i *Interpreter) PushNewEnvironment() Environment {
 	env := make(Environment)
 	i.Stack = append(i.Stack, env)
 	return env
+}
+
+func (i *Interpreter) PushEnvironment(env Environment) {
+	i.Stack = append(i.Stack, env)
 }
 
 func (i *Interpreter) PopEnvironment() (env Environment) {
@@ -81,7 +62,9 @@ func (i *Interpreter) Run() RuntimeValue {
 
 	// Then run program itself
 
-	return i.RunExpression(i.Program.Body)
+	mainValue := i.RunExpression(i.Program.Body)
+
+	return mainValue.Evaluate(i)
 }
 
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
@@ -100,10 +83,10 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 
 	switch e := expression.(type) {
 	case *NumberLiteral:
-		return e.Value
+		return RuntimeNumber(e.Value)
 
 	case *StringLiteral:
-		return e.Value
+		return RuntimeString(e.Value)
 
 	case *Tuple:
 		var tup RuntimeTuple
@@ -119,7 +102,7 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.FoldOperation(e)
 
 	case *Let:
-		i.PushEnvironment()
+		i.PushNewEnvironment()
 		i.TreatBindings(e.Bindings)
 		value := i.RunExpression(e.Expression)
 		i.PopEnvironment()
@@ -147,10 +130,10 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 	}
 }
 
-func (i *Interpreter) MakeClosure(lambdas... *Lambda) RuntimeClosure {
+func (i *Interpreter) MakeClosure(lambdas ...*Lambda) RuntimeClosure {
 	env := make(Environment)
-	for _,lambda := range lambdas {
-		for _,upvalue := range lambda.Upvalues {
+	for _, lambda := range lambdas {
+		for _, upvalue := range lambda.Upvalues {
 			env[upvalue] = i.ResolveName(upvalue).(*NamedValue)
 		}
 	}
