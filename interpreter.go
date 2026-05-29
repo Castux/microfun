@@ -18,7 +18,11 @@ type RuntimeComposition struct {
 	Function2 RuntimeValue
 }
 
-type RuntimeLambda []*Lambda
+type RuntimeClosure struct {
+	Upvalues Environment
+	Lambdas  []*Lambda
+}
+
 type RuntimeBuiltin func(RuntimeValue) RuntimeValue
 
 type Environment map[string]*NamedValue
@@ -37,8 +41,10 @@ func (i *Interpreter) PushEnvironment() Environment {
 	return env
 }
 
-func (i *Interpreter) PopEnvironment() {
+func (i *Interpreter) PopEnvironment() (env Environment) {
+	env = i.Stack[len(i.Stack)-1]
 	i.Stack = i.Stack[:len(i.Stack)-1]
+	return
 }
 
 func (i *Interpreter) ResolveName(name string) RuntimeValue {
@@ -49,20 +55,38 @@ func (i *Interpreter) ResolveName(name string) RuntimeValue {
 		}
 	}
 
-	if builtin, found := Builtins[name]; found {
-		return builtin
-	}
-
 	panic("could not find name " + name)
 }
 
 func (i *Interpreter) Run() RuntimeValue {
-	return i.RunProgram(i.Program)
+
+	// First create environemnts for all modules
+	// (modules can refer to each other, the NameValues need to exist
+
+	for modName, module := range i.Modules {
+		env := make(Environment)
+		for _, binding := range module.PublicBindings {
+			env[binding.Name.Value] = &NamedValue{}
+		}
+		i.ModuleEnvironments[modName] = env
+	}
+
+	// Then fill up these environments
+
+	for modName, module := range i.Modules {
+		for _, binding := range module.PublicBindings {
+			i.ModuleEnvironments[modName][binding.Name.Value].Value = i.RunExpression(binding.Expression)
+		}
+	}
+
+	// Then run program itself
+
+	return i.RunExpression(i.Program.Body)
 }
 
-func (i *Interpreter) TreatBindings(bindings []*Binding) Environment {
+func (i *Interpreter) TreatBindings(bindings []*Binding) {
 
-	env := i.PushEnvironment()
+	env := i.Stack[len(i.Stack)-1]
 	for _, binding := range bindings {
 		env[binding.Name.Value] = &NamedValue{}
 	}
@@ -70,25 +94,6 @@ func (i *Interpreter) TreatBindings(bindings []*Binding) Environment {
 	for _, binding := range bindings {
 		env[binding.Name.Value].Value = i.RunExpression(binding.Expression)
 	}
-
-	return env
-}
-
-func (i *Interpreter) RunModule(modName string) {
-	module := i.Modules[modName]
-	for _, modName2 := range module.Imports {
-		i.RunModule(modName2.Value)
-	}
-	env := i.TreatBindings(module.PublicBindings)
-	i.ModuleEnvironments[modName] = env
-}
-
-func (i *Interpreter) RunProgram(program *Program) RuntimeValue {
-	for _, modName := range program.Imports {
-		i.RunModule(modName.Value)
-	}
-
-	return i.RunExpression(program.Body)
 }
 
 func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
@@ -114,27 +119,42 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.FoldOperation(e)
 
 	case *Let:
+		i.PushEnvironment()
 		i.TreatBindings(e.Bindings)
 		value := i.RunExpression(e.Expression)
 		i.PopEnvironment()
 		return value
 
 	case *Name:
+		if e.ResolvedToBuiltin {
+			return Builtins[e.Value]
+		} else if e.ResolvedModule != nil {
+			return i.ModuleEnvironments[e.ResolvedModule.Name][e.Value]
+		}
 		return i.ResolveName(e.Value)
 
 	case *QualifiedName:
 		return i.ModuleEnvironments[e.Module][e.Value]
 
 	case *MultiLambda:
-		// THIS SOHUD BE ACLOSURE
-		return RuntimeLambda(e.Lambdas)
+		return i.MakeClosure(e.Lambdas...)
 
 	case *Lambda:
-		return RuntimeLambda{e}
+		return i.MakeClosure(e)
 
 	default:
 		panic("unimplemented expression " + NodeType(expression))
 	}
+}
+
+func (i *Interpreter) MakeClosure(lambdas... *Lambda) RuntimeClosure {
+	env := make(Environment)
+	for _,lambda := range lambdas {
+		for _,upvalue := range lambda.Upvalues {
+			env[upvalue] = i.ResolveName(upvalue).(*NamedValue)
+		}
+	}
+	return RuntimeClosure{env, lambdas}
 }
 
 func (i *Interpreter) FoldList(list *List) RuntimeValue {
