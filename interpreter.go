@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"maps"
+	"os"
 	"slices"
 )
 
@@ -169,25 +169,27 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 		subs = append(subs, i.RunExpression(operand))
 	}
 
+	pos := op.FirstPos().To(op.LastPos())
+
 	switch op.Operator {
 	case "":
-		current := RuntimeApplication{subs[0], subs[1]}
+		current := RuntimeApplication{subs[0], subs[1], pos}
 		for k := 2; k < len(subs); k++ {
-			current = RuntimeApplication{current, subs[k]}
+			current = RuntimeApplication{current, subs[k], pos}
 		}
 		return current
 
 	case ">":
-		current := RuntimeApplication{subs[1], subs[0]}
+		current := RuntimeApplication{subs[1], subs[0], pos}
 		for k := 2; k < len(subs); k++ {
-			current = RuntimeApplication{subs[k], current}
+			current = RuntimeApplication{subs[k], current, pos}
 		}
 		return current
 
 	case "<":
-		current := RuntimeApplication{subs[len(subs)-2], subs[len(subs)-1]}
+		current := RuntimeApplication{subs[len(subs)-2], subs[len(subs)-1], pos}
 		for k := len(subs) - 3; k >= 0; k-- {
-			current = RuntimeApplication{subs[k], current}
+			current = RuntimeApplication{subs[k], current, pos}
 		}
 		return current
 
@@ -220,6 +222,9 @@ type StackFrame interface {
 
 type ArgumentFrame struct {
 	Argument RuntimeValue
+	// Pos is the source span of the application this argument came from, used to
+	// report a failure to apply at its origin. It may be a zero SourcePos.
+	Pos SourcePos
 }
 
 type UpdateFrame struct {
@@ -249,7 +254,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 		// and remember on the stack where to resume.
 		switch reducible := control.(type) {
 		case RuntimeApplication:
-			stack = append(stack, ArgumentFrame{Argument: reducible.Argument})
+			stack = append(stack, ArgumentFrame{Argument: reducible.Argument, Pos: reducible.Pos})
 			control = reducible.Function
 			continue
 
@@ -259,7 +264,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 				continue
 			}
 			if reducible.Value == nil {
-				panic("forcing a thunk before its value was computed")
+				panic("internal error: forced thunk " + reducible.Name + " before its value was computed")
 			}
 			stack = append(stack, UpdateFrame{Thunk: reducible})
 			control = reducible.Value
@@ -284,8 +289,16 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 			// An argument is waiting, so the value in hand is applied to it.
 			switch function := control.(type) {
 			case RuntimeClosure:
+				body, matched := i.ApplyClosure(function, frame.Argument)
+				if !matched {
+					pos := function.Lambdas[0].Pattern.FirstPos().To(
+						function.Lambdas[len(function.Lambdas)-1].Pattern.LastPos())
+					i.raiseRuntimeError(
+						"no pattern matched value "+i.ShowValue(frame.Argument),
+						pos, stack)
+				}
 				stack = stack[:len(stack)-1]
-				control = i.ApplyClosure(function, frame.Argument)
+				control = body
 
 			case RuntimeBuiltin:
 				stack = stack[:len(stack)-1]
@@ -298,15 +311,16 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 					Argument: RuntimeApplication{
 						Function: function.Function2,
 						Argument: frame.Argument,
+						Pos:      frame.Pos,
 					},
+					Pos: frame.Pos,
 				}
 				control = function.Function1
 
-			case RuntimeNumber:
-				panic("Cannot apply number")
-
-			case RuntimeTuple:
-				panic("Cannot apply tuple")
+			case RuntimeNumber, RuntimeTuple:
+				i.raiseRuntimeError(
+					"cannot apply "+i.ShowValue(function)+", it is not a function",
+					frame.Pos, stack)
 
 			default:
 				panic(function)
@@ -318,8 +332,10 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 // ApplyClosure performs one beta reduction: it matches the argument against the
 // closure's patterns and returns the body of the first lambda that matches,
 // ready to be reduced further. Names in the body are resolved against the
-// environment here, so the returned value no longer depends on the stack.
-func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) RuntimeValue {
+// environment here, so the returned value no longer depends on the stack. The
+// boolean is false when no lambda matched; the caller reports the failure, as it
+// holds the reduction stack needed for the trace.
+func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) (RuntimeValue, bool) {
 
 	i.PushEnvironment(closure.Upvalues)
 	defer i.PopEnvironment()
@@ -330,16 +346,11 @@ func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue
 			i.PushEnvironment(matched)
 			body := i.RunExpression(lambda.Expression)
 			i.PopEnvironment()
-			return body
+			return body, true
 		}
 	}
 
-	valueStr := fmt.Sprintf("%+v", argument)
-	for _, lambda := range closure.Lambdas {
-		pos := lambda.Pattern.FirstPos().To(lambda.Pattern.LastPos())
-		Log("Could not match value "+valueStr+" to pattern", pos, SeverityError)
-	}
-	panic("")
+	return nil, false
 }
 
 func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool) {
@@ -476,12 +487,24 @@ func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool)
 	return false
 }
 
-func Interpret(analyzer *Analyzer) RuntimeValue {
+func Interpret(analyzer *Analyzer) (result RuntimeValue) {
 	interpreter := &Interpreter{
 		Program:            analyzer.Program,
 		Modules:            analyzer.Modules,
 		ModuleEnvironments: make(map[string]Environment),
 	}
+
+	// A RuntimeError is a program error we can report cleanly; anything else is
+	// an interpreter bug, so we re-panic to keep its Go stack trace.
+	defer func() {
+		if r := recover(); r != nil {
+			if rerr, ok := r.(*RuntimeError); ok {
+				ReportRuntimeError(rerr)
+				os.Exit(1)
+			}
+			panic(r)
+		}
+	}()
 
 	return interpreter.Run()
 }

@@ -27,10 +27,13 @@ func (RuntimeTuple) isRuntimeValue() {}
 
 // A RuntimeApplication is an unreduced function application. It is reduced by
 // EvaluateToWeakHeadNormalForm using an explicit stack, never by walking the Go
-// call stack.
+// call stack. Pos is the source span of the application, carried so that a
+// failure to apply (e.g. applying a number) can be reported at its origin; it
+// may be a zero SourcePos for applications synthesized during reduction.
 type RuntimeApplication struct {
 	Function RuntimeValue
 	Argument RuntimeValue
+	Pos      SourcePos
 }
 
 func (RuntimeApplication) isRuntimeValue() {}
