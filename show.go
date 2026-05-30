@@ -8,8 +8,8 @@ import (
 
 // Limits that keep show terminating on infinite or self-referential values.
 const (
-	showMaxWidth = 100 // most elements rendered in a single list or tuple
-	showMaxDepth = 50  // deepest nesting rendered before an ellipsis
+	ShowMaxWidth = 100 // most elements rendered in a single list or tuple
+	ShowMaxDepth = 50  // deepest nesting rendered before an ellipsis
 )
 
 // ListEnding describes how a chain of cons cells ended, as discovered while
@@ -38,7 +38,7 @@ func (i *Interpreter) ShowValue(value RuntimeValue) string {
 // prints its name instead of looping forever.
 func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, depth int, expanding map[*NamedValue]bool) {
 
-	if depth > showMaxDepth {
+	if depth > ShowMaxDepth {
 		builder.WriteString("…")
 		return
 	}
@@ -85,7 +85,7 @@ func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTu
 	}
 
 	if len(tuple) == 2 {
-		heads, ending, tailName := i.CollectListSpine(tuple, expanding)
+		heads, ending, tailName := i.CollectListSpine(tuple, expanding, ShowMaxWidth)
 		if ending != NotAList {
 			builder.WriteByte('[')
 			for index, head := range heads {
@@ -121,7 +121,7 @@ func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTu
 // of each cell and reporting how the chain ended. It forces only the spine, so
 // the heads stay lazy until they are rendered. A repeated named value, or one
 // already being expanded above, is reported as a cycle rather than followed.
-func (i *Interpreter) CollectListSpine(start RuntimeTuple, expanding map[*NamedValue]bool) ([]RuntimeValue, ListEnding, string) {
+func (i *Interpreter) CollectListSpine(start RuntimeTuple, expanding map[*NamedValue]bool, maxWidth int) ([]RuntimeValue, ListEnding, string) {
 
 	var heads []RuntimeValue
 	seen := make(map[*NamedValue]bool)
@@ -149,7 +149,7 @@ func (i *Interpreter) CollectListSpine(start RuntimeTuple, expanding map[*NamedV
 		heads = append(heads, tuple[0])
 		current = tuple[1]
 
-		if len(heads) >= showMaxWidth {
+		if len(heads) >= maxWidth {
 			return heads, Truncated, ""
 		}
 	}
