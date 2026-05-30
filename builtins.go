@@ -76,7 +76,7 @@ func init() {
 		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
 		"eval": Nop,
 		"show": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			fmt.Printf("%+v\n", interpreter.EvaluateToWeakHeadNormalForm(a))
+			fmt.Println(interpreter.ShowValue(a))
 			return a
 		},
 		"showt": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {

@@ -51,7 +51,7 @@ func (i *Interpreter) Run() RuntimeValue {
 	for modName, module := range i.Modules {
 		env := make(Environment)
 		for _, binding := range module.PublicBindings {
-			env[binding.Name.Value] = &NamedValue{}
+			env[binding.Name.Value] = &NamedValue{Name: binding.Name.Value}
 		}
 		i.ModuleEnvironments[modName] = env
 	}
@@ -74,7 +74,7 @@ func (i *Interpreter) TreatBindings(bindings []*Binding) {
 
 	env := i.Stack[len(i.Stack)-1]
 	for _, binding := range bindings {
-		env[binding.Name.Value] = &NamedValue{}
+		env[binding.Name.Value] = &NamedValue{Name: binding.Name.Value}
 	}
 
 	for _, binding := range bindings {
@@ -364,7 +364,7 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 
 	case *Name:
 		return Environment{
-			patt.Value: &NamedValue{Value: argument},
+			patt.Value: &NamedValue{Name: patt.Value, Value: argument},
 		}
 
 	case *TuplePattern:

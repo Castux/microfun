@@ -11,8 +11,10 @@ func (RuntimeNumber) isRuntimeValue() {}
 // A NamedValue is a thunk: a value whose computation may have been deferred.
 // The first time it is reduced to weak head normal form, the result is written
 // back into Value and Forced is set, so the computation is shared and never
-// repeated.
+// repeated. Name, when set, is the binding the thunk came from; it is only used
+// to make output readable (see ShowValue).
 type NamedValue struct {
+	Name   string
 	Value  RuntimeValue
 	Forced bool
 }
