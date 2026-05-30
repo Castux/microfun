@@ -1,63 +1,553 @@
-**microfun v1**
+# microfun
 
-*microfun* is a toy language developed to learn about compilers, pure functional programming and lazy evaluation.
+*microfun* is a toy programming language built to explore compiler construction,
+pure functional programming, and lazy evaluation. It is minimalistic ("micro")
+and functional ("fun"): a whole program is a single expression, there is one
+primitive type and one constructed type, functions are pure, and evaluation is
+lazy throughout.
 
-# Lexical rules
+This document is the language reference. For how the implementation actually
+works — the lexer, parser, analyzer, and the lazy reduction engine — see
+[IMPLEMENTATION.md](IMPLEMENTATION.md).
 
-The source code must be encoded in UTF-8.
+## Contents
 
-- Whitespace has no syntactic value other than separating tokens
-- Identifiers follow the usual rule: sequences of alphanumerical characters plus underscores, not starting with a digit: `[a-zA-Z_][a-zA-Z0-9_]*`
-- The `let`, `in`, `module`, `import` keywords are reserved and cannot be used as identifiers
-- Numbers are sequences of digits, with an optional fractional part: `[0-9]+ ('.' [0-9]+)?`
-- Strings are sequences of characters enclosed in pairs of single quotes `'` or double quotes `"`
-- A line starting with `--` is a comment and is ignored by the parser
+1. [Design principles](#1-design-principles)
+2. [Running a program](#2-running-a-program)
+3. [Programs and modules](#3-programs-and-modules)
+4. [Lexical elements](#4-lexical-elements)
+5. [Grammar](#5-grammar)
+6. [Values and types](#6-values-and-types)
+7. [Expressions](#7-expressions)
+8. [Operators](#8-operators)
+9. [Lambdas and pattern matching](#9-lambdas-and-pattern-matching)
+10. [Bindings: `let`](#10-bindings-let)
+11. [Lists, strings, and other sugar](#11-lists-strings-and-other-sugar)
+12. [Lazy evaluation](#12-lazy-evaluation)
+13. [Built-in functions](#13-built-in-functions)
+14. [The prelude](#14-the-prelude)
 
-# Grammar
+---
 
-*microfun*'s grammar is described as a [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar):
+## 1. Design principles
 
-Terminals: `Name`, `Number` and `String`, as described above.
+- **A program is an expression.** There are no statements. Running a program
+  evaluates its single body expression; output happens only through the
+  side-effecting builtins `peek`, `show`, and `write`.
+- **One primitive, one constructor.** The only primitive type is the number; the
+  only way to build compound data is the tuple. Lists and strings are not
+  separate types — they are conventions built on tuples (see
+  [§11](#11-lists-strings-and-other-sugar)).
+- **Purity.** Functions have no mutable state and no side effects beyond the
+  output builtins. A value, once bound, never changes.
+- **No variables, only bindings.** Names are bound to expressions by `let … in`
+  or by lambda patterns; they are never reassigned.
+- **Dynamic typing.** There are no type declarations and no static type checks.
+  Passing the wrong shape of value to a builtin, or a value no clause matches, is
+  a *run-time* error.
+- **Pattern matching is fundamental.** Function application *is* pattern matching:
+  every lambda matches its argument against a pattern, and the multi-lambda
+  chooses among clauses by matching.
+- **Laziness.** Expressions are evaluated as late as possible and only as far as
+  needed. This makes infinite and self-referential data structures ordinary tools
+  (see [§12](#12-lazy-evaluation)).
+
+## 2. Running a program
 
 ```
-Module := Import? Let? 'module' ListBinding
+microfun <path>
+```
+
+The interpreter loads the file at `<path>` as a program, loads any modules it
+imports (from `<modulename>.mf` in the working directory), analyzes everything,
+and evaluates the program body. Anything the program prints via `peek`, `show`,
+or `write` appears on standard output. A lexical, syntactic, or name-resolution
+error is reported with a located diagnostic and the program does not run; a
+run-time error is reported with a source location and a reduction trace.
+
+There is **no automatic prelude**. A program that wants the standard library must
+say so:
+
+```
+import prelude in
+  show (sum [1; 2; 3; 4])
+```
+
+## 3. Programs and modules
+
+A *program* is an optional import clause followed by a single expression:
+
+```
+import prelude, mymodule in
+  <expression>
+```
+
+A *module* is a file named `<name>.mf` that begins with an optional import clause,
+then the keyword `module`, then a comma-separated list of bindings. Every binding
+in a module is public:
+
+```
+import prelude in
+
+module
+
+double = x -> mul 2 x,
+square = x -> mul x x
+```
+
+Imports make the names of the imported module's bindings available **unqualified**
+in the importing unit; they can also be reached **qualified** as
+`module.name`. When two imported modules export the same name, a later import in
+the `import` clause shadows the earlier one's unqualified name; the qualified
+form `module.name` always reaches the intended binding and so disambiguates.
+Modules may import one another, and **circular imports are permitted** — each
+module is loaded exactly once regardless of import order, and because all module
+bindings are created before any is evaluated, cross-module (and self-) references
+resolve correctly.
+
+```
+import prelude, mod2 in
+  show mod2.foo            -- qualified access
+```
+
+The standard library `prelude.mf` is an ordinary module; it is special only in
+that it is the conventional home of the standard functions.
+
+## 4. Lexical elements
+
+Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant.
+
+- **Comments** start with `--` and run to the end of the line.
+- **Identifiers** match `[a-zA-Z_][a-zA-Z0-9_]*`.
+- **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
+  `module`, `import`.
+- **Numbers** match `[0-9]+(\.[0-9]+)?`. There is a single numeric type; integer
+  and fractional literals both denote it.
+- **Strings** are enclosed in matching single quotes `'…'` or double quotes
+  `"…"`. A string denotes a list of its Unicode code points (see
+  [§11](#11-lists-strings-and-other-sugar)). A string cannot contain its own
+  quote character.
+- **Symbols**: `->`, `<*`, `*>`, `>`, `<`, `.`, `=`, `,`, `;`, `(`, `)`, `{`,
+  `}`, `[`, `]`. The multi-character symbols are matched before their prefixes.
+
+## 5. Grammar
+
+The grammar is a [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar).
+Terminals `Name`, `Number`, and `String` are as defined in [§4](#4-lexical-elements).
+
+**This grammar is the authoritative definition of the syntax.** The sections that
+follow explain and illustrate it, but they introduce no syntax beyond what is
+written here — there are no hidden forms in the prose.
+
+```
 Program := Import? Expr
+Module  := Import? 'module' ListBinding
 
-Import := 'import' Name ( ',' Name )* 'in'
-Let := 'let' ListBinding 'in'
+Import      := 'import' Name ( ',' Name )* 'in'
 ListBinding := Binding ( ',' Binding )*
-Binding := Name '=' Expr
+Binding     := Name '=' Expr
 
-Expr := Let Expr | Lambda | Operation
+Expr   := Let | Lambda | Operation
+Let    := 'let' ListBinding 'in' Expr
 Lambda := Pattern '->' Expr
-Pattern := Name | Number | String | TuplePattern | ListPattern
+
+Pattern      := Name | Number | String | TuplePattern | ListPattern
 TuplePattern := '[' ']' | '[' Pattern ( ',' Pattern )* ']'
-ListPattern := '[' Pattern ';' ']' | '[' Pattern ( ';' Pattern )+ ']'
+ListPattern  := '[' Pattern ';' ']' | '[' Pattern ( ';' Pattern )+ ']'
 
 Operation :=
-	Operand ( '>' Operand )* |
-	Operand ( '<' Operand )* |
-	Operand ( '*>' Operand )* |
-	Operand ( '<*' Operand )*
-Operand := Application | AtomicExpr
+    Operand ( '>'  Operand )* |
+    Operand ( '<'  Operand )* |
+    Operand ( '*>' Operand )* |
+    Operand ( '<*' Operand )*
+Operand     := Application | AtomicExpr
 Application := AtomicExpr+
 
-AtomicExpr := QualifiedName | Name | Number | String | Tuple | List | MultiLambda | '(' Expr ')'
+AtomicExpr := QualifiedName | Name | Number | String
+            | Tuple | List | MultiLambda | '(' Expr ')'
 QualifiedName := Name '.' Name
 
-Tuple := '[' ']' | '[' Expr ( ',' Expr )* ']'
-List := '[' Expr ';' ']' | '[' Expr ( ';' Expr )+ ']'
+Tuple       := '[' ']' | '[' Expr ( ',' Expr )* ']'
+List        := '[' Expr ';' ']' | '[' Expr ( ';' Expr )+ ']'
 MultiLambda := '{' Lambda ( ',' Lambda )* '}'
 ```
 
-Note that there is no operator precedence, as mixing operators within a single chain of operation is not allowed. Parentheses are used for that effect.
+Notes:
 
-# Semantics
+- There is **no operator precedence among the four operators**, and they may not
+  be mixed within a single chain. Use parentheses to combine different operators.
+- Application binds tighter than any operator: in `f x > g`, `f x` is applied
+  first.
+- A `Pattern` is syntactically a restricted `Expr`. The parser parses the
+  left-hand side of a `->` as an expression and then checks that it is a legal
+  pattern; this is why tuple/list patterns and tuple/list expressions look
+  identical.
 
-microfun is dynamically typed
+## 6. Values and types
 
-Evaluation is **lazy**: the code only builds expression trees at runtime, which are evaluated only when required, and then only as much as required:
+At run time a value is one of:
 
-- when pattern matching
-- when calling arithmetic built-ins
-- when using the special built-in "eval"
+- a **number** — a signed value with a fractional part (internally a 64-bit
+  float). `eq`, `lt`, and the arithmetic builtins operate on numbers;
+- a **tuple** — an ordered, fixed-length sequence of values, written
+  `[e1, e2, …]`. The empty tuple is `[]`. Tuples are the only compound type;
+- a **function** — a lambda, multi-lambda, builtin, or composition. Functions are
+  first-class values.
+
+### Truth values
+
+There is no boolean type. By convention **0 is false and 1 is true**. The
+comparison builtins (`eq`, `lt`) and the prelude's logical functions return `0`
+or `1`, and the prelude's `if` matches its condition against exactly `1` or `0`
+(any other value is a non-exhaustive-match error).
+
+## 7. Expressions
+
+### Atomic expressions
+
+- **Number literal** — e.g. `42`, `3.14`.
+- **String literal** — e.g. `"hi"`, denoting a list of code points.
+- **Name** — a reference to a binding (from a `let`, a lambda pattern, an import,
+  or a builtin). A name must be bound; an unbound name is a compile-time error.
+- **Qualified name** — `module.name`, referring to a binding exported by an
+  imported module.
+- **Tuple** — `[e1, e2, …]`, a comma-separated sequence in brackets. `[]` is the
+  empty tuple, `[e]` is a one-element tuple.
+- **List** — `[e1; e2; …]`, a semicolon-separated sequence in brackets; sugar for
+  nested tuples (see [§11](#11-lists-strings-and-other-sugar)). `[e;]` is a
+  one-element list.
+- **Multi-lambda** — `{ clause, clause, … }` (see [§9](#9-lambdas-and-pattern-matching)).
+- **Parenthesized expression** — `( e )`, grouping only. Parentheses do **not**
+  form tuples.
+
+> **Brackets vs. parentheses.** `( … )` only groups. `[ … ]` builds tuples (with
+> `,`), lists (with `;`), or the empty value `[]`. `{ … }` builds multi-lambdas.
+
+### Application
+
+Functions are applied by juxtaposition: `f x`. Application is left-associative,
+so `f a b c` means `((f a) b) c`. Combined with currying (a function returning a
+function), this gives multi-argument functions and partial application:
+
+```
+let add3 = x -> y -> z -> add x (add y z) in
+  add3 10 20 30                     -- 60
+
+let addFive = add 5 in addFive 10   -- 15  (partial application)
+```
+
+## 8. Operators
+
+microfun has four binary operators, all concerning function application or
+composition. They come in two symmetrical pairs — *pipe* (which applies to a
+value present in the chain) and *compose* (which builds a new function) — each
+pair pointing in either direction.
+
+| Operator | Name | `a OP b OP c` is | Direction |
+|----------|------|------------------|-----------|
+| `>` | pipe right | `c (b a)` | value flows left → right |
+| `<` | pipe left | `a (b c)` | value flows right → left |
+| `*>` | compose right | `\x -> c (b (a x))` | `a` runs first |
+| `<*` | compose left | `\x -> a (b (c x))` | `c` runs first |
+
+`>` (pipe right) threads a value through a sequence of functions and reads in
+evaluation order; `<` (pipe left) is ordinary application written with the
+function on the left, useful for removing parentheses; `*>` and `<*` build a new
+function by composition without a value yet present, in the forward and
+mathematical directions respectively.
+
+None of the four may be mixed with another in the same chain without parentheses,
+and application binds tighter than all of them. The pipe operators associate so
+that the value flows through the chain in the named direction; the compose
+operators associate to the right.
+
+```
+import prelude in
+  show (5 > add 1 > mul 2)          -- 12 : mul 2 (add 1 5)
+  show (mul 2 < add 1 < 5)          -- 12 : mul 2 (add 1 5)
+  show ((add 1 *> mul 2) 5)         -- 12 : add 1 first, then mul 2
+  show ((add 1 <* mul 2) 5)         -- 11 : mul 2 first, then add 1
+```
+
+## 9. Lambdas and pattern matching
+
+### Lambda
+
+A lambda is `pattern -> body`. All functions are anonymous; bind one to a name
+with `let` if you want to refer to it.
+
+```
+let increment = x -> add x 1 in increment 10    -- 11
+```
+
+The body extends as far right as possible, so `x -> y -> e` is
+`x -> (y -> e)`.
+
+### Patterns
+
+A pattern decides whether a value is accepted and what names it binds:
+
+- **Name pattern** (`x`) — matches any value and binds it to `x`. **It does not
+  force the value** (see [§12](#12-lazy-evaluation)).
+- **Number pattern** (`0`, `42`) — matches only a number equal to it; this forces
+  the argument to a number.
+- **Tuple pattern** (`[a, b]`, `[]`) — matches a tuple of the same length, matching
+  each element against the corresponding sub-pattern. Forces the argument only far
+  enough to determine it is a tuple of that arity; the elements themselves stay
+  unforced unless a nested pattern forces them.
+- **List pattern** (`[a; b; c]`, `[a;]`) — matches a *proper list of exactly that
+  length* (see [§11](#11-lists-strings-and-other-sugar)), matching each element
+  against the corresponding sub-pattern.
+- **String pattern** — parses, but matching one is not implemented and raises an
+  error at run time.
+
+Tuple and list patterns are **recursive**: their sub-patterns are themselves
+patterns of any kind — names, numbers, or further tuple and list patterns — so
+patterns nest to arbitrary depth and may mix matching with binding at each level.
+
+```
+[a, [b, c]] -> add a (add b c)         -- a tuple pattern nested inside a tuple pattern
+
+{
+  [0, n] -> n,                         -- a number pattern nested in a tuple pattern
+  [m, n] -> add m n
+}
+
+[[p; q]; [r; s]] -> add p s            -- list patterns nested inside a list pattern
+```
+
+(Recall that a list pattern matches the cons-cell structure of a proper list of
+exactly that length, and that lists *are* tuples — so a tuple pattern can also
+match a value written with list syntax. Clauses are tried in order, and the first
+structural match wins.)
+
+Names introduced by a pattern shadow outer bindings of the same name within the
+body.
+
+Applying a lambda to a value that does not match its pattern is a run-time error.
+
+### Multi-lambda
+
+The multi-lambda is the principal use of pattern matching: a brace-enclosed,
+comma-separated list of lambda clauses.
+
+```
+{ pattern1 -> body1, pattern2 -> body2, … }
+```
+
+When applied, the argument is matched against each clause's pattern in order; the
+first clause that matches is chosen and its body returned. If no clause matches,
+it is a run-time error.
+
+```
+{ 0 -> 1, 1 -> 0, n -> add n 100 }      -- 0↦1, 1↦0, otherwise +100
+
+{
+  []     -> 0,                          -- empty tuple
+  [a, b] -> add a b                     -- 2-tuple → sum
+}
+```
+
+This is also how `if`, list functions, and most of the prelude are written.
+
+## 10. Bindings: `let`
+
+```
+let name1 = expr1, name2 = expr2, … in body
+```
+
+`let` binds names within `body`. Bindings in one `let` are **mutually visible**:
+each right-hand side may refer to any name in the group, including itself. Because
+of laziness this enables recursion, mutual recursion, and self-referential data:
+
+```
+let
+  a = 5,
+  b = 6
+in
+  show (add a b)                       -- 11
+
+let
+  fact = { 1 -> 1, n -> mul n (fact (sub 1 n)) }
+in
+  show (fact 5)                        -- 120
+```
+
+Inner bindings shadow outer ones:
+
+```
+let a = 10 in
+  let a = 20 in
+    show a                             -- 20
+```
+
+A self-referential lazy structure is an ordinary definition:
+
+```
+import prelude in
+let fibonacci = concat [1; 1] (zipWith add fibonacci (tail fibonacci)) in
+  show (take 10 fibonacci)             -- [1; 1; 2; 3; 5; 8; 13; 21; 34; 55]
+```
+
+## 11. Lists, strings, and other sugar
+
+### Lists are tuples
+
+A list is a convention layered on tuples:
+
+- the **empty list** is the empty tuple `[]`;
+- a **non-empty list** is a 2-tuple of head and tail: `[head, tail]` (a *cons
+  cell*).
+
+So a list of three elements `a`, `b`, `c` is `[a, [b, [c, []]]]`. The list
+literal `[a; b; c]` is **syntactic sugar** for exactly that nesting:
+
+```
+[a; b; c]   ≡   [a, [b, [c, []]]]
+[a;]        ≡   [a, []]
+[]          ≡   []                     -- the empty list and empty tuple coincide
+```
+
+Note the distinction:
+
+- `[a]` is a **one-element tuple** — a single value in brackets.
+- `[a;]` is a **one-element list** — i.e. `[a, []]`.
+
+Because lists are just tuples, list patterns are sugar too: the list pattern
+`[a; b]` matches the cons-cell structure of a proper two-element list, equivalent
+to matching `[a, [b, []]]`. The prelude's list functions destructure cons cells
+directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
+
+```
+length = {
+  []      -> 0,
+  [h, t]  -> succ (length t)
+}
+```
+
+When a tuple has the shape of a list, output routines render it with list syntax
+(`[1; 2; 3]`); otherwise they use tuple syntax (`[1, 2]`).
+
+### Strings are lists of code points
+
+A string literal denotes the list of its Unicode code points, so any list
+function works on strings. The `write` builtin prints a list of code points as
+characters.
+
+```
+import prelude in
+  write "hello"                        -- prints: hello
+  write (concat "ab" "cd")             -- prints: abcd
+```
+
+## 12. Lazy evaluation
+
+Evaluation is lazy: an expression is reduced only when something needs its value,
+and then only to the depth required. Reduction is forced by:
+
+- **applying a function** — the function position of an application is reduced
+  until it is known to be a function (a closure, builtin, or composition);
+- **matching a number pattern** — the argument is reduced fully to a number and
+  compared;
+- **matching a tuple or list pattern** — the argument is reduced just far enough
+  to learn it is a tuple of the right shape; the elements remain unreduced thunks
+  until something forces them. Matching a *name* pattern forces nothing — it only
+  binds;
+- **calling an arithmetic or comparison builtin** — the numeric arguments are
+  reduced to numbers and type-checked;
+- **`eval` / `show` / `peek` / `write`** — `eval` and `show` force a value to
+  *full* normal form (everything inside it); `peek` does the same but with output
+  bounded in width and depth; `write` forces the spine and elements of a code-point
+  list.
+
+A bound expression is **memoized**: once reduced to weak head normal form, the
+result is shared, so it is never recomputed and further reduction resumes where it
+stopped. Together with mutual `let` bindings, this makes self-referential
+definitions efficient — `fibonacci` above computes each element once.
+
+A consequence of laziness is that infinite structures are fine as long as only a
+finite part is forced:
+
+```
+import prelude in
+  show (take 5 (upFrom 1))             -- [1; 2; 3; 4; 5]
+```
+
+## 13. Built-in functions
+
+Builtins are the primitive operations available without importing anything;
+everything else is defined in the prelude in microfun itself.
+
+The binary arithmetic and comparison builtins take their arguments in an order
+chosen for **partial application and piping**: the *first* argument is the
+right-hand operand. This makes `sub 1` mean "subtract one", `mod 10` mean "reduce
+modulo ten", `div 2` mean "halve", and `lt 0` mean "is greater than zero". The
+exact semantics:
+
+| Builtin | Arity | Result | Notes |
+|---------|-------|--------|-------|
+| `add a b` | 2 | `a + b` | |
+| `mul a b` | 2 | `a * b` | |
+| `sub a b` | 2 | `b - a` | argument order: `sub 1 x = x - 1` |
+| `div a b` | 2 | `b / a` (integer) | truncating integer division |
+| `fdiv a b` | 2 | `b / a` (real) | floating-point division |
+| `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10` |
+| `fmod a b` | 2 | `b mod a` (real) | floating-point remainder |
+| `sqrt a` | 1 | `√a` | |
+| `eq a b` | 2 | `1` if `a = b` else `0` | numbers only |
+| `lt a b` | 2 | `1` if `b < a` else `0` | argument order: `lt 0 x = x < 0` |
+| `equal a b` | 2 | `1` if `a` and `b` are structurally equal else `0` | works on any values; forces as needed; functions compare equal only by identity |
+| `eval a` | 1 | `a`, forced to full normal form | identity otherwise; breaks laziness |
+| `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
+| `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
+| `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
+| `stdin` | — | identity | placeholder; currently a no-op |
+
+`peek`, `show`, and `write` are the only ways a program produces output; each
+returns its argument so it can be inserted into an expression. `add`, `mul`, and
+`eq` are commutative, so their argument order is immaterial.
+
+Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
+a code-point list, is a run-time error.
+
+## 14. The prelude
+
+`prelude.mf` is a module of standard functions written in microfun. Importing it
+(`import prelude in …`) brings the following into scope. This is a catalogue;
+consult [prelude.mf](prelude.mf) for the definitions.
+
+**Combinators**
+`id`, `compose`, `flip`, `curry`, `uncurry`, `const`.
+
+**Tuples**
+`first`, `second`.
+
+**Numbers**
+`succ`, `pred`, `minus` (negate), `abs`, `max`, `min`.
+
+**Booleans / control**
+`if cond t f`, `ifs` (multi-branch), `and`, `or`, `not`.
+
+**Comparisons**
+`neq`, `gte`, `gt`, `lte` (built on the `eq` and `lt` builtins).
+
+**List construction and inspection**
+`cons`, `isList`, `length`, `head`, `tail`, `empty`, `concat`, `remove`,
+`reverse`.
+
+**Higher-order list functions**
+`map`, `filter`, `foldr`, `foldl`, `sum`, `product`, `orList`, `andList`, `any`,
+`all`, `none`, `zipWith`, `zip`, `take`, `drop`, `dropWhile`, `takeWhile`,
+`split`, `flatten`, `range`, `sortWith`, `sort`, `pairs`, `contains`.
+
+**Infinite lists**
+`iterate`, `downFrom`, `upFrom`, `repeat`.
+
+**Strings**
+`join`, `toString` (renders numbers, lists, and tuples to their textual form as a
+code-point list, ready for `write`).
+
+```
+import prelude in
+  range 1 10 > filter (x -> eq 0 (mod 2 x)) > show   -- even numbers in [1,10]
+```
