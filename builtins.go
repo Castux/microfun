@@ -3,8 +3,11 @@ package main
 import "math"
 import "fmt"
 
-func Nop(interpreter *Interpreter, in RuntimeValue) RuntimeValue {
-	return in
+// inputStreamPlaceholder stands in the Builtins map for stdin and bstdin so the
+// analyzer accepts those names. They are not callable functions but lazy input
+// lists, resolved directly in RunExpression, so this is never actually invoked.
+func inputStreamPlaceholder(*Interpreter, RuntimeValue) RuntimeValue {
+	panic("internal error: stdin / bstdin must be resolved as a stream, not called")
 }
 
 type Monop func(float64) float64
@@ -122,6 +125,7 @@ func init() {
 			}
 			return RuntimeBuiltin(inner)
 		},
-		"stdin": Nop,
+		"stdin":  inputStreamPlaceholder,
+		"bstdin": inputStreamPlaceholder,
 	}
 }

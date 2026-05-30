@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"io"
 	"maps"
 	"os"
 	"slices"
+	"unicode"
 )
 
 type Environment map[string]*NamedValue
@@ -14,6 +17,14 @@ type Interpreter struct {
 
 	ModuleEnvironments map[string]Environment
 	Stack              []Environment
+
+	// Standard input is exposed to programs as the shared lazy lists stdin (code
+	// points) and bstdin (bytes). stdinReader is the single buffered reader they
+	// both draw from; the two stream heads are built once and memoized so that
+	// every reference to stdin / bstdin sees the same, once-read sequence.
+	stdinReader  *bufio.Reader
+	stdinStream  *NamedValue
+	bstdinStream *NamedValue
 }
 
 func (i *Interpreter) PushNewEnvironment() Environment {
@@ -113,6 +124,15 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 
 	case *Name:
 		if e.ResolvedToBuiltin {
+			// stdin and bstdin are values (lazy input lists), not callable
+			// functions, so they are resolved here rather than via the Builtins
+			// map; their map entries exist only so the analyzer knows the names.
+			switch e.Value {
+			case "stdin":
+				return i.StdinCodePoints()
+			case "bstdin":
+				return i.StdinBytes()
+			}
 			return Builtins[e.Value]
 		} else if e.ResolvedModule != nil {
 			return i.ModuleEnvironments[e.ResolvedModule.Name][e.Value]
@@ -160,6 +180,77 @@ func (i *Interpreter) FoldString(str string) RuntimeValue {
 		}
 	}
 	return current
+}
+
+func (i *Interpreter) stdin() *bufio.Reader {
+	if i.stdinReader == nil {
+		i.stdinReader = bufio.NewReader(os.Stdin)
+	}
+	return i.stdinReader
+}
+
+// makeInputStream builds the head of a shared, lazy cons-list backed by standard
+// input. The head is a thunk that, when forced, calls readCell to read one item:
+// readCell returns the item as a number, or ok = false at end of input. A read
+// item becomes a cons cell [item, tail] whose tail is another such thunk, so the
+// stream is produced one cell at a time and each cell, once forced, is memoized
+// by its NamedValue. The thunk is realized as an application of a reader builtin
+// to a dummy argument, reusing the ordinary reduction machinery rather than a
+// dedicated runtime value; the builtin closes over itself to build each tail.
+func (i *Interpreter) makeInputStream(readCell func() (RuntimeNumber, bool)) *NamedValue {
+	var reader RuntimeBuiltin
+	reader = func(*Interpreter, RuntimeValue) RuntimeValue {
+		value, ok := readCell()
+		if !ok {
+			return RuntimeTuple{} // end of input is the empty list
+		}
+		tail := &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
+		return RuntimeTuple{value, tail}
+	}
+	return &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
+}
+
+// StdinCodePoints returns stdin: the standard input decoded as a lazy list of
+// Unicode code points. A byte sequence that is not valid UTF-8 is a runtime
+// error.
+func (i *Interpreter) StdinCodePoints() *NamedValue {
+	if i.stdinStream == nil {
+		i.stdinStream = i.makeInputStream(func() (RuntimeNumber, bool) {
+			r, size, err := i.stdin().ReadRune()
+			if err == io.EOF {
+				return 0, false
+			}
+			if err != nil {
+				i.raiseRuntimeError("error reading standard input: "+err.Error(), SourcePos{}, nil)
+			}
+			// ReadRune does not fail on malformed input: it yields U+FFFD with a
+			// size of one byte. A genuine U+FFFD is three bytes, so size == 1 is
+			// the unambiguous signal of an invalid byte.
+			if r == unicode.ReplacementChar && size == 1 {
+				i.raiseRuntimeError("invalid UTF-8 byte on standard input", SourcePos{}, nil)
+			}
+			return RuntimeNumber(r), true
+		})
+	}
+	return i.stdinStream
+}
+
+// StdinBytes returns bstdin: the standard input as a lazy list of raw byte
+// values, without any decoding.
+func (i *Interpreter) StdinBytes() *NamedValue {
+	if i.bstdinStream == nil {
+		i.bstdinStream = i.makeInputStream(func() (RuntimeNumber, bool) {
+			b, err := i.stdin().ReadByte()
+			if err == io.EOF {
+				return 0, false
+			}
+			if err != nil {
+				i.raiseRuntimeError("error reading standard input: "+err.Error(), SourcePos{}, nil)
+			}
+			return RuntimeNumber(b), true
+		})
+	}
+	return i.bstdinStream
 }
 
 func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {

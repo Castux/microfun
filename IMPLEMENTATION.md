@@ -551,7 +551,35 @@ the map is fully built before the interpreter ever runs.
 
 `eval` forces full normal form; `peek` prints the width/depth-limited rendering;
 `show` prints the unlimited rendering; `write` walks a list of code points and
-prints them as characters; `equal` is `DeepEqual`; `stdin` is currently the
-identity (a placeholder). All of the higher-level numeric, logical, list, and
-string functions are *not* builtins — they are defined in the prelude in microfun
-itself.
+prints them as characters; `equal` is `DeepEqual`. All of the higher-level
+numeric, logical, list, and string functions are *not* builtins — they are
+defined in the prelude in microfun itself.
+
+### Standard input as a lazy stream
+
+`stdin` and `bstdin` are not callable functions but *values*: each is the
+standard input presented as a lazy cons-list (of Unicode code points and of raw
+bytes respectively). They illustrate how an effectful, blocking input source fits
+into the lazy model with no new runtime machinery.
+
+A stream is built by `makeInputStream` ([interpreter.go](interpreter.go)). Its
+head is a `*NamedValue` thunk whose deferred value is a `RuntimeApplication` of a
+*reader* builtin to a dummy argument. Forcing the head therefore reduces that
+application through the ordinary `EvaluateToWeakHeadNormalForm` path: the reader
+runs, reads one item from a shared `bufio.Reader` over `os.Stdin`, and returns
+either the empty tuple (at end of input) or a cons cell `[item, tail]` whose
+`tail` is *another* such thunk wrapping the same reader. The reader closure
+refers to itself to build each tail, so a single closure produces the whole
+stream, one cell per force. Because each cell is a `NamedValue`, it is memoized:
+an item is read exactly once no matter how often it is revisited.
+
+`StdinCodePoints` (`stdin`) reads with `ReadRune`. `ReadRune` does not fail on
+malformed input — it yields U+FFFD with a byte size of one — so invalid UTF-8 is
+detected as `r == unicode.ReplacementChar && size == 1` (a genuine U+FFFD is three
+bytes) and raised as a `RuntimeError`. `StdinBytes` (`bstdin`) reads with
+`ReadByte` and does no decoding. Both stream heads are created once and cached on
+the `Interpreter` (`stdinStream`, `bstdinStream`), so every reference to the name
+resolves to the same shared, once-read sequence; the resolution happens directly
+in `RunExpression`'s `*Name` case, not through the `Builtins` map. The map still
+holds `stdin`/`bstdin` entries (an `inputStreamPlaceholder` that panics if ever
+called) only so the analyzer recognizes the names as defined.

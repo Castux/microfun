@@ -504,7 +504,8 @@ exact semantics:
 | `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
 | `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
 | `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
-| `stdin` | — | identity | placeholder; currently a no-op |
+| `stdin` | — (a value) | standard input as a lazy list of Unicode code points | see below |
+| `bstdin` | — (a value) | standard input as a lazy list of raw byte values | see below |
 
 `peek`, `show`, and `write` are the only ways a program produces output; each
 returns its argument so it can be inserted into an expression. `add`, `mul`, and
@@ -512,6 +513,30 @@ returns its argument so it can be inserted into an expression. `add`, `mul`, and
 
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
 a code-point list, is a run-time error.
+
+### Standard input
+
+`stdin` and `bstdin` are not functions but **values**: each is the standard input
+presented as a list, in the usual cons-cell representation
+([§11](#11-lists-strings-and-other-sugar)). They are **lazy** — input is read only
+as far as the list is forced, and forcing a cell whose data has not yet arrived
+**blocks** until it does. End of input is the empty list `[]`, so the ordinary
+list functions work on them directly.
+
+- `stdin` decodes the input as UTF-8 text into a list of Unicode code points. A
+  byte sequence that is not valid UTF-8 is a run-time error. It is the natural
+  input counterpart to `write`.
+- `bstdin` ("binary stdin") is the input as a list of raw byte values (`0`–`255`),
+  with no decoding.
+
+Both draw from the same underlying input and denote a single shared stream:
+every reference to `stdin` (or `bstdin`) sees the same once-read sequence, so the
+same character is never delivered twice.
+
+```
+import prelude in
+  write (take 5 stdin)        -- echo the first five characters of the input
+```
 
 ## 14. The prelude
 
