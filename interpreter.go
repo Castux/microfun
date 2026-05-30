@@ -577,16 +577,11 @@ func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*Nam
 }
 
 type ComparisonPair struct {
-	a, b RuntimeValue
+	a, b *RuntimeValue
 }
 
 func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool) bool {
-	// Simple pointer equality or same literal value
-	if a == b {
-		return true
-	}
-
-	pair := ComparisonPair{a, b}
+	pair := ComparisonPair{&a, &b}
 	if seen[pair] {
 		return true
 	}
