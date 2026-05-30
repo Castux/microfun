@@ -435,6 +435,47 @@ func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*Nam
 	return forced
 }
 
+type ComparisonPair struct {
+	a, b RuntimeValue
+}
+
+func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool) bool {
+	// Simple pointer equality or same literal value
+	if a == b {
+		return true
+	}
+
+	pair := ComparisonPair{a, b}
+	if seen[pair] {
+		return true
+	}
+	seen[pair] = true
+
+	forcedA := i.EvaluateToWeakHeadNormalForm(a)
+	forcedB := i.EvaluateToWeakHeadNormalForm(b)
+
+	switch valA := forcedA.(type) {
+	case RuntimeNumber:
+		if valB, ok := forcedB.(RuntimeNumber); ok {
+			return valA == valB
+		}
+	case RuntimeTuple:
+		if valB, ok := forcedB.(RuntimeTuple); ok {
+			if len(valA) != len(valB) {
+				return false
+			}
+			for j := range valA {
+				if !i.DeepEqual(valA[j], valB[j], seen) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+
+	return false
+}
+
 func Interpret(analyzer *Analyzer) RuntimeValue {
 	interpreter := &Interpreter{
 		Program:            analyzer.Program,

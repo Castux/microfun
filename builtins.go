@@ -113,7 +113,15 @@ func init() {
 			fmt.Println()
 			return original
 		},
-		"equal": Nop,
+		"equal": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			inner := func(interpreter *Interpreter, b RuntimeValue) RuntimeValue {
+				if interpreter.DeepEqual(a, b, make(map[ComparisonPair]bool)) {
+					return RuntimeNumber(1)
+				}
+				return RuntimeNumber(0)
+			}
+			return RuntimeBuiltin(inner)
+		},
 		"stdin": Nop,
 	}
 }
