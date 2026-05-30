@@ -286,9 +286,16 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		if !ok {
 			return nil
 		}
+
+		if len(patt.SubPatterns) == 0 {
+			if len(right) == 0 {
+				return make(Environment)
+			} else {
+				return nil
+			}
+		}
+
 		leftEnv := i.MatchPattern(patt.SubPatterns[0], right[0])
-		print("left ")
-		println(leftEnv != nil)
 		if leftEnv == nil {
 			return nil
 		}
@@ -297,20 +304,15 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 			Start: patt.Start,
 			End: patt.End,
 		}, right[1])
-		print("right ")
-		println(rightEnv != nil)
 		if rightEnv == nil {
 			return nil
 		}
 		maps.Copy(leftEnv, rightEnv)
 		return leftEnv
 
-
 	case *StringLiteral:
-
-
+		panic("string pattern not implemented")
 	}
-
 
 	return nil
 }

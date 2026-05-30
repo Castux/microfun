@@ -71,7 +71,7 @@ func (app RuntimeApplication) Apply(i *Interpreter) RuntimeValue {
 			valueStr :=  fmt.Sprintf("%+v", app.Argument)
 			for _,lambda := range left.Lambdas {
 				pos := lambda.Pattern.FirstPos().To(lambda.Pattern.LastPos())
-				Log("Could not match value to pattern (" + valueStr + ")", pos, SeverityError)
+				Log("Could not match value " + valueStr + " to pattern", pos, SeverityError)
 			}
 			panic("")
 		}
