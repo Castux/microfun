@@ -418,6 +418,23 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 	return nil
 }
 
+func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*NamedValue]bool) RuntimeValue {
+	if named, isNamed := value.(*NamedValue); isNamed {
+		if seen[named] {
+			return named
+		}
+		seen[named] = true
+	}
+
+	forced := i.EvaluateToWeakHeadNormalForm(value)
+	if tuple, isTuple := forced.(RuntimeTuple); isTuple {
+		for index, element := range tuple {
+			tuple[index] = i.EvaluateToFullNormalForm(element, seen)
+		}
+	}
+	return forced
+}
+
 func Interpret(analyzer *Analyzer) RuntimeValue {
 	interpreter := &Interpreter{
 		Program:            analyzer.Program,

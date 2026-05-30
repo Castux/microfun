@@ -74,7 +74,9 @@ func init() {
 			}
 		}, "lt"),
 		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
-		"eval": Nop,
+		"eval": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			return interpreter.EvaluateToFullNormalForm(a, make(map[*NamedValue]bool))
+		},
 		"peek": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 			fmt.Println(interpreter.ShowValue(a))
 			return a
