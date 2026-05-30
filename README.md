@@ -298,8 +298,11 @@ A pattern decides whether a value is accepted and what names it binds:
 - **List pattern** (`[a; b; c]`, `[a;]`) — matches a *proper list of exactly that
   length* (see [§11](#11-lists-strings-and-other-sugar)), matching each element
   against the corresponding sub-pattern.
-- **String pattern** — parses, but matching one is not implemented and raises an
-  error at run time.
+- **String pattern** (`"hello"`, `""`) — matches a value that is exactly the list
+  of the string's Unicode code points, and binds nothing. It is, in effect, a
+  fixed-length list pattern whose elements are number patterns for the code
+  points; `""` matches the empty list. Like a list pattern it forces only the
+  list spine and the heads it compares.
 
 Tuple and list patterns are **recursive**: their sub-patterns are themselves
 patterns of any kind — names, numbers, or further tuple and list patterns — so

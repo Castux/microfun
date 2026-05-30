@@ -423,7 +423,30 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		return leftEnv
 
 	case *StringLiteral:
-		panic("string pattern not implemented")
+		// A string pattern is a literal: it matches a value that is exactly the
+		// list of the string's code points, and binds nothing. Unlike a list
+		// pattern it is not recursive, so rather than reuse that machinery we
+		// just walk the cons-cell spine, comparing each head to the expected code
+		// point (as a number pattern would) and requiring the list to end at the
+		// same length.
+		current := argument
+		for _, expected := range []rune(patt.Value) {
+			cell, ok := i.EvaluateToTuple(current)
+			if !ok || len(cell) != 2 {
+				return nil
+			}
+			head, ok := i.EvaluateToNumber(cell[0])
+			if !ok || rune(head) != expected {
+				return nil
+			}
+			current = cell[1]
+		}
+		// The string's code points are exhausted, so the list must end here.
+		rest, ok := i.EvaluateToTuple(current)
+		if !ok || len(rest) != 0 {
+			return nil
+		}
+		return make(Environment)
 	}
 
 	return nil

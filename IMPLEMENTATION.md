@@ -430,11 +430,16 @@ pattern forces its argument:
   remaining sub-patterns against `tuple[1]`, bottoming out at the empty pattern,
   which requires the empty tuple. So `[a; b]` matches exactly a proper two-element
   list and binds `a` and `b` to the elements.
-- **`StringLiteral`**: not implemented; matching one panics. String patterns parse
-  but cannot be used at run time.
+- **`StringLiteral`**: a flat literal — it matches a value that is exactly the
+  list of the string's code points and binds nothing. Because it is not recursive
+  (no sub-patterns), it does not reuse the `ListPattern` machinery: it walks the
+  cons-cell spine directly, comparing each head to the expected code point (as a
+  number pattern would) and requiring the list to end at the same length. `""`
+  matches the empty list.
 
-Note the laziness contract: matching a tuple or list pattern forces only the
-*spine* needed to check the shape and arity, never the element values.
+Note the laziness contract: matching a tuple, list, or string pattern forces only
+the *spine* needed to check the shape — and, for number and string patterns, the
+heads being compared — never the unmatched element values.
 
 ## 11. Deep evaluation and equality
 
