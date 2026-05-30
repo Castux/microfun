@@ -1,6 +1,7 @@
 package main
 
 import "math"
+import "fmt"
 
 func Nop(in RuntimeValue) RuntimeValue {
 	return in
@@ -66,8 +67,58 @@ var Builtins = map[string]RuntimeBuiltin{
 		} }, "lt"),
 	"sqrt":  WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
 	"eval":  Nop,
-	"show":  Nop,
-	"showt": Nop,
+	"show":  func(a RuntimeValue) RuntimeValue {
+		fmt.Printf("%+v\n", a)
+		return a
+	},
+	"showt": func(a RuntimeValue) RuntimeValue {
+		init := a
+		for a != nil {
+			tup, ok := a.(RuntimeTuple)
+			if !ok {
+				panic("Not a list")
+			}
+
+			if len(tup) == 0 {
+				break
+			}
+
+			if len(tup) != 2 {
+				panic("Not a list")
+			}
+
+			num := rune(int(tup[0].(RuntimeNumber)))
+			fmt.Printf("%c", num)
+
+			a = tup[1]
+		}
+		fmt.Println()
+		return init
+	},
+	"showl": func(a RuntimeValue) RuntimeValue {
+		init := a
+		fmt.Print("[")
+		for a != nil {
+			tup, ok := a.(RuntimeTuple)
+			if !ok {
+				panic("Not a list")
+			}
+
+			if len(tup) == 0 {
+				break
+			}
+
+			if len(tup) != 2 {
+				panic("Not a list")
+			}
+
+			fmt.Printf("%+v;", tup[0])
+
+			a = tup[1]
+		}
+		fmt.Println("]")
+		return init
+	},
 	"equal": Nop,
 	"stdin": Nop,
 }
