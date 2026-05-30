@@ -75,11 +75,15 @@ func init() {
 		}, "lt"),
 		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
 		"eval": Nop,
-		"show": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+		"peek": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 			fmt.Println(interpreter.ShowValue(a))
 			return a
 		},
-		"showt": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+		"show": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			fmt.Println(interpreter.ShowValueFull(a))
+			return a
+		},
+		"write": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 			original := a
 			for {
 				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
@@ -105,30 +109,6 @@ func init() {
 				a = cell[1]
 			}
 			fmt.Println()
-			return original
-		},
-		"showl": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			original := a
-			fmt.Print("[")
-			for {
-				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
-				if !ok {
-					panic("Not a list")
-				}
-
-				if len(cell) == 0 {
-					break
-				}
-
-				if len(cell) != 2 {
-					panic("Not a list")
-				}
-
-				fmt.Printf("%+v;", interpreter.EvaluateToWeakHeadNormalForm(cell[0]))
-
-				a = cell[1]
-			}
-			fmt.Println("]")
 			return original
 		},
 		"equal": Nop,

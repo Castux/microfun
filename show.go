@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
 
 // Limits that keep show terminating on infinite or self-referential values.
 const (
-	ShowMaxWidth = 100 // most elements rendered in a single list or tuple
-	ShowMaxDepth = 50  // deepest nesting rendered before an ellipsis
+	ShowDefaultWidth = 100 // most elements rendered in a single list or tuple
+	ShowDefaultDepth = 50  // deepest nesting rendered before an ellipsis
 )
 
 // ListEnding describes how a chain of cons cells ended, as discovered while
@@ -29,16 +30,23 @@ const (
 // depth so that even an infinite or self-referential value still prints.
 func (i *Interpreter) ShowValue(value RuntimeValue) string {
 	var builder strings.Builder
-	i.WriteValue(&builder, value, 0, make(map[*NamedValue]bool))
+	i.WriteValue(&builder, value, 0, ShowDefaultDepth, ShowDefaultWidth, make(map[*NamedValue]bool))
+	return builder.String()
+}
+
+// ShowValueFull is like ShowValue but without width or depth limits.
+func (i *Interpreter) ShowValueFull(value RuntimeValue) string {
+	var builder strings.Builder
+	i.WriteValue(&builder, value, 0, math.MaxInt, math.MaxInt, make(map[*NamedValue]bool))
 	return builder.String()
 }
 
 // WriteValue renders one value. expanding holds the named values currently being
 // rendered on the path above this point, so a value that refers back to itself
 // prints its name instead of looping forever.
-func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, depth int, expanding map[*NamedValue]bool) {
+func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
-	if depth > ShowMaxDepth {
+	if depth > maxDepth {
 		builder.WriteString("…")
 		return
 	}
@@ -61,7 +69,7 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 		builder.WriteString(FormatNumber(forced))
 
 	case RuntimeTuple:
-		i.WriteTupleOrList(builder, forced, depth, expanding)
+		i.WriteTupleOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
 
 	case RuntimeClosure, RuntimeBuiltin, RuntimeComposition:
 		if name != "" {
@@ -77,7 +85,7 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 
 // WriteTupleOrList renders a tuple as a list [a; b; c] when its shape looks like
 // a chain of cons cells, and as a plain tuple {a, b} otherwise.
-func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTuple, depth int, expanding map[*NamedValue]bool) {
+func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTuple, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
 	if len(tuple) == 0 {
 		builder.WriteString("[]")
@@ -85,14 +93,14 @@ func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTu
 	}
 
 	if len(tuple) == 2 {
-		heads, ending, tailName := i.CollectListSpine(tuple, expanding, ShowMaxWidth)
+		heads, ending, tailName := i.CollectListSpine(tuple, expanding, maxWidth)
 		if ending != NotAList {
 			builder.WriteByte('[')
 			for index, head := range heads {
 				if index > 0 {
 					builder.WriteString("; ")
 				}
-				i.WriteValue(builder, head, depth+1, expanding)
+				i.WriteValue(builder, head, depth+1, maxDepth, maxWidth, expanding)
 			}
 			if ending == Truncated {
 				builder.WriteString("; …")
@@ -112,7 +120,7 @@ func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTu
 		if index > 0 {
 			builder.WriteString(", ")
 		}
-		i.WriteValue(builder, element, depth+1, expanding)
+		i.WriteValue(builder, element, depth+1, maxDepth, maxWidth, expanding)
 	}
 	builder.WriteByte(']')
 }
