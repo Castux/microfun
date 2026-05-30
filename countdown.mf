@@ -1,0 +1,108 @@
+-- countdown.mf
+--
+-- The numbers round of the Countdown game: starting from a set of source
+-- numbers, reach a target by combining them with + - * /, using each number at
+-- most once and only ever producing positive whole numbers.
+--
+-- A node is a little expression tree [value, symbol, left, right]; a source
+-- number is a leaf [n, 'given', [], []]. The search repeatedly replaces a pair
+-- of nodes with every legal combination of them, collecting any node whose
+-- value equals the target.
+
+import prelude in
+
+let
+	target  = 800,
+	numbers = [100; 25; 3; 2; 4; 7],
+
+	-- Node accessors -------------------------------------------------------
+
+	leaf  = n -> [n, 'given', [], []],
+	value = [v, sym, left, right] -> v,
+
+	-- The four operations, each tagged with its printed symbol. An operation
+	-- returns [] when its result would be illegal: a fraction, a non-positive
+	-- number, or a trivial × / ÷ by one. Operands arrive larger-first.
+
+	ops = [
+		[ add,                                                              '+' ];
+		[ x -> y -> if (and (gt 1 x) (gt 1 y)) (mul x y) [],                '*' ];
+		[ x -> y -> abs (sub x y),                                          '-' ];
+		[ x -> y -> if (and (gt 1 y) (x > mod y > eq 0)) (x > div y) [],    '/' ]
+	],
+
+	-- Every ordered pair (a, b) drawn from the nodes, paired with the nodes
+	-- that remain once a and b are removed.
+
+	extractPairs = nodes ->
+		nodes > pairs > map ([a, b] -> [a, b, nodes > remove a > remove b]),
+
+	-- Combine two nodes with each operation (larger value first), keeping only
+	-- the combinations that produced a legal result.
+
+	combine = a -> b ->
+		let
+			bBigger = value b > gt (value a),
+			big     = if bBigger b a,
+			small   = if bBigger a b
+		in
+			ops
+				> map ([op, sym] -> [op (value big) (value small), sym, big, small])
+				> filter (not <* empty <* value),
+
+	-- One search step: the nodes already equal to the target, plus the result
+	-- of combining each pair and searching the smaller set recursively.
+
+	step = target -> nodes ->
+		let
+			solved = filter (node -> eq target (value node)) nodes,
+			deeper = nodes
+				> extractPairs
+				> map ([a, b, rest] -> combine a b > map (flip cons rest))
+				> flatten
+				> map (step target)
+				> flatten
+		in
+			if (not < empty solved) solved deeper,
+
+	solve = target -> numbers -> numbers > map leaf > step target,
+
+	-- Flatten a solution tree into its internal (operation) nodes, post-order.
+
+	collect = [v, sym, left, right] ->
+		if (empty left)
+			[]
+			(flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]),
+
+	-- Render a solution tree as "a op b = c, …".
+
+	solutionToString = tree ->
+		tree
+			> collect
+			> map ([v, sym, left, right] ->
+				join '' [ toString < value left; sym; toString < value right; '='; toString v ])
+			> join ', ',
+
+	-- Drop duplicate solution strings, keeping the first occurrence.
+
+	unique =
+		let
+			addIfUnique = elem -> seen -> if (contains elem seen) seen [elem, seen]
+		in
+			foldr addIfUnique [],
+
+	-- Comparator for sortWith: shortest solutions first.
+
+	byLength = a -> b -> lt (length a) (length b),
+
+	solutions = solve target numbers
+		> map solutionToString,
+--		> unique
+--		> sortWith byLength,
+
+	header = join '' [ 'reaching '; toString target; ' from '; toString numbers ],
+	footer = join '' [ toString (length solutions); ' solution(s)' ],
+
+	report = concat [ header; ] (concat solutions [ footer; ])
+in
+	report > map write > eval
