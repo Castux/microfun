@@ -220,15 +220,17 @@ toString =
 				]	(concat (numberToString (div 10 n)) digit),
 
 
-		listToString = l ->
-			flatten ['{' ; l > map toString > join ',' ; '}'],
+		listToString = {
+			[x;] -> flatten ['['; toString x; ';]'],
+			l -> flatten ['[' ; l > map toString > join '; ' ; ']']
+		},
 
 		tupleToString = t ->
 			let
 				asList = tupleToList t
 			in
 				if (isList asList)
-					(flatten ['(' ; asList > map toString > join ',' ; ')' ])
+					(flatten ['[' ; asList > map toString > join ', ' ; ']' ])
 					(numberToString asList)
 	in
 		x -> if (isList x) (listToString x) (tupleToString x)
