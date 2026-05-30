@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 )
@@ -66,7 +67,7 @@ func (i *Interpreter) Run() RuntimeValue {
 	// Then run program itself
 
 	mainValue := i.RunExpression(i.Program.Body)
-	return mainValue.Evaluate(i)
+	return i.EvaluateToWeakHeadNormalForm(mainValue)
 }
 
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
@@ -209,46 +210,146 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 	}
 }
 
-func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool) {
-	switch v := value.(type) {
-		case RuntimeNumber:
-			return v, true
+// A StackFrame is one entry on the explicit reduction stack used by
+// EvaluateToWeakHeadNormalForm. It is either an argument waiting to be applied
+// to the function on its left, or a thunk waiting to be updated with its weak
+// head normal form once that form is known.
+type StackFrame interface {
+	isStackFrame()
+}
+
+type ArgumentFrame struct {
+	Argument RuntimeValue
+}
+
+type UpdateFrame struct {
+	Thunk *NamedValue
+}
+
+func (ArgumentFrame) isStackFrame() {}
+func (UpdateFrame) isStackFrame()   {}
+
+// EvaluateToWeakHeadNormalForm reduces a value until its outermost shape is
+// known: either a constructor (a number or a tuple, whose contents are left
+// untouched as thunks) or a function value that has no argument left to consume
+// (a closure, a builtin, or a composition).
+//
+// The reduction runs on the explicit stack below rather than on the Go call
+// stack. Unwinding the spine of an application, following a chain of thunks, and
+// tail calls (a closure body that is itself an application) therefore all run in
+// constant Go stack space, which is what lets an infinite list be consumed one
+// cell at a time without overflowing.
+func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeValue {
+
+	control := value
+	var stack []StackFrame
+
+	for {
+		// If the value in hand can still be reduced, take one step down the tree
+		// and remember on the stack where to resume.
+		switch reducible := control.(type) {
+		case RuntimeApplication:
+			stack = append(stack, ArgumentFrame{Argument: reducible.Argument})
+			control = reducible.Function
+			continue
 
 		case *NamedValue:
-			num, ok := i.EvaluateToNumber(v.Value)
-			if ok {
-				v.Value = num
+			if reducible.Forced {
+				control = reducible.Value
+				continue
 			}
-			return num, ok
+			if reducible.Value == nil {
+				panic("forcing a thunk before its value was computed")
+			}
+			stack = append(stack, UpdateFrame{Thunk: reducible})
+			control = reducible.Value
+			continue
+		}
 
-		case RuntimeApplication:
-			res := v.Apply(i)
-			return i.EvaluateToNumber(res)
+		// Otherwise the value in hand is a constructor or a function value. What
+		// to do with it depends on the frame we come back up to.
+		if len(stack) == 0 {
+			return control
+		}
 
-		default:
-			return 0, false
+		switch frame := stack[len(stack)-1].(type) {
+		case UpdateFrame:
+			// We have reached the weak head normal form of this thunk. Memoize
+			// it so it is never reduced again, then keep coming back up.
+			frame.Thunk.Value = control
+			frame.Thunk.Forced = true
+			stack = stack[:len(stack)-1]
+
+		case ArgumentFrame:
+			// An argument is waiting, so the value in hand is applied to it.
+			switch function := control.(type) {
+			case RuntimeClosure:
+				stack = stack[:len(stack)-1]
+				control = i.ApplyClosure(function, frame.Argument)
+
+			case RuntimeBuiltin:
+				stack = stack[:len(stack)-1]
+				control = function(i, frame.Argument)
+
+			case RuntimeComposition:
+				// (function1 *> function2) argument reduces to
+				// function1 (function2 argument).
+				stack[len(stack)-1] = ArgumentFrame{
+					Argument: RuntimeApplication{
+						Function: function.Function2,
+						Argument: frame.Argument,
+					},
+				}
+				control = function.Function1
+
+			case RuntimeNumber:
+				panic("Cannot apply number")
+
+			case RuntimeTuple:
+				panic("Cannot apply tuple")
+
+			default:
+				panic(function)
+			}
+		}
 	}
 }
 
-func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
-	switch v := value.(type) {
-		case RuntimeTuple:
-			return v, true
+// ApplyClosure performs one beta reduction: it matches the argument against the
+// closure's patterns and returns the body of the first lambda that matches,
+// ready to be reduced further. Names in the body are resolved against the
+// environment here, so the returned value no longer depends on the stack.
+func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) RuntimeValue {
 
-		case *NamedValue:
-			tup, ok := i.EvaluateToTuple(v.Value)
-			if ok {
-				v.Value = tup
-			}
-			return tup, true
+	i.PushEnvironment(closure.Upvalues)
+	defer i.PopEnvironment()
 
-		case RuntimeApplication:
-			res := v.Apply(i)
-			return i.EvaluateToTuple(res)
-
-		default:
-			return nil, false
+	for _, lambda := range closure.Lambdas {
+		matched := i.MatchPattern(lambda.Pattern, argument)
+		if matched != nil {
+			i.PushEnvironment(matched)
+			body := i.RunExpression(lambda.Expression)
+			i.PopEnvironment()
+			return body
+		}
 	}
+
+	valueStr := fmt.Sprintf("%+v", argument)
+	for _, lambda := range closure.Lambdas {
+		pos := lambda.Pattern.FirstPos().To(lambda.Pattern.LastPos())
+		Log("Could not match value "+valueStr+" to pattern", pos, SeverityError)
+	}
+	panic("")
+}
+
+func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool) {
+	number, ok := i.EvaluateToWeakHeadNormalForm(value).(RuntimeNumber)
+	return number, ok
+}
+
+func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
+	tuple, ok := i.EvaluateToWeakHeadNormalForm(value).(RuntimeTuple)
+	return tuple, ok
 }
 
 func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Environment {
@@ -263,7 +364,7 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 
 	case *Name:
 		return Environment{
-			patt.Value: &NamedValue{argument},
+			patt.Value: &NamedValue{Value: argument},
 		}
 
 	case *TuplePattern:
@@ -301,8 +402,8 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		}
 		rightEnv := i.MatchPattern(&ListPattern{
 			SubPatterns: patt.SubPatterns[1:],
-			Start: patt.Start,
-			End: patt.End,
+			Start:       patt.Start,
+			End:         patt.End,
 		}, right[1])
 		if rightEnv == nil {
 			return nil

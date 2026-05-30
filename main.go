@@ -75,8 +75,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	PrintAST(program)
+	//PrintAST(program)
 
-	value := Interpret(analyzer)
-	fmt.Printf("%+v\n", value)
+	Interpret(analyzer)
 }

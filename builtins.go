@@ -3,122 +3,135 @@ package main
 import "math"
 import "fmt"
 
-func Nop(in RuntimeValue) RuntimeValue {
+func Nop(interpreter *Interpreter, in RuntimeValue) RuntimeValue {
 	return in
 }
 
 type Monop func(float64) float64
 type Binop func(float64, float64) float64
 
-func WrapMonop(op Monop, name string) RuntimeBuiltin {
-	f := func(a RuntimeValue) RuntimeValue {
-		fa, ok := a.(RuntimeNumber)
+func WrapMonop(operation Monop, name string) RuntimeBuiltin {
+	function := func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+		number, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
 
 		if !ok {
 			panic("Non number argument to " + name)
 		}
 
-		return RuntimeNumber(op(float64(fa)))
+		return RuntimeNumber(operation(float64(number)))
 	}
 
-	return RuntimeBuiltin(f)
+	return RuntimeBuiltin(function)
 }
 
-func WrapBinop(op Binop, name string) RuntimeBuiltin {
-	f := func(a RuntimeValue) RuntimeValue {
-		g := func(b RuntimeValue) RuntimeValue {
-			fa, oka := a.(RuntimeNumber)
-			fb, okb := b.(RuntimeNumber)
+func WrapBinop(operation Binop, name string) RuntimeBuiltin {
+	outer := func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+		inner := func(interpreter *Interpreter, b RuntimeValue) RuntimeValue {
+			numberA, okA := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
+			numberB, okB := interpreter.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
 
-			if !oka || !okb {
+			if !okA || !okB {
 				panic("Non number argument to " + name)
 			}
 
-			return RuntimeNumber(op(float64(fa), float64(fb)))
+			return RuntimeNumber(operation(float64(numberA), float64(numberB)))
 		}
 
-		return RuntimeBuiltin(g)
+		return RuntimeBuiltin(inner)
 	}
-	return RuntimeBuiltin(f)
+	return RuntimeBuiltin(outer)
 }
 
-var Builtins = map[string]RuntimeBuiltin{
-	"add": WrapBinop(func(a, b float64) float64 { return b + a }, "add"),
-	"mul": WrapBinop(func(a, b float64) float64 { return b * a }, "mul"),
-	"sub": WrapBinop(func(a, b float64) float64 { return b - a }, "sub"),
-	"fdiv": WrapBinop(func(a, b float64) float64 { return b / a }, "fdiv"),
-	"div": WrapBinop(func(a, b float64) float64 { return float64(int(b) / int(a)) }, "div"),
-	"mod": WrapBinop(func(a, b float64) float64 { return float64(int(b) % int(a)) }, "mod"),
+// Builtins is populated in init rather than as a plain var initializer: the
+// builtin bodies call interpreter methods that transitively read Builtins (the
+// name resolver looks builtins up here), which Go would otherwise reject as an
+// initialization cycle. init runs after all variable initialization and before
+// main, so the map is ready well before the interpreter ever runs.
+var Builtins map[string]RuntimeBuiltin
 
+func init() {
+	Builtins = map[string]RuntimeBuiltin{
+		"add":  WrapBinop(func(a, b float64) float64 { return b + a }, "add"),
+		"mul":  WrapBinop(func(a, b float64) float64 { return b * a }, "mul"),
+		"sub":  WrapBinop(func(a, b float64) float64 { return b - a }, "sub"),
+		"fdiv": WrapBinop(func(a, b float64) float64 { return b / a }, "fdiv"),
+		"div":  WrapBinop(func(a, b float64) float64 { return float64(int(b) / int(a)) }, "div"),
+		"mod":  WrapBinop(func(a, b float64) float64 { return float64(int(b) % int(a)) }, "mod"),
 
-	"fmod": WrapBinop(func(a, b float64) float64 { return math.Mod(b, a) }, "fmod"),
-	"eq": WrapBinop(func(a, b float64) float64 {
-		if a == b {
-			return 1
-		} else {
-			return 0
-		}
-	}, "eq"),
-	"lt":    WrapBinop(func(a, b float64) float64 {
-		if b < a {
-			return 1
-		} else {
-			return 0
-		} }, "lt"),
-	"sqrt":  WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
-	"eval":  Nop,
-	"show":  func(a RuntimeValue) RuntimeValue {
-		fmt.Printf("%+v\n", a)
-		return a
-	},
-	"showt": func(a RuntimeValue) RuntimeValue {
-		init := a
-		for a != nil {
-			tup, ok := a.(RuntimeTuple)
-			if !ok {
-				panic("Not a list")
+		"fmod": WrapBinop(func(a, b float64) float64 { return math.Mod(b, a) }, "fmod"),
+		"eq": WrapBinop(func(a, b float64) float64 {
+			if a == b {
+				return 1
+			} else {
+				return 0
 			}
-
-			if len(tup) == 0 {
-				break
+		}, "eq"),
+		"lt": WrapBinop(func(a, b float64) float64 {
+			if b < a {
+				return 1
+			} else {
+				return 0
 			}
+		}, "lt"),
+		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
+		"eval": Nop,
+		"show": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			fmt.Printf("%+v\n", interpreter.EvaluateToWeakHeadNormalForm(a))
+			return a
+		},
+		"showt": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			original := a
+			for {
+				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
+				if !ok {
+					panic("Not a list")
+				}
 
-			if len(tup) != 2 {
-				panic("Not a list")
+				if len(cell) == 0 {
+					break
+				}
+
+				if len(cell) != 2 {
+					panic("Not a list")
+				}
+
+				number, ok := interpreter.EvaluateToWeakHeadNormalForm(cell[0]).(RuntimeNumber)
+				if !ok {
+					panic("Not a character")
+				}
+
+				fmt.Printf("%c", rune(int(number)))
+
+				a = cell[1]
 			}
+			fmt.Println()
+			return original
+		},
+		"showl": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+			original := a
+			fmt.Print("[")
+			for {
+				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
+				if !ok {
+					panic("Not a list")
+				}
 
-			num := rune(int(tup[0].(RuntimeNumber)))
-			fmt.Printf("%c", num)
+				if len(cell) == 0 {
+					break
+				}
 
-			a = tup[1]
-		}
-		fmt.Println()
-		return init
-	},
-	"showl": func(a RuntimeValue) RuntimeValue {
-		init := a
-		fmt.Print("[")
-		for a != nil {
-			tup, ok := a.(RuntimeTuple)
-			if !ok {
-				panic("Not a list")
+				if len(cell) != 2 {
+					panic("Not a list")
+				}
+
+				fmt.Printf("%+v;", interpreter.EvaluateToWeakHeadNormalForm(cell[0]))
+
+				a = cell[1]
 			}
-
-			if len(tup) == 0 {
-				break
-			}
-
-			if len(tup) != 2 {
-				panic("Not a list")
-			}
-
-			fmt.Printf("%+v;", tup[0])
-
-			a = tup[1]
-		}
-		fmt.Println("]")
-		return init
-	},
-	"equal": Nop,
-	"stdin": Nop,
+			fmt.Println("]")
+			return original
+		},
+		"equal": Nop,
+		"stdin": Nop,
+	}
 }
