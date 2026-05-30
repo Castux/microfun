@@ -485,8 +485,9 @@ when a name is known.
 
 ## 13. Runtime errors and the reduction trace
 
-When a program cannot continue — a non-exhaustive match, applying a non-function —
-the interpreter raises a `*RuntimeError` ([runtime_error.go](runtime_error.go))
+When a program cannot continue — a non-exhaustive match, applying a non-function,
+a builtin given the wrong type — the interpreter raises a `*RuntimeError`
+([runtime_error.go](runtime_error.go))
 by panic, which is recovered at the `Interpret` boundary; `ReportRuntimeError`
 prints it and the process exits with status 1. Bare (non-`RuntimeError`) panics
 are deliberately *not* recovered: they indicate interpreter bugs (an
@@ -536,11 +537,19 @@ Builtins ([builtins.go](builtins.go)) are Go functions of type
 `func(*Interpreter, RuntimeValue) RuntimeValue`. Curried binary builtins are
 built by `WrapBinop`, which returns a builtin that captures the first argument and
 returns a second builtin for the second argument; `WrapMonop` is the unary
-analogue. Both force their numeric arguments to weak head normal form and type-check
-them, panicking on a non-number (these panics are program errors surfaced through
-the same machinery). The exact argument order of the arithmetic and comparison
-builtins — tuned for partial application — is documented in
-[README.md §13](README.md#13-built-in-functions).
+analogue. Both force their numeric arguments to weak head normal form and
+type-check them, reporting a non-number as a clean runtime error (see below). The
+exact argument order of the arithmetic and comparison builtins — tuned for partial
+application — is documented in [README.md §13](README.md#13-built-in-functions).
+
+A builtin that hits a type error (a non-number argument, or a value `write`
+cannot read as a list of code points) reports it through the ordinary
+`RuntimeError` path rather than crashing the interpreter. Because a builtin does
+not itself hold the source span or reduction stack, the reducer records them on
+the interpreter (`builtinPos`, `builtinStack`) immediately before each builtin is
+applied; the builtin then calls `builtinError`, which raises a located,
+traced `RuntimeError` exactly as `raiseRuntimeError` does for pattern-match and
+application failures.
 
 The `Builtins` map is populated in an `init` function rather than as a plain
 package-level initializer. The builtin bodies call interpreter methods that

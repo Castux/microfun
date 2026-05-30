@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
-	"strings"
 )
 
 type Node interface {
@@ -86,7 +84,6 @@ func Traverse(node Node, pre, post func(n Node)) {
 
 	case *Module:
 		TraverseList(n.Imports, pre, post)
-		//		TraverseList(n.PrivateBindings, pre, post)
 		TraverseList(n.PublicBindings, pre, post)
 
 	case *Binding:
@@ -123,40 +120,4 @@ func Traverse(node Node, pre, post func(n Node)) {
 	if post != nil {
 		post(node)
 	}
-}
-
-func PrintAST(root Node) {
-
-	depth := 0
-	pre := func(node Node) {
-		fmt.Printf("%s%s", strings.Repeat(".  ", depth), NodeType(node))
-
-		switch n := node.(type) {
-		case *Operation:
-			fmt.Printf(" (%s)", n.Operator)
-		case *Name:
-			if n.ResolvedModule != nil {
-				fmt.Printf(" (%s.%s)", n.ResolvedModule.Name, n.Value)
-			} else if n.ResolvedToBuiltin {
-				fmt.Printf(" (<builtin>.%s)", n.Value)
-			} else {
-				fmt.Printf(" (%s)", n.Value)
-			}
-		case *QualifiedName:
-			fmt.Printf(" (%s.%s)", n.Module, n.Value)
-		case *NumberLiteral:
-			fmt.Printf(" (%f)", n.Value)
-		case *StringLiteral:
-			fmt.Printf(" (%s)", n.Value)
-		case *Lambda:
-			if len(n.Upvalues) > 0 {
-				fmt.Printf(" (↑ %s)", strings.Join(n.Upvalues, ","))
-			}
-		}
-		fmt.Printf("\n")
-
-		depth++
-	}
-	post := func(node Node) { depth-- }
-	Traverse(root, pre, post)
 }

@@ -18,7 +18,7 @@ func WrapMonop(operation Monop, name string) RuntimeBuiltin {
 		number, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
 
 		if !ok {
-			panic("Non number argument to " + name)
+			interpreter.builtinError("argument to " + name + " is not a number")
 		}
 
 		return RuntimeNumber(operation(float64(number)))
@@ -34,7 +34,7 @@ func WrapBinop(operation Binop, name string) RuntimeBuiltin {
 			numberB, okB := interpreter.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
 
 			if !okA || !okB {
-				panic("Non number argument to " + name)
+				interpreter.builtinError("argument to " + name + " is not a number")
 			}
 
 			return RuntimeNumber(operation(float64(numberA), float64(numberB)))
@@ -93,7 +93,7 @@ func init() {
 			for {
 				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
 				if !ok {
-					panic("Not a list")
+					interpreter.builtinError("write expects a list of code points")
 				}
 
 				if len(cell) == 0 {
@@ -101,12 +101,12 @@ func init() {
 				}
 
 				if len(cell) != 2 {
-					panic("Not a list")
+					interpreter.builtinError("write expects a list of code points")
 				}
 
 				number, ok := interpreter.EvaluateToWeakHeadNormalForm(cell[0]).(RuntimeNumber)
 				if !ok {
-					panic("Not a character")
+					interpreter.builtinError("write expects a list of code points, found a non-number element")
 				}
 
 				fmt.Printf("%c", rune(int(number)))

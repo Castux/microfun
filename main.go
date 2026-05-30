@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"maps"
 	"os"
-	"slices"
-	"strings"
 )
 
 func LoadProgram(path string) *Program {
@@ -64,18 +61,13 @@ func main() {
 
 	path := os.Args[1]
 	program := LoadProgram(path)
-	fmt.Println("Loaded program: " + path)
-
 	modules := LoadModules(program.Imports)
-	fmt.Println("Loaded modules: " + strings.Join(slices.Collect(maps.Keys(modules)), ", "))
 
 	analyzer := Analyze(program, modules)
 	if analyzer.Errors > 0 {
 		fmt.Printf("Analyzer found %d errors\n", analyzer.Errors)
 		os.Exit(1)
 	}
-
-	//PrintAST(program)
 
 	Interpret(analyzer)
 }

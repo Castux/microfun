@@ -25,6 +25,18 @@ type Interpreter struct {
 	stdinReader  *bufio.Reader
 	stdinStream  *NamedValue
 	bstdinStream *NamedValue
+
+	// Set just before a builtin is applied, so that a builtin hitting a runtime
+	// error (e.g. a non-number argument) can report it at the application's
+	// source span with the reduction trace, via builtinError.
+	builtinPos   SourcePos
+	builtinStack []StackFrame
+}
+
+// builtinError reports a runtime error raised from inside a builtin, using the
+// source span and reduction stack of the application currently being reduced.
+func (i *Interpreter) builtinError(message string) {
+	i.raiseRuntimeError(message, i.builtinPos, i.builtinStack)
 }
 
 func (i *Interpreter) PushNewEnvironment() Environment {
@@ -221,13 +233,13 @@ func (i *Interpreter) StdinCodePoints() *NamedValue {
 				return 0, false
 			}
 			if err != nil {
-				i.raiseRuntimeError("error reading standard input: "+err.Error(), SourcePos{}, nil)
+				i.builtinError("error reading standard input: " + err.Error())
 			}
 			// ReadRune does not fail on malformed input: it yields U+FFFD with a
 			// size of one byte. A genuine U+FFFD is three bytes, so size == 1 is
 			// the unambiguous signal of an invalid byte.
 			if r == unicode.ReplacementChar && size == 1 {
-				i.raiseRuntimeError("invalid UTF-8 byte on standard input", SourcePos{}, nil)
+				i.builtinError("invalid UTF-8 byte on standard input")
 			}
 			return RuntimeNumber(r), true
 		})
@@ -245,7 +257,7 @@ func (i *Interpreter) StdinBytes() *NamedValue {
 				return 0, false
 			}
 			if err != nil {
-				i.raiseRuntimeError("error reading standard input: "+err.Error(), SourcePos{}, nil)
+				i.builtinError("error reading standard input: " + err.Error())
 			}
 			return RuntimeNumber(b), true
 		})
@@ -393,6 +405,10 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 
 			case RuntimeBuiltin:
 				stack = stack[:len(stack)-1]
+				// Record where this builtin was applied so that a runtime error
+				// raised inside it (via builtinError) is located and traced.
+				i.builtinPos = frame.Pos
+				i.builtinStack = stack
 				control = function(i, frame.Argument)
 
 			case RuntimeComposition:
@@ -414,7 +430,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 					frame.Pos, stack)
 
 			default:
-				panic(function)
+				panic("internal error: cannot apply value of unexpected runtime type")
 			}
 		}
 	}

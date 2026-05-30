@@ -89,17 +89,6 @@ func (p *Parser) ParseModule() *Module {
 		p.Expect("in")
 	}
 
-	// private := []*Binding{}
-	// if p.Accept("let") {
-	// 	for {
-	// 		private = append(private, p.ParseBinding())
-	// 		if !p.Accept(",") {
-	// 			break
-	// 		}
-	// 	}
-	// 	p.Expect("in")
-	// }
-
 	p.Expect("module")
 
 	public := []*Binding{}
@@ -112,8 +101,7 @@ func (p *Parser) ParseModule() *Module {
 	p.Expect("eof")
 
 	return &Module{
-		Imports: imports,
-		//PrivateBindings: private,
+		Imports:        imports,
 		PublicBindings: public,
 		Start:          start,
 	}
