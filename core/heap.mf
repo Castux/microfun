@@ -7,7 +7,7 @@ import core, math, list in
 
 module
 
-empty = [], -- the empty heap
+emptyHeap = [], -- the empty heap
 
 isEmpty = { [] -> 1, h -> 0 }, -- 1 if heap is empty, else 0
 
@@ -39,7 +39,7 @@ merge = cmp -> {
 
 insert = cmp -> x -> h -> merge cmp (singleton x) h, -- insert x into heap h ($O(\log n)$)
 
-peek = {
+top = {
 	[] -> [],
 	[rank, value, left, right] -> value
 }, -- return the root value of the heap ($O(1)$)
@@ -53,7 +53,7 @@ fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a li
 
 toList = cmp -> {
 	[] -> [],
-	h -> [peek h, toList cmp (pop cmp h)]
+	h -> [top h, toList cmp (pop cmp h)]
 }, -- convert a heap to a sorted list (heapsort)
 
 -- sort cmp l: Heapsort using the provided cmp.

@@ -8,14 +8,13 @@ module
 
 succ = add 1, -- successor: add 1
 pred = sub 1, -- predecessor: subtract 1
-minus = n -> sub n 0, -- arithmetic negation: 0 - n
-negate = minus, -- alias for minus
+negate = n -> sub n 0, -- arithmetic negation: negate n = 0 - n
 
 -- signum n: sign of n (-1, 0, or 1)
-signum = n -> if (eq n 0) 0 (if (lt 0 n) (minus 1) 1),
+signum = n -> if (eq n 0) 0 (if (lt 0 n) (negate 1) 1),
 
 -- abs n: absolute value of n
-abs = n -> if (lt 0 n) (minus n) n,
+abs = n -> if (lt 0 n) (negate n) n,
 
 max = a -> b -> if (lt a b) a b, -- larger of two numbers
 min = a -> b -> if (lt a b) b a, -- smaller of two numbers
@@ -27,18 +26,18 @@ trunc = div 1,
 -- floor n: round n towards negative infinity
 floor = n ->
 	let t = trunc n in
-	if (lt 0 n)
+	if (lt 0 n)           -- n < 0
 		(if (eq t n) t (sub 1 t))
 		t,
 
 -- ceil n: round n towards positive infinity
 ceil = n ->
 	let t = trunc n in
-	if (lt 0 n)
+	if (lt 0 n)           -- n < 0
 		t
 		(if (eq t n) t (add 1 t)),
 
--- round n: round n to the nearest integer, half away from zero
+-- round n: round n to the nearest integer, half toward positive infinity (round half up)
 round = n -> floor (add 0.5 n),
 
 even = n -> eq 0 (mod 2 n), -- 1 if n is even
@@ -51,7 +50,7 @@ gcd = a -> b ->
 		absB = abs b,
 		go = {
 			[x, 0] -> x,
-			[x, y] -> go [y, mod y x]
+			[x, y] -> go [y, mod y x]  -- mod y x = x mod y (builtin: mod a b = b mod a)
 		}
 	in
 		go [absA, absB],

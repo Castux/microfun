@@ -9,7 +9,7 @@
 --
 -- Strategy. Every expression is a binary tree whose leaves are some subset of
 -- the source numbers. We build each tree exactly once by structural recursion:
--- to evaluate a subset, split it into an ordered pair of non-empty subsets,
+-- to evaluate a subset, split it into an ordered pair of non-isEmpty subsets,
 -- take every result for each side, and combine the two with each operation.
 --
 -- Three things keep this fast:
@@ -64,7 +64,7 @@ let
 	-- Subsets and partitions ----------------------------------------------
 
 	-- Every assignment of the elements to a [left, right] pair, then those
-	-- where both sides are non-empty: the ordered partitions of the subset.
+	-- where both sides are non-isEmpty: the ordered partitions of the subset.
 	-- Both orderings of each partition appear, which is what lets the ops
 	-- above pick the legal orientation for - and / and the canonical one for
 	-- + and *.
@@ -77,7 +77,7 @@ let
 	},
 
 	partitionsOf = subset ->
-		assignments subset > filter ([l, r] -> and (not (empty l)) (not (empty r))),
+		assignments subset > filter ([l, r] -> and (not (isEmpty l)) (not (isEmpty r))),
 
 	-- Memoised results -----------------------------------------------------
 	--
@@ -111,7 +111,7 @@ let
 	bySize = a -> b -> lt (length a) (length b),
 
 	memo = subsets numbers
-		> filter (not <* empty)
+		> filter (not <* isEmpty)
 		> sortWith bySize
 		> foldl addSubset [],
 
@@ -127,7 +127,7 @@ let
 	-- Flatten a solution tree into its internal (operation) nodes, post-order.
 
 	collect = [v, sym, left, right] ->
-		if (empty left)
+		if (isEmpty left)
 			[]
 			(flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]),
 

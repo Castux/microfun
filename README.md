@@ -615,7 +615,7 @@ Imports `core` (for `if`).
 |------|-------------|
 | `succ` | `add 1` |
 | `pred` | `sub 1` |
-| `minus n` / `negate n` | arithmetic negation |
+| `negate n` | arithmetic negation |
 | `signum n` | sign of `n`: `-1`, `0`, or `1` |
 | `abs n` | absolute value |
 | `max a b` | larger of `a`, `b` |
@@ -637,7 +637,7 @@ Imports `core` (for `if`).
 Imports `math` and `core` (circular with `core` — permitted).
 
 **Construction and inspection**
-`cons`, `isList`, `length`, `head`, `tail`, `last`, `init`, `empty`, `concat`, `remove`, `reverse`, `intersperse`
+`emptyList`, `cons`, `isList`, `length`, `head`, `tail`, `last`, `init`, `isEmpty`, `concat`, `remove`, `reverse`, `intersperse`
 
 **Higher-order**
 `map`, `filter`, `find`, `foldr`, `foldl`
@@ -719,12 +719,12 @@ To achieve standard behaviors with built-in comparators:
 
 | Name | Description |
 |------|-------------|
-| `empty` | the empty heap |
+| `emptyHeap` | the empty heap |
 | `isEmpty h` | `1` if `h` is empty |
 | `singleton x` | a heap containing only `x` |
 | `merge cmp h1 h2` | merge two heaps ($O(\log n)$) |
 | `insert cmp x h` | insert `x` into `h` ($O(\log n)$) |
-| `peek h` | return the root element |
+| `top h` | return the root element |
 | `pop comparator h` | remove the root element and return the new heap ($O(\log n)$) |
 | `fromList comparator l` | build a heap from a list |
 | `toList comparator h` | convert a heap to a sorted list (heapsort) |

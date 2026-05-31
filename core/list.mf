@@ -36,7 +36,8 @@ init = {
 	[h, t] -> [h, init t]
 },
 
-empty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
+emptyList = [], -- the empty list
+isEmpty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
 
 -- concat a b: join two lists into one
 concat = {
