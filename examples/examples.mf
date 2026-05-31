@@ -1,4 +1,4 @@
-import prelude, mod2 in
+import core, list, math, text in
 
 -- Some arithmetics
 
@@ -6,7 +6,7 @@ let
 
 divides = n -> x -> n > mod x > eq 0,
 divisors = n -> range 1 n > filter (divides n),
-digits = reverse <* map (mod 10) <* takeWhile (gt 0) <* iterate (div 10),
+digisdfts = reverse <* map (mod 10) <* takeWhile (gt 0) <* iterate (div 10),
 
 isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte 2 n),
 primes = upFrom 1 > filter isPrime,
@@ -71,4 +71,4 @@ add3 = a -> b -> c -> sum [a;b;c]
 
 in
 
-primes > take 1000 > show
+"-334534.25" > stringToFloat > show
