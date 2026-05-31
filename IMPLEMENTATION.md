@@ -320,22 +320,24 @@ graph without forcing anything that laziness should defer.
 
 ### Environments and binding
 
-An `Environment` is a `map[string]*NamedValue`. The interpreter keeps a stack of
-them (`Stack`). `ResolveName` searches it from the top down. `TreatBindings`
-implements `let` (and module) binding in two passes: first it inserts an *empty*
-`NamedValue` for every name so that all names in the group are in scope, then it
-fills each `Value` by translating its expression. The two-pass order is what lets
-a binding's right-hand side refer to names defined later in the same group, and
-to itself — the foundation of recursion and of self-referential lazy structures
-like `fibonacci`.
+An `Environment` is a `[]*NamedValue`, a flat array of thunks indexed by slot
+number. The interpreter keeps a stack of them (`Stack`). `ResolveName` accesses
+them directly by stack depth and slot index, both of which are pre-computed by
+the analyzer. `TreatBindings` implements `let` (and module) binding in two
+passes: first it inserts an *empty* `NamedValue` into each slot so that all names
+in the group are in scope, then it fills each `Value` by translating its
+expression. The two-pass order is what lets a binding's right-hand side refer to
+names defined later in the same group, and to itself — the foundation of
+recursion and of self-referential lazy structures like `fibonacci`.
 
 ### Closures capture by reference
 
-`MakeClosure` builds the closure's environment from the `Upvalues` the analyzer
-computed: for each upvalue name it looks up the *current* `*NamedValue` and stores
-that pointer. The closure therefore captures the live thunks of its free
-variables — sharing, not copying — so a value forced through the closure is also
-forced for everyone else holding the same binding.
+`MakeClosure` builds the closure's environment from the `UpvalueCaptures` the
+analyzer computed: for each upvalue it looks up the *current* `*NamedValue` by
+stack depth and slot index and stores that pointer. The closure therefore
+captures the live thunks of its free variables — sharing, not copying — so a
+value forced through the closure is also forced for everyone else holding the
+same binding.
 
 ### Operators become application/composition graphs
 

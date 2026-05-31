@@ -47,11 +47,22 @@ type Lambda struct {
 	Pattern    Pattern
 	Expression Expression
 
-	Upvalues []string // added by analyzer
+	// If this lambda is part of a MultiLambda, these are nil and the
+	// MultiLambda's fields are used instead.
+	Upvalues        []string         // added by analyzer for display/traces
+	UpvalueCaptures []UpvalueCapture // added by analyzer for MakeClosure
+}
+
+type UpvalueCapture struct {
+	Depth int
+	Slot  int
 }
 
 type MultiLambda struct {
 	Lambdas []*Lambda
+
+	Upvalues        []string         // added by analyzer
+	UpvalueCaptures []UpvalueCapture // added by analyzer
 
 	Start, End SourcePos
 }
@@ -91,12 +102,16 @@ type Name struct {
 	InBinding         bool
 	ResolvedModule    *Module // added by analyzer
 	ResolvedToBuiltin bool    // added by analyzer
+	ResolvedSlot      int     // added by analyzer: index in environment
+	ResolvedDepth     int     // added by analyzer: steps up the stack
 	Pos               SourcePos
 }
 
 type QualifiedName struct {
 	Module string
 	Value  string
+
+	ResolvedSlot int // added by analyzer
 
 	Start, End SourcePos
 }

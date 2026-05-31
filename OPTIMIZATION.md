@@ -41,9 +41,10 @@ type StackFrame struct {
 
 ---
 
-## 4. Replace string-keyed `Environment` maps with index-keyed arrays
+## 4. Replace string-keyed `Environment` maps with index-keyed arrays ✅
 
-**Files:** `interpreter.go`, `runtime.go`  
+**Files:** `interpreter.go`, `runtime.go`
+  
 **Problem:** `MatchPattern` returns a `map[string]*NamedValue` (with `maps.Copy` to merge
 sub-environments) and `MakeClosure` creates one per closure, even for the trivial
 `\x -> ...` case. String hashing on every lookup adds up.  

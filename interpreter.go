@@ -3,14 +3,13 @@ package main
 import (
 	"bufio"
 	"io"
-	"maps"
 	"os"
 	"slices"
 	"unicode"
 	"unicode/utf8"
 )
 
-type Environment map[string]*NamedValue
+type Environment []*NamedValue
 
 type Interpreter struct {
 	Program *Program
@@ -40,8 +39,8 @@ func (i *Interpreter) builtinError(message string) {
 	i.raiseRuntimeError(message, i.builtinPos, i.builtinStack)
 }
 
-func (i *Interpreter) PushNewEnvironment() Environment {
-	env := make(Environment)
+func (i *Interpreter) PushNewEnvironment(size int) Environment {
+	env := make(Environment, size)
 	i.Stack = append(i.Stack, env)
 	return env
 }
@@ -56,26 +55,19 @@ func (i *Interpreter) PopEnvironment() (env Environment) {
 	return
 }
 
-func (i *Interpreter) ResolveName(name string) RuntimeValue {
-
-	for _, env := range slices.Backward(i.Stack) {
-		if value, found := env[name]; found {
-			return value
-		}
-	}
-
-	panic("could not find name " + name)
+func (i *Interpreter) ResolveName(depth, slot int) RuntimeValue {
+	return i.Stack[len(i.Stack)-1-depth][slot]
 }
 
 func (i *Interpreter) Run() RuntimeValue {
 
-	// First create environemnts for all modules
+	// First create environments for all modules
 	// (modules can refer to each other, the NameValues need to exist
 
 	for modName, module := range i.Modules {
-		env := make(Environment)
-		for _, binding := range module.PublicBindings {
-			env[binding.Name.Value] = &NamedValue{Name: binding.Name.Value}
+		env := make(Environment, len(module.PublicBindings))
+		for j, binding := range module.PublicBindings {
+			env[j] = &NamedValue{Name: binding.Name.Value}
 		}
 		i.ModuleEnvironments[modName] = env
 	}
@@ -83,8 +75,8 @@ func (i *Interpreter) Run() RuntimeValue {
 	// Then fill up these environments
 
 	for modName, module := range i.Modules {
-		for _, binding := range module.PublicBindings {
-			i.ModuleEnvironments[modName][binding.Name.Value].Value = i.RunExpression(binding.Expression)
+		for j, binding := range module.PublicBindings {
+			i.ModuleEnvironments[modName][j].Value = i.RunExpression(binding.Expression)
 		}
 	}
 
@@ -97,12 +89,12 @@ func (i *Interpreter) Run() RuntimeValue {
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
 
 	env := i.Stack[len(i.Stack)-1]
-	for _, binding := range bindings {
-		env[binding.Name.Value] = &NamedValue{Name: binding.Name.Value}
+	for j, binding := range bindings {
+		env[j] = &NamedValue{Name: binding.Name.Value}
 	}
 
-	for _, binding := range bindings {
-		env[binding.Name.Value].Value = i.RunExpression(binding.Expression)
+	for j, binding := range bindings {
+		env[j].Value = i.RunExpression(binding.Expression)
 	}
 }
 
@@ -137,7 +129,7 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.FoldOperation(e)
 
 	case *Let:
-		i.PushNewEnvironment()
+		i.PushNewEnvironment(len(e.Bindings))
 		i.TreatBindings(e.Bindings)
 		value := i.RunExpression(e.Expression)
 		i.PopEnvironment()
@@ -156,32 +148,39 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 			}
 			return Builtins[e.Value]
 		} else if e.ResolvedModule != nil {
-			return i.ModuleEnvironments[e.ResolvedModule.Name][e.Value]
+			return i.ModuleEnvironments[e.ResolvedModule.Name][e.ResolvedSlot]
 		}
-		return i.ResolveName(e.Value)
+		return i.ResolveName(e.ResolvedDepth, e.ResolvedSlot)
 
 	case *QualifiedName:
-		return i.ModuleEnvironments[e.Module][e.Value]
+		return i.ModuleEnvironments[e.Module][e.ResolvedSlot]
 
 	case *MultiLambda:
-		return i.MakeClosure(e.Lambdas...)
+		return i.MakeClosureFromNode(e, e.Lambdas...)
 
 	case *Lambda:
-		return i.MakeClosure(e)
+		return i.MakeClosureFromNode(e, e)
 
 	default:
 		panic("unimplemented expression " + NodeType(expression))
 	}
 }
 
-func (i *Interpreter) MakeClosure(lambdas ...*Lambda) RuntimeClosure {
+func (i *Interpreter) MakeClosureFromNode(holder Node, lambdas ...*Lambda) RuntimeClosure {
 	var env Environment
-	for _, lambda := range lambdas {
-		for _, upvalue := range lambda.Upvalues {
-			if env == nil {
-				env = make(Environment)
-			}
-			env[upvalue] = i.ResolveName(upvalue).(*NamedValue)
+	var uvCaptures []UpvalueCapture
+
+	switch h := holder.(type) {
+	case *Lambda:
+		uvCaptures = h.UpvalueCaptures
+	case *MultiLambda:
+		uvCaptures = h.UpvalueCaptures
+	}
+
+	if len(uvCaptures) > 0 {
+		env = make(Environment, len(uvCaptures))
+		for j, cap := range uvCaptures {
+			env[j] = i.ResolveName(cap.Depth, cap.Slot).(*NamedValue)
 		}
 	}
 	return RuntimeClosure{env, lambdas}
@@ -459,10 +458,8 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 // holds the reduction stack needed for the trace.
 func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) (RuntimeValue, bool) {
 
-	if closure.Upvalues != nil {
-		i.PushEnvironment(closure.Upvalues)
-		defer i.PopEnvironment()
-	}
+	i.PushEnvironment(closure.Upvalues)
+	defer i.PopEnvironment()
 
 	for _, lambda := range closure.Lambdas {
 		matched := i.MatchPattern(lambda.Pattern, argument)
@@ -488,19 +485,27 @@ func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
 }
 
 func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Environment {
+	names := GetNamesInPattern(pattern)
+	env := make(Environment, len(names))
+	if i.matchPatternInto(pattern, argument, env) {
+		return env
+	}
+	return nil
+}
+
+func (i *Interpreter) matchPatternInto(pattern Pattern, argument RuntimeValue, env Environment) bool {
 
 	switch patt := pattern.(type) {
 	case *NumberLiteral:
 		right, ok := i.EvaluateToNumber(argument)
 		if !ok || float64(right) != patt.Value {
-			return nil
+			return false
 		}
-		return make(Environment)
+		return true
 
 	case *Name:
-		return Environment{
-			patt.Value: &NamedValue{Name: patt.Value, Value: argument},
-		}
+		env[patt.ResolvedSlot] = &NamedValue{Name: patt.Value, Value: argument}
+		return true
 
 	case *TuplePattern:
 		forced := i.EvaluateToWeakHeadNormalForm(argument)
@@ -510,33 +515,22 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		// matches it against its head and tail directly.
 		if cons, isCons := forced.(RuntimeCons); isCons {
 			if len(patt.SubPatterns) != 2 {
-				return nil
+				return false
 			}
-			env := i.MatchPattern(patt.SubPatterns[0], cons.Head)
-			if env == nil {
-				return nil
-			}
-			tailEnv := i.MatchPattern(patt.SubPatterns[1], cons.Tail)
-			if tailEnv == nil {
-				return nil
-			}
-			maps.Copy(env, tailEnv)
-			return env
+			return i.matchPatternInto(patt.SubPatterns[0], cons.Head, env) &&
+				i.matchPatternInto(patt.SubPatterns[1], cons.Tail, env)
 		}
 
 		right, ok := forced.(RuntimeTuple)
 		if !ok || len(right) != len(patt.SubPatterns) {
-			return nil
+			return false
 		}
-		env := make(Environment)
 		for j, subPatt := range patt.SubPatterns {
-			subEnv := i.MatchPattern(subPatt, right[j])
-			if subEnv == nil {
-				return nil
+			if !i.matchPatternInto(subPatt, right[j], env) {
+				return false
 			}
-			maps.Copy(env, subEnv)
 		}
-		return env
+		return true
 
 	case *ListPattern:
 		panic("internal error: ListPattern reached MatchPattern without normalization")
@@ -546,23 +540,23 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		for _, expected := range []rune(patt.Value) {
 			cell, ok := i.EvaluateToWeakHeadNormalForm(current).(RuntimeCons)
 			if !ok {
-				return nil
+				return false
 			}
 			head, ok := i.EvaluateToNumber(cell.Head)
 			if !ok || rune(head) != expected {
-				return nil
+				return false
 			}
 			current = cell.Tail
 		}
 		// The string's code points are exhausted, so the list must end here.
 		rest, ok := i.EvaluateToTuple(current)
 		if !ok || len(rest) != 0 {
-			return nil
+			return false
 		}
-		return make(Environment)
+		return true
 	}
 
-	return nil
+	return false
 }
 
 func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*NamedValue]bool) RuntimeValue {
