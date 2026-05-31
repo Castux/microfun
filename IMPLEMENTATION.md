@@ -514,8 +514,10 @@ module, and recursively loads *its* imports, memoizing by name. The recursion is
 guarded by the `loaded` map, so **circular imports are allowed** (e.g. `mod1`
 imports `mod2` and vice-versa) and each module is loaded exactly once.
 
-There is no automatic prelude: the standard library lives in `prelude.mf` and is
-available only to programs that `import prelude`.
+There is no automatic library import: programs must explicitly import the modules
+they need. The standard library modules (`list`, `math`, `text`, etc.) are
+embedded in the binary and are loaded from there when no same-named file exists
+in the working directory.
 
 `Interpreter.Run` evaluates modules in two passes that mirror `TreatBindings`,
 and for the same reason:
@@ -562,7 +564,8 @@ the map is fully built before the interpreter ever runs.
 `show` prints the unlimited rendering; `write` walks a list of code points and
 prints them as characters; `equal` is `DeepEqual`. All of the higher-level
 numeric, logical, list, and string functions are *not* builtins — they are
-defined in the prelude in microfun itself.
+defined in the standard library modules (`math`, `list`, `text`, etc.) in
+microfun itself.
 
 ### Standard input as a lazy stream
 

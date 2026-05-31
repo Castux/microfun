@@ -1,0 +1,78 @@
+-- text.mf: string formatting and value rendering.
+-- Strings in microfun are lists of Unicode code points, so all list operations
+-- work on them directly. This module adds higher-level formatting utilities.
+import list, math in
+
+module
+
+-- join separator strings: intercalate separator between each string in the list
+join = separator -> {
+	[] -> [],
+	[h,t] -> t > {
+		[] -> h,
+		t2 -> list.concat h (list.concat separator (join separator t2))
+	}
+},
+
+-- padLeft n char s: left-pad string s with single-char string char to minimum width n
+padLeft = n -> char -> s ->
+	list.concat
+		(list.flatten (list.replicate (math.max 0 (sub (list.length s) n)) char))
+		s,
+
+-- intToString n: render an integer as a string.
+-- Produces wrong output for non-integers; use floatToString for fractional numbers.
+intToString = n ->
+	let
+		digit = [ n > mod 10 > add (list.head '0'); ]
+	in
+		math.ifs [
+			[lt 0 n,  list.concat '-' (intToString (math.minus n))];
+			[lt 10 n, digit]
+		]	(list.concat (intToString (div 10 n)) digit),
+
+-- floatToString precision n: render n with exactly `precision` decimal digits.
+-- Explicit precision is required; the appropriate number of digits is context-dependent.
+floatToString = precision -> n ->
+	let
+		sign  = math.if (lt 0 n) '-' [],
+		absN  = math.abs n,
+		whole = math.trunc absN,
+		scale = math.pow precision 10,
+		frac  = math.trunc (mul scale (sub whole absN))
+	in
+		list.flatten [sign; intToString whole; '.'; padLeft precision '0' (intToString frac)],
+
+-- toString x: render any number, list, or tuple as a code-point string, ready for `write`.
+-- Tuples with more than 10 elements are not supported and will produce a runtime error.
+toString =
+	let
+		tupleToList = {
+			[] -> [],
+			[a] -> [a;],
+			[a,b] -> [a;b],
+			[a,b,c] -> [a;b;c],
+			[a,b,c,d] -> [a;b;c;d],
+			[a,b,c,d,e] -> [a;b;c;d;e],
+			[a,b,c,d,e,f] -> [a;b;c;d;e;f],
+			[a,b,c,d,e,f,g] -> [a;b;c;d;e;f;g],
+			[a,b,c,d,e,f,g,h] -> [a;b;c;d;e;f;g;h],
+			[a,b,c,d,e,f,g,h,i] -> [a;b;c;d;e;f;g;h;i],
+			[a,b,c,d,e,f,g,h,i,j] -> [a;b;c;d;e;f;g;h;i;j],
+			n -> n
+		},
+
+		listToString = {
+			[x;] -> list.flatten ['['; toString x; ';]'],
+			l -> list.flatten ['[' ; l > list.map toString > join '; ' ; ']']
+		},
+
+		tupleToString = t ->
+			let
+				asList = tupleToList t
+			in
+				math.if (list.isList asList)
+					(list.flatten ['[' ; asList > list.map toString > join ', ' ; ']'])
+					(intToString asList)
+	in
+		x -> math.if (list.isList x) (listToString x) (tupleToString x)

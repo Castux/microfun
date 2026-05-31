@@ -25,7 +25,7 @@ works — the lexer, parser, analyzer, and the lazy reduction engine — see
 11. [Lists, strings, and other sugar](#11-lists-strings-and-other-sugar)
 12. [Lazy evaluation](#12-lazy-evaluation)
 13. [Built-in functions](#13-built-in-functions)
-14. [The prelude](#14-the-prelude)
+14. [Standard library](#14-standard-library)
 
 ---
 
@@ -59,17 +59,23 @@ microfun <path>
 ```
 
 The interpreter loads the file at `<path>` as a program, loads any modules it
-imports (from `<modulename>.mf` in the working directory), analyzes everything,
-and evaluates the program body. Anything the program prints via `peek`, `show`,
-or `write` appears on standard output. A lexical, syntactic, or name-resolution
-error is reported with a located diagnostic and the program does not run; a
-run-time error is reported with a source location and a reduction trace.
+imports, analyzes everything, and evaluates the program body. Anything the
+program prints via `peek`, `show`, or `write` appears on standard output. A
+lexical, syntactic, or name-resolution error is reported with a located
+diagnostic and the program does not run; a run-time error is reported with a
+source location and a reduction trace.
 
-There is **no automatic prelude**. A program that wants the standard library must
-say so:
+**Module search order.** For each import `name`, the interpreter first looks for
+`./name.mf` in the current working directory. If that file does not exist, it
+falls back to the standard library embedded in the binary (see
+[§14](#14-standard-library)). A file in the working directory therefore always
+shadows the built-in module of the same name.
+
+There is **no automatic library import**. A program that wants the standard
+library must say so explicitly:
 
 ```
-import prelude in
+import list in
   show (sum [1; 2; 3; 4])
 ```
 
@@ -78,7 +84,7 @@ import prelude in
 A *program* is an optional import clause followed by a single expression:
 
 ```
-import prelude, mymodule in
+import math, list, mymodule in
   <expression>
 ```
 
@@ -87,7 +93,7 @@ then the keyword `module`, then a comma-separated list of bindings. Every bindin
 in a module is public:
 
 ```
-import prelude in
+import math in
 
 module
 
@@ -106,12 +112,12 @@ bindings are created before any is evaluated, cross-module (and self-) reference
 resolve correctly.
 
 ```
-import prelude, mod2 in
+import list, mod2 in
   show mod2.foo            -- qualified access
 ```
 
-The standard library `prelude.mf` is an ordinary module; it is special only in
-that it is the conventional home of the standard functions.
+The standard library modules (`list`, `math`, `text`, etc.) are ordinary modules
+embedded in the binary; see [§14](#14-standard-library) for the full catalogue.
 
 ## 4. Lexical elements
 
@@ -197,8 +203,8 @@ At run time a value is one of:
 ### Truth values
 
 There is no boolean type. By convention **0 is false and 1 is true**. The
-comparison builtins (`eq`, `lt`) and the prelude's logical functions return `0`
-or `1`, and the prelude's `if` matches its condition against exactly `1` or `0`
+comparison builtins (`eq`, `lt`) and the `math` module's logical functions return
+`0` or `1`, and `math.if` matches its condition against exactly `1` or `0`
 (any other value is a non-exhaustive-match error).
 
 ## 7. Expressions
@@ -262,11 +268,10 @@ that the value flows through the chain in the named direction; the compose
 operators associate to the right.
 
 ```
-import prelude in
-  show (5 > add 1 > mul 2)          -- 12 : mul 2 (add 1 5)
-  show (mul 2 < add 1 < 5)          -- 12 : mul 2 (add 1 5)
-  show ((add 1 *> mul 2) 5)         -- 12 : add 1 first, then mul 2
-  show ((add 1 <* mul 2) 5)         -- 11 : mul 2 first, then add 1
+show (5 > add 1 > mul 2)          -- 12 : mul 2 (add 1 5)
+show (mul 2 < add 1 < 5)          -- 12 : mul 2 (add 1 5)
+show ((add 1 *> mul 2) 5)         -- 12 : add 1 first, then mul 2
+show ((add 1 <* mul 2) 5)         -- 11 : mul 2 first, then add 1
 ```
 
 ## 9. Lambdas and pattern matching
@@ -351,7 +356,7 @@ it is a run-time error.
 }
 ```
 
-This is also how `if`, list functions, and most of the prelude are written.
+This is also how `if`, list functions, and most of the standard library are written.
 
 ## 10. Bindings: `let`
 
@@ -387,7 +392,7 @@ let a = 10 in
 A self-referential lazy structure is an ordinary definition:
 
 ```
-import prelude in
+import list in
 let fibonacci = concat [1; 1] (zipWith add fibonacci (tail fibonacci)) in
   show (take 10 fibonacci)             -- [1; 1; 2; 3; 5; 8; 13; 21; 34; 55]
 ```
@@ -418,8 +423,8 @@ Note the distinction:
 
 Because lists are just tuples, list patterns are sugar too: the list pattern
 `[a; b]` matches the cons-cell structure of a proper two-element list, equivalent
-to matching `[a, [b, []]]`. The prelude's list functions destructure cons cells
-directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
+to matching `[a, [b, []]]`. The standard library's list functions destructure
+cons cells directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
 
 ```
 length = {
@@ -438,7 +443,7 @@ function works on strings. The `write` builtin prints a list of code points as
 characters.
 
 ```
-import prelude in
+import list in
   write "hello"                        -- prints: hello
   write (concat "ab" "cd")             -- prints: abcd
 ```
@@ -472,14 +477,14 @@ A consequence of laziness is that infinite structures are fine as long as only a
 finite part is forced:
 
 ```
-import prelude in
+import list in
   show (take 5 (upFrom 1))             -- [1; 2; 3; 4; 5]
 ```
 
 ## 13. Built-in functions
 
 Builtins are the primitive operations available without importing anything;
-everything else is defined in the prelude in microfun itself.
+everything else is defined in the standard library modules in microfun itself.
 
 The binary arithmetic and comparison builtins take their arguments in an order
 chosen for **partial application and piping**: the *first* argument is the
@@ -534,48 +539,166 @@ every reference to `stdin` (or `bstdin`) sees the same once-read sequence, so th
 same character is never delivered twice.
 
 ```
-import prelude in
+import list in
   write (take 5 stdin)        -- echo the first five characters of the input
 ```
 
-## 14. The prelude
+## 14. Standard library
 
-`prelude.mf` is a module of standard functions written in microfun. Importing it
-(`import prelude in …`) brings the following into scope. This is a catalogue;
-consult [prelude.mf](prelude.mf) for the definitions.
+The standard library is a collection of microfun modules **embedded in the
+interpreter binary** — no separate installation is needed. Modules are written in
+microfun itself and are split by concern across five files in `core/`.
 
-**Combinators**
-`id`, `compose`, `flip`, `curry`, `uncurry`, `const`.
+**Module search order.** For every `import name`, the interpreter first checks
+`./name.mf` in the working directory, then falls back to the embedded library.
+Placing your own `list.mf` (or any other core module name) next to your program
+**shadows** the built-in one for that run.
 
-**Tuples**
-`first`, `second`.
+### Core modules
 
-**Numbers**
-`succ`, `pred`, `minus` (negate), `abs`, `max`, `min`.
+Each module can be imported directly when only part of the library is needed.
+Modules that depend on each other import each other explicitly; circular imports
+are permitted and handled correctly (see [§3](#3-programs-and-modules)).
+
+---
+
+#### `func` — functional combinators
+
+No imports.
+
+| Name | Description |
+|------|-------------|
+| `id` | identity: `id x = x` |
+| `compose f g` | right-to-left composition: `(compose f g) x = f (g x)` |
+| `flip f` | flip first two arguments: `flip f x y = f y x` |
+| `curry f` | `curry f x y = f [x, y]` |
+| `uncurry f` | `uncurry f [x, y] = f x y` |
+| `const c` | constant function: `const c x = c` |
+| `first [a, b]` | first element of a 2-tuple |
+| `second [a, b]` | second element of a 2-tuple |
+
+---
+
+#### `math` — numbers, booleans, and comparisons
+
+Imports `func` and `list` (for `ifs`; circular with `list` — permitted).
 
 **Booleans / control**
-`if cond t f`, `ifs` (multi-branch), `and`, `or`, `not`.
 
-**Comparisons**
-`neq`, `gte`, `gt`, `lte` (built on the `eq` and `lt` builtins).
+| Name | Description |
+|------|-------------|
+| `if cond t f` | conditional; `cond` must be `0` or `1` |
+| `ifs [(c1,v1); …] else` | first `vi` whose `ci` is `1`, or `else` |
+| `and a b` | logical and |
+| `or a b` | logical or |
+| `not b` | logical not |
 
-**List construction and inspection**
-`cons`, `isList`, `length`, `head`, `tail`, `empty`, `concat`, `remove`,
-`reverse`.
+**Comparisons** — convention matches the builtins: threshold first, value second,
+so `lt 0` means "is negative" and `gte 0` means "is non-negative".
 
-**Higher-order list functions**
-`map`, `filter`, `foldr`, `foldl`, `sum`, `product`, `orList`, `andList`, `any`,
-`all`, `none`, `zipWith`, `zip`, `take`, `drop`, `dropWhile`, `takeWhile`,
-`split`, `flatten`, `range`, `sortWith`, `sort`, `pairs`, `contains`.
+| Name | Description |
+|------|-------------|
+| `neq a b` | `b ≠ a` |
+| `lte a b` | `b ≤ a` |
+| `gte a b` | `b ≥ a` |
+| `gt a b` | `b > a` |
+
+**Numbers** (builtins: `add`, `mul`, `sub`, `div`, `fdiv`, `mod`, `fmod`, `sqrt`)
+
+| Name | Description |
+|------|-------------|
+| `succ` | `add 1` |
+| `pred` | `sub 1` |
+| `minus n` / `negate n` | arithmetic negation |
+| `abs n` | absolute value |
+| `max a b` | larger of `a`, `b` |
+| `min a b` | smaller of `a`, `b` |
+| `clamp lo hi n` | clamp `n` to `[lo, hi]` |
+| `trunc n` | round towards zero |
+| `floor n` | round towards −∞ |
+| `ceil n` | round towards +∞ |
+| `round n` | round half-up |
+| `pow exp base` | `base ^ exp` (non-negative integer exponents) |
+| `even n` | `1` if `n mod 2 = 0` |
+| `odd n` | `1` if `n mod 2 ≠ 0` |
+
+---
+
+#### `list` — list operations and infinite lists
+
+Imports `math` and `func` (circular with `math` — permitted).
+
+**Construction and inspection**
+`cons`, `isList`, `length`, `head`, `tail`, `empty`, `concat`, `remove`, `reverse`
+
+**Higher-order**
+`map`, `filter`, `foldr`, `foldl`
+
+**Aggregations**
+`sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
+
+**Zipping**
+`zipWith`, `zip`
+
+**Slicing**
+`take`, `drop`, `takeWhile`, `dropWhile`, `span`
+
+`span f l` returns `[[taken while f holds], [rest]]`.
+
+**Structure**
+`flatten`, `range`
+
+`range a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
+
+**Search and set-like**
+`contains`, `maximum`, `minimum`, `replicate`, `unzip`, `nub`, `nth`
+
+`nth n l` — zero-based index; runtime error if out of bounds.
+`nub l` — remove duplicates, keeping first occurrences.
+`maximum` / `minimum` — crash on an empty list.
 
 **Infinite lists**
-`iterate`, `downFrom`, `upFrom`, `repeat`.
-
-**Strings**
-`join`, `toString` (renders numbers, lists, and tuples to their textual form as a
-code-point list, ready for `write`).
+`iterate`, `downFrom`, `upFrom`, `repeat`, `cycle`
 
 ```
-import prelude in
-  range 1 10 > filter (x -> eq 0 (mod 2 x)) > show   -- even numbers in [1,10]
+import list in
+  show (list.take 8 (list.upFrom 1))          -- [1; 2; 3; 4; 5; 6; 7; 8]
+  show (list.take 6 (list.cycle [1; 2; 3]))   -- [1; 2; 3; 1; 2; 3]
+```
+
+---
+
+#### `comb` — sorting and combinatorics
+
+Imports `list` and `math`.
+
+| Name | Description |
+|------|-------------|
+| `partition p l` | `[[elements where p holds], [elements where p does not]]` |
+| `sortWith f l` | quicksort; `f pivot elem = 1` if `elem` belongs before `pivot` |
+| `sort l` | ascending sort (uses builtin `lt`) |
+| `uniquePairs l` | all ordered pairs `[a, b]` where `a` appears before `b` in `l` |
+
+---
+
+#### `text` — string formatting and value rendering
+
+Imports `list` and `math`. Strings are lists of Unicode code points, so all
+`list` functions work on them; this module adds higher-level formatting.
+
+| Name | Description |
+|------|-------------|
+| `join sep strings` | intercalate `sep` between each string in the list |
+| `padLeft n char s` | left-pad `s` with single-char string `char` to width `n` |
+| `intToString n` | render an integer as a string (wrong output for non-integers) |
+| `floatToString prec n` | render `n` with exactly `prec` decimal digits |
+| `toString x` | render any number, list, or tuple as a string for `write` |
+
+`toString` does not support tuples with more than 10 elements or function values.
+
+```
+import text, list in
+  write (text.toString [1; 2; 3])           -- [1; 2; 3]
+  write (text.floatToString 2 3.14159)      -- 3.14
+  write (text.join ", " ["a"; "b"; "c"])    -- a, b, c
 ```

@@ -125,21 +125,23 @@ var symbols = []string{
 }
 
 func Lex(path string) []Token {
-
 	text, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Printf("Could not read file: %s\n", path)
 		return nil
 	}
+	return LexContent(path, string(text))
+}
 
-	source := string(text)
+func LexContent(path string, content string) []Token {
 	file := &Source{
 		Path: path,
-		Text: source,
+		Text: content,
 	}
 
 	var tokens []Token
 	head := 0
+	source := content
 
 lexLoop:
 	for head < len(source) {

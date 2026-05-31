@@ -1,9 +1,15 @@
 package main
 
 import (
+	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 )
+
+//go:embed core
+var coreFS embed.FS
 
 func LoadProgram(path string) *Program {
 	tokens := Lex(path)
@@ -19,6 +25,29 @@ func LoadProgram(path string) *Program {
 	return prog
 }
 
+// LexModule tries to load a module by name: first from the working directory,
+// then from the embedded core/ library. Returns nil if not found in either place.
+func LexModule(name string) []Token {
+	path := name + ".mf"
+	text, err := os.ReadFile(path)
+	if err == nil {
+		return LexContent(path, string(text))
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		fmt.Printf("Could not read %s: %v\n", path, err)
+		return nil
+	}
+
+	corePath := "core/" + name + ".mf"
+	text, err = coreFS.ReadFile(corePath)
+	if err == nil {
+		return LexContent(corePath, string(text))
+	}
+
+	fmt.Printf("Module not found: %s\n", name, path)
+	return nil
+}
+
 func LoadModules(imports []*Name) map[string]*Module {
 	loaded := make(map[string]*Module)
 
@@ -28,7 +57,7 @@ func LoadModules(imports []*Name) map[string]*Module {
 			return
 		}
 
-		tokens := Lex(name.Value + ".mf")
+		tokens := LexModule(name.Value)
 		if tokens == nil {
 			Log("imported here", name.Pos, SeverityInfo)
 			os.Exit(1)

@@ -1,0 +1,172 @@
+-- list.mf: list operations and infinite lists.
+-- Circular with math (math imports list for `ifs`) — permitted by the language.
+import math, func in
+
+module
+
+-- Construction and inspection
+
+cons = h -> t -> [h,t],
+
+isList = {
+	[] -> 1,
+	[x,xs] -> isList xs,
+	n -> 0
+},
+
+length = {
+	[] -> 0,
+	[h,t] -> math.succ (length t)
+},
+
+head = [h,t] -> h,
+tail = [h,t] -> t,
+
+empty = { [] -> 1, l -> 0 },
+
+concat = {
+	[] -> v -> v,
+	[h,t] -> v -> [h, concat t v]
+},
+
+remove = e -> {
+	[] -> [],
+	[h,t] -> math.if (equal e h) t [h, remove e t]
+},
+
+reverse = foldl (func.flip cons) [],
+
+-- Higher-order
+
+map = f -> {
+	[] -> [],
+	[h,t] -> [f h, map f t]
+},
+
+filter = f -> {
+	[] -> [],
+	[h,t] -> math.if (f h) [h, filter f t] (filter f t)
+},
+
+foldr = f -> acc -> {
+	[] -> acc,
+	[h,t] -> f h (foldr f acc t)
+},
+
+foldl = f -> acc -> {
+	[] -> acc,
+	[h,t] -> foldl f (f acc h) t
+},
+
+-- Aggregations
+
+sum     = foldr add 0,
+product = foldr mul 1,
+
+orList  = foldr math.or 0,
+andList = foldr math.and 1,
+
+any  = f -> l -> orList (map f l),
+all  = f -> l -> andList (map f l),
+none = f -> l -> math.not (any f l),
+
+-- Zipping
+
+zipWith = f -> {
+	[]		-> b -> [],
+	[a,as]	-> {
+		[]		-> [],
+		[b,bs]	-> [f a b, zipWith f as bs]
+	}
+},
+
+zip = zipWith cons,
+
+-- Slicing
+
+take = {
+	0 -> l -> [],
+	n -> {
+		[] -> [],
+		[h,t] -> [h, take (math.pred n) t]
+	}
+},
+
+drop = {
+	0 -> l -> l,
+	n -> {
+		[] -> [],
+		[h,t] -> drop (math.pred n) t
+	}
+},
+
+dropWhile = f -> {
+	[] -> [],
+	[x,xs] -> math.if (f x)
+		(dropWhile f xs)
+		[x,xs]
+},
+
+takeWhile = f -> {
+	[] -> [],
+	[x,xs] -> math.if (f x)
+		[x, takeWhile f xs]
+		[]
+},
+
+-- span f l = [[taken while f holds], [rest of list]]
+span = f -> {
+	[] -> [[], []],
+	[x, xs] -> math.if (f x)
+		(span f xs > { [ts, fs] -> [[x, ts], fs] })
+		[[], [x, xs]]
+},
+
+flatten = foldr concat [],
+
+-- range a b = [a; a+1; ...; b], both endpoints inclusive
+range = a -> b ->
+	math.if (math.lte b a)
+		[a, range (math.succ a) b]
+		[],
+
+-- Searching and membership
+
+contains = elem -> any (equal elem),
+
+-- maximum / minimum crash on an empty list (same contract as Haskell's maximum/minimum)
+maximum = [h,t] -> foldl math.max h t,
+minimum = [h,t] -> foldl math.min h t,
+
+-- Replication and structural operations
+
+replicate = n -> x ->
+	math.if (eq n 0)
+		[]
+		[x, replicate (sub 1 n) x],
+
+-- unzip [[a1,b1]; [a2,b2]; ...] = [[a1;a2;...], [b1;b2;...]]
+unzip = {
+	[] -> [[], []],
+	[[a,b], rest] ->
+		unzip rest > { [as, bs] -> [[a, as], [b, bs]] }
+},
+
+-- nub: remove duplicates, keeping the first occurrence of each value
+nub = {
+	[] -> [],
+	[h, t] -> [h, nub (filter (x -> math.not (equal x h)) t)]
+},
+
+-- nth n l: zero-based index; runtime error if the index is out of bounds
+nth = n -> {
+	[h,t] -> math.if (eq n 0) h (nth (sub 1 n) t)
+},
+
+-- Infinite lists
+
+iterate  = f -> x -> [x, iterate f (f x)],
+downFrom = iterate math.pred,
+upFrom   = iterate math.succ,
+repeat   = iterate func.id,
+cycle    = l -> concat l (cycle l)

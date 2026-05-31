@@ -1,0 +1,26 @@
+-- comb.mf: combinatorics — sorting, partitioning, and set-like operations on lists.
+import list, math in
+
+module
+
+-- partition p l = [[elements where p holds], [elements where p does not]]
+partition = p ->
+	list.foldr
+	( x -> [ts,fs] -> math.if (p x) [[x,ts],fs] [ts,[x,fs]] )
+	[[],[]],
+
+-- sortWith f l: quicksort; f is a comparison predicate (f pivot element = 1 if element < pivot)
+sortWith = f -> {
+	[] -> [],
+	[x,xs] -> partition (f x) xs > {
+		[low,high] -> list.concat (sortWith f low) [x, sortWith f high]
+	}
+},
+
+sort = sortWith lt,
+
+-- uniquePairs l: all ordered pairs (a, b) where a appears before b in l
+uniquePairs = {
+	[] -> [],
+	[h,t] -> list.concat (list.map (list.cons h) t) (uniquePairs t)
+}
