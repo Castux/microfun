@@ -317,25 +317,22 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 
 // A StackFrame is one entry on the explicit reduction stack used by
 // EvaluateToWeakHeadNormalForm. It is either an argument waiting to be applied
-// to the function on its left, or a thunk waiting to be updated with its weak
-// head normal form once that form is known.
-type StackFrame interface {
-	isStackFrame()
-}
+// to the function on its left (Kind == argumentFrame), or a thunk waiting to be
+// updated with its weak head normal form once that form is known (Kind ==
+// updateFrame).
+const (
+	argumentFrame byte = iota
+	updateFrame
+)
 
-type ArgumentFrame struct {
-	Argument RuntimeValue
+type StackFrame struct {
+	Kind     byte
+	Thunk    *NamedValue  // set when Kind == updateFrame
+	Argument RuntimeValue // set when Kind == argumentFrame
 	// Pos is the source span of the application this argument came from, used to
 	// report a failure to apply at its origin. It may be a zero SourcePos.
-	Pos SourcePos
+	Pos SourcePos // set when Kind == argumentFrame
 }
-
-type UpdateFrame struct {
-	Thunk *NamedValue
-}
-
-func (ArgumentFrame) isStackFrame() {}
-func (UpdateFrame) isStackFrame()   {}
 
 // EvaluateToWeakHeadNormalForm reduces a value until its outermost shape is
 // known: either a constructor (a number or a tuple, whose contents are left
@@ -357,7 +354,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 		// and remember on the stack where to resume.
 		switch reducible := control.(type) {
 		case RuntimeApplication:
-			stack = append(stack, ArgumentFrame{Argument: reducible.Argument, Pos: reducible.Pos})
+			stack = append(stack, StackFrame{Argument: reducible.Argument, Pos: reducible.Pos})
 			control = reducible.Function
 			continue
 
@@ -369,7 +366,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 			if reducible.Value == nil {
 				panic("internal error: forced thunk " + reducible.Name + " before its value was computed")
 			}
-			stack = append(stack, UpdateFrame{Thunk: reducible})
+			stack = append(stack, StackFrame{Kind: updateFrame, Thunk: reducible})
 			control = reducible.Value
 			continue
 		}
@@ -380,15 +377,16 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 			return control
 		}
 
-		switch frame := stack[len(stack)-1].(type) {
-		case UpdateFrame:
+		frame := stack[len(stack)-1]
+		switch frame.Kind {
+		case updateFrame:
 			// We have reached the weak head normal form of this thunk. Memoize
 			// it so it is never reduced again, then keep coming back up.
 			frame.Thunk.Value = control
 			frame.Thunk.Forced = true
 			stack = stack[:len(stack)-1]
 
-		case ArgumentFrame:
+		case argumentFrame:
 			// An argument is waiting, so the value in hand is applied to it.
 			switch function := control.(type) {
 			case RuntimeClosure:
@@ -414,7 +412,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 			case RuntimeComposition:
 				// (function1 *> function2) argument reduces to
 				// function1 (function2 argument).
-				stack[len(stack)-1] = ArgumentFrame{
+				stack[len(stack)-1] = StackFrame{
 					Argument: RuntimeApplication{
 						Function: function.Function2,
 						Argument: frame.Argument,

@@ -38,8 +38,8 @@ func (e *RuntimeError) Error() string { return e.Message }
 func collectTrace(stack []StackFrame) []string {
 	var trace []string
 	for _, frame := range stack {
-		if update, ok := frame.(UpdateFrame); ok && update.Thunk.Name != "" {
-			trace = append(trace, update.Thunk.Name)
+		if frame.Kind == updateFrame && frame.Thunk.Name != "" {
+			trace = append(trace, frame.Thunk.Name)
 		}
 	}
 	return trace

@@ -23,7 +23,7 @@ is the single largest architectural win.
 
 ---
 
-## 3. Eliminate interface boxing on the reduction stack
+## 3. Eliminate interface boxing on the reduction stack ✅
 
 **File:** `interpreter.go` — `EvaluateToWeakHeadNormalForm`  
 **Problem:** `[]StackFrame` stores interface values. Every `append` and every type-switch
