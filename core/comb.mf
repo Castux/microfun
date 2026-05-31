@@ -1,26 +1,37 @@
--- comb.mf: combinatorics — sorting, partitioning, and set-like operations on lists.
+-- comb.mf: combinatorics — subsets, permutations, and selections.
 import list, math, core in
 
 module
 
--- partition p l = [[elements where p holds], [elements where p does not]]
-partition = p ->
-	foldr
-	( x -> [ts,fs] -> if (p x) [[x,ts],fs] [ts,[x,fs]] )
-	[[],[]],
+-- uniquePairs l: all ordered pairs [a, b] where a appears before b in l
+uniquePairs = choose 2,
 
--- sortWith f l: quicksort; f is a comparison predicate (f pivot element = 1 if element < pivot)
-sortWith = f -> {
-	[] -> [],
-	[x,xs] -> partition (f x) xs > {
-		[low,high] -> concat (sortWith f low) [x, sortWith f high]
+-- subsets l: power set — all subsets of l (including empty, shortest first)
+subsets = {
+	[] -> [[];],
+	[h, t] -> let ss = subsets t in concat ss (map (cons h) ss)
+},
+
+-- subsetsWithRest n l: all ways to choose n elements, each result as [chosen, rest]
+subsetsWithRest = {
+	0 -> l -> [[[], l];],
+	n -> {
+		[] -> [],
+		[h, t] ->
+			concat
+				(map ([ch, r] -> [[h, ch], r]) (subsetsWithRest (pred n) t))
+				(subsetsWithRest n t)
 	}
 },
 
-sort = sortWith lt,
+-- choose n l: all n-element subsets of l
+choose = n -> l -> map first (subsetsWithRest n l),
 
--- uniquePairs l: all ordered pairs (a, b) where a appears before b in l
-uniquePairs = {
-	[] -> [],
-	[h,t] -> concat (map (cons h) t) (uniquePairs t)
+-- crossPairs a b: Cartesian product — all pairs [x, y] with x from a, y from b
+crossPairs = a -> b -> flatten (map (x -> map (y -> [x, y]) b) a),
+
+-- permutations l: all permutations of l
+permutations = {
+	[] -> [[];],
+	l -> flatten (map (x -> map (cons x) (permutations (remove x l))) l)
 }

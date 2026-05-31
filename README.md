@@ -660,48 +660,120 @@ Imports `math` and `core` (circular with `core` — permitted).
 `nub l` — remove duplicates, keeping first occurrences.
 `maximum` / `minimum` — crash on an empty list.
 
+**Sorting**
+`partition`, `sortWith`, `sort`
+
+`partition p l` — returns `[matching, rest]`; both halves are lists.
+`sortWith f l` — quicksort; `f pivot elem = 1` if `elem` belongs before `pivot`.
+`sort l` — ascending sort using the builtin `lt` comparator.
+
 **Infinite lists**
 `iterate`, `downFrom`, `upFrom`, `repeat`, `cycle`
 
 ```
 import list in
-  show (list.take 8 (list.upFrom 1))          -- [1; 2; 3; 4; 5; 6; 7; 8]
-  show (list.take 6 (list.cycle [1; 2; 3]))   -- [1; 2; 3; 1; 2; 3]
+  show (list.take 8 (list.upFrom 1))                   -- [1; 2; 3; 4; 5; 6; 7; 8]
+  show (list.sort [3; 1; 4; 1; 5])                     -- [1; 1; 3; 4; 5]
+  show (list.take 6 (list.cycle [1; 2; 3]))            -- [1; 2; 3; 1; 2; 3]
 ```
 
 ---
 
-#### `comb` — sorting and combinatorics
+#### `comb` — combinatorics
 
 Imports `list`, `math`, and `core`.
 
 | Name | Description |
 |------|-------------|
-| `partition p l` | `[[elements where p holds], [elements where p does not]]` |
-| `sortWith f l` | quicksort; `f pivot elem = 1` if `elem` belongs before `pivot` |
-| `sort l` | ascending sort (uses builtin `lt`) |
-| `uniquePairs l` | all ordered pairs `[a, b]` where `a` appears before `b` in `l` |
+| `subsets l` | power set — all subsets of `l` (including `[]`, shortest first) |
+| `subsetsWithRest n l` | all ways to pick `n` elements; each result is `[chosen, rest]` |
+| `choose n l` | all `n`-element subsets of `l` (= `map first (subsetsWithRest n l)`) |
+| `uniquePairs l` | all ordered pairs `[a, b]` where `a` appears before `b` (= `choose 2`) |
+| `crossPairs a b` | Cartesian product — all pairs `[x, y]` with `x` from `a`, `y` from `b` |
+| `permutations l` | all permutations of `l` |
+
+```
+import list, comb in
+  show (comb.choose 2 [1; 2; 3])         -- [[1; 2]; [1; 3]; [2; 3]]
+  show (comb.permutations [1; 2; 3])     -- [[1;2;3]; [1;3;2]; [2;1;3]; ...]
+  show (comb.crossPairs [1;2] [3;4])     -- [[1,3]; [1,4]; [2,3]; [2,4]]
+  show (comb.subsets [1; 2])             -- [[]; [2;]; [1;]; [1;2]]
+```
 
 ---
 
-#### `text` — string formatting and value rendering
+#### `text` — string formatting, parsing, and value rendering
 
 Imports `list`, `math`, and `core`. Strings are lists of Unicode code points, so
-all `list` functions work on them; this module adds higher-level formatting.
+all `list` functions work on them; this module adds higher-level formatting and parsing.
+
+**`char` and named code-point constants**
+
+Microfun string literals have no escape sequences, so characters that would
+normally be written as `\t`, `\n`, etc. must be expressed as integers.
+
+`char s` is an alias for `head` — it extracts the code point of the first (or only)
+character of a string, and is the idiomatic way to write character literals:
+`char 'A'` = `65`, `char '0'` = `48`.
+
+| Constant | Value | Usual escape |
+|----------|-------|--------------|
+| `nul` | 0 | `\0` |
+| `tab` | 9 | `\t` |
+| `lf` | 10 | `\n` |
+| `cr` | 13 | `\r` |
+| `esc` | 27 | `\e` |
+| `space` | 32 | |
+| `dquote` | 34 | `\"` |
+| `quote` | 39 | `\'` (string delimiter — cannot appear in a literal) |
+| `backslash` | 92 | `\\` |
+
+**Formatting**
 
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
-| `padLeft n char s` | left-pad `s` with single-char string `char` to width `n` |
+| `padLeft n fill s` | left-pad `s` with single-char string `fill` to width `n` |
 | `intToString n` | render an integer as a string (wrong output for non-integers) |
 | `floatToString prec n` | render `n` with exactly `prec` decimal digits |
 | `toString x` | render any number, list, or tuple as a string for `write` |
 
 `toString` does not support tuples with more than 10 elements or function values.
 
+**Character classification and conversion**
+
+All functions below take a Unicode code point (an integer, as found in a microfun string).
+
+| Name | Description |
+|------|-------------|
+| `isDigit c` | `1` if `c` is `'0'`–`'9'` |
+| `isLower c` | `1` if `c` is `'a'`–`'z'` |
+| `isUpper c` | `1` if `c` is `'A'`–`'Z'` |
+| `isAlpha c` | `1` if `c` is a letter |
+| `isAlphaNum c` | `1` if `c` is a letter or digit |
+| `isSpace c` | `1` if `c` is `space`, `tab`, `lf`, or `cr` |
+| `toLower c` | lowercase the character; non-uppercase returned unchanged |
+| `toUpper c` | uppercase the character; non-lowercase returned unchanged |
+| `digitToInt c` | digit character → integer (`char '5'` → `5`) |
+| `intToDigit n` | integer → digit character (`5` → `char '5'`) |
+
+**Parsing**
+
+| Name | Description |
+|------|-------------|
+| `stringToInt s` | parse a decimal integer string (optional leading `'-'`) |
+| `stringToFloat s` | parse a decimal float string (optional `'-'` and `'.'`) |
+| `split sep s` | split `s` on separator `sep`; returns a list of strings |
+
+`stringToInt` and `stringToFloat` do no validation — non-digit characters produce
+wrong results silently. `split "" s` splits `s` into individual single-character strings.
+
 ```
 import text, list in
-  write (text.toString [1; 2; 3])           -- [1; 2; 3]
-  write (text.floatToString 2 3.14159)      -- 3.14
-  write (text.join ", " ["a"; "b"; "c"])    -- a, b, c
+  write (text.toString [1; 2; 3])                     -- [1; 2; 3]
+  write (text.floatToString 2 3.14159)                -- 3.14
+  write (text.join ", " ["a"; "b"; "c"])              -- a, b, c
+  write (map text.toUpper 'hello')                    -- HELLO
+  show  (text.stringToInt '123')                      -- 123
+  show  (text.split ',' 'one,two,three')              -- ["one"; "two"; "three"]
 ```

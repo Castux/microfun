@@ -163,6 +163,25 @@ nth = n -> {
 	[h,t] -> if (eq n 0) h (nth (sub 1 n) t)
 },
 
+-- Sorting
+
+-- partition p l = [[elements where p holds], [elements where p does not]]
+partition = p ->
+	foldr
+	( x -> [ts,fs] -> if (p x) [[x,ts],fs] [ts,[x,fs]] )
+	[[],[]],
+
+-- sortWith f l: quicksort; f pivot elem = 1 if elem belongs before pivot
+sortWith = f -> {
+	[] -> [],
+	[x,xs] -> partition (f x) xs > {
+		[low,high] -> concat (sortWith f low) [x, sortWith f high]
+	}
+},
+
+-- sort l: ascending sort using the builtin lt comparator
+sort = sortWith lt,
+
 -- Infinite lists
 
 iterate  = f -> x -> [x, iterate f (f x)],

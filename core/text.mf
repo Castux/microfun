@@ -1,9 +1,23 @@
--- text.mf: string formatting and value rendering.
+-- text.mf: string formatting, parsing, and value rendering.
 -- Strings in microfun are lists of Unicode code points, so all list operations
 -- work on them directly. This module adds higher-level formatting utilities.
 import list, math, core in
 
 module
+
+-- char s: code point of the first (or only) character of string s
+char = head,
+
+-- Named code points for characters that cannot appear in string literals
+nul       = 0,   -- \0  null
+tab       = 9,   -- \t  horizontal tab
+lf        = 10,  -- \n  line feed (newline on Unix)
+cr        = 13,  -- \r  carriage return
+esc       = 27,  -- \e  escape
+space     = 32,  --     space
+dquote    = 34,  -- \"  double quote
+quote     = 39,  -- \'  single quote (string delimiter in microfun)
+backslash = 92,  -- \\  backslash
 
 -- join separator strings: intercalate separator between each string in the list
 join = separator -> {
@@ -14,10 +28,10 @@ join = separator -> {
 	}
 },
 
--- padLeft n char s: left-pad string s with single-char string char to minimum width n
-padLeft = n -> char -> s ->
+-- padLeft n fill s: left-pad string s with single-char string fill to minimum width n
+padLeft = n -> fill -> s ->
 	concat
-		(flatten (replicate (max 0 (sub (length s) n)) char))
+		(flatten (replicate (max 0 (sub (length s) n)) fill))
 		s,
 
 -- intToString n: render an integer as a string.
@@ -75,4 +89,72 @@ toString =
 					(flatten ['[' ; asList > map toString > join ', ' ; ']'])
 					(intToString asList)
 	in
-		x -> if (isList x) (listToString x) (tupleToString x)
+		x -> if (isList x) (listToString x) (tupleToString x),
+
+-- Character classification — all functions take a Unicode code point (integer)
+
+isDigit    = c -> and (lte c (head '0')) (lte (head '9') c),
+isLower    = c -> and (lte c (head 'a')) (lte (head 'z') c),
+isUpper    = c -> and (lte c (head 'A')) (lte (head 'Z') c),
+isAlpha    = c -> or (isLower c) (isUpper c),
+isAlphaNum = c -> or (isAlpha c) (isDigit c),
+isSpace    = c -> contains c [space; tab; lf; cr],
+
+-- Character conversion
+digitToInt = c -> sub (head '0') c,
+intToDigit = n -> add (head '0') n,
+toLower    = c -> if (isUpper c) (add (sub (head 'A') (head 'a')) c) c,
+toUpper    = c -> if (isLower c) (sub (sub (head 'A') (head 'a')) c) c,
+
+-- stringToInt s: parse a decimal integer string (optional leading '-') as a number.
+-- No validation; non-digit characters produce wrong results.
+stringToInt = s ->
+	let
+		zero         = head '0',
+		neg          = head '-',
+		parsePositive = foldl (acc -> c -> add (mul 10 acc) (sub zero c)) 0
+	in
+		s > {
+			[] -> 0,
+			[c, rest] -> if (equal c neg) (minus (parsePositive rest)) (parsePositive s)
+		},
+
+-- stringToFloat s: parse a decimal float string (optional leading '-', optional '.').
+-- No validation; non-digit/non-dot characters produce wrong results.
+stringToFloat = s ->
+	let
+		zero         = head '0',
+		neg          = head '-',
+		dot          = head '.',
+		digitVal     = c -> sub zero c,
+		parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitVal c)) 0,
+		parseFrac     = foldr (c -> acc -> fdiv 10 (add acc (digitVal c))) 0,
+		parseUnsigned = u ->
+			u > span (c -> neq c dot) > {
+				[intPart, []]        -> parsePositive intPart,
+				[intPart, [d, frac]] -> add (parsePositive intPart) (parseFrac frac)
+			}
+	in
+		s > {
+			[] -> 0,
+			[c, rest] -> if (equal c neg)
+				(minus (parseUnsigned rest))
+				(parseUnsigned s)
+		},
+
+-- split sep s: split string s on separator sep, returning a list of strings.
+-- Consecutive separators produce empty strings. Empty sep splits into single-char strings.
+split = sep -> s ->
+	if (empty sep)
+		(map (c -> [c;]) s)
+		(let
+			sepLen = length sep,
+			go     = current -> str ->
+				if (equal sep (take sepLen str))
+					[reverse current, go [] (drop sepLen str)]
+					(str > {
+						[] -> [reverse current;],
+						[c, rest] -> go [c, current] rest
+					})
+		in
+			go [] s)

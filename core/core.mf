@@ -1,5 +1,5 @@
 -- core.mf: foundational combinators, tuple accessors, and boolean logic.
--- Imports list for `ifs` (which uses list.filter and list.map).
+-- Imports list for `ifs` (which uses list.foldr).
 -- Circular with list (list imports core for `if`, `not`, etc.) — permitted by the language.
 import list in
 
@@ -25,11 +25,7 @@ if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 
 -- ifs [(cond1, val1); (cond2, val2); ...] else
 -- Returns the value paired with the first true condition, or else.
-ifs = l -> else ->
-	l > filter first > map second > {
-		[h, rest] -> h,
-		[] -> else
-	},
+ifs = l -> else -> foldr ([c, v] -> acc -> if c v acc) else l,
 
 and = a -> b -> if a b 0,
 or  = a -> b -> if a 1 b,
