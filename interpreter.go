@@ -116,6 +116,14 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.FoldString(e.Value)
 
 	case *Tuple:
+		// A 2-tuple is represented as a cons cell (see RuntimeCons); every other
+		// arity stays a RuntimeTuple.
+		if len(e.SubExpressions) == 2 {
+			return RuntimeCons{
+				Head: i.RunExpression(e.SubExpressions[0]),
+				Tail: i.RunExpression(e.SubExpressions[1]),
+			}
+		}
 		var tup RuntimeTuple
 		for _, subexp := range e.SubExpressions {
 			tup = append(tup, i.RunExpression(subexp))
@@ -180,19 +188,19 @@ func (i *Interpreter) MakeClosure(lambdas ...*Lambda) RuntimeClosure {
 }
 
 func (i *Interpreter) FoldList(list *List) RuntimeValue {
-	var current RuntimeTuple
+	var current RuntimeValue = RuntimeTuple{} // the empty list terminates the chain
 	for _, elem := range slices.Backward(list.SubExpressions) {
-		current = RuntimeTuple{i.RunExpression(elem), current}
+		current = RuntimeCons{i.RunExpression(elem), current}
 	}
 	return current
 }
 
 func (i *Interpreter) FoldString(str string) RuntimeValue {
-	var current RuntimeTuple
+	var current RuntimeValue = RuntimeTuple{} // the empty list terminates the chain
 	for len(str) > 0 {
 		r, size := utf8.DecodeLastRuneInString(str)
 		str = str[:len(str)-size]
-		current = RuntimeTuple{RuntimeNumber(r), current}
+		current = RuntimeCons{RuntimeNumber(r), current}
 	}
 	return current
 }
@@ -220,7 +228,7 @@ func (i *Interpreter) makeInputStream(readCell func() (RuntimeNumber, bool)) *Na
 			return RuntimeTuple{} // end of input is the empty list
 		}
 		tail := &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
-		return RuntimeTuple{value, tail}
+		return RuntimeCons{value, tail}
 	}
 	return &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
 }
@@ -431,7 +439,7 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 				}
 				control = function.Function1
 
-			case RuntimeNumber, RuntimeTuple:
+			case RuntimeNumber, RuntimeTuple, RuntimeCons:
 				i.raiseRuntimeError(
 					"cannot apply "+i.ShowValue(function)+", it is not a function",
 					frame.Pos, stack)
@@ -495,7 +503,28 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		}
 
 	case *TuplePattern:
-		right, ok := i.EvaluateToTuple(argument)
+		forced := i.EvaluateToWeakHeadNormalForm(argument)
+
+		// A cons cell is the runtime form of a 2-tuple, so an arity-2 tuple
+		// pattern (this is also what a normalized list pattern reduces to)
+		// matches it against its head and tail directly.
+		if cons, isCons := forced.(RuntimeCons); isCons {
+			if len(patt.SubPatterns) != 2 {
+				return nil
+			}
+			env := i.MatchPattern(patt.SubPatterns[0], cons.Head)
+			if env == nil {
+				return nil
+			}
+			tailEnv := i.MatchPattern(patt.SubPatterns[1], cons.Tail)
+			if tailEnv == nil {
+				return nil
+			}
+			maps.Copy(env, tailEnv)
+			return env
+		}
+
+		right, ok := forced.(RuntimeTuple)
 		if !ok || len(right) != len(patt.SubPatterns) {
 			return nil
 		}
@@ -515,15 +544,15 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 	case *StringLiteral:
 		current := argument
 		for _, expected := range []rune(patt.Value) {
-			cell, ok := i.EvaluateToTuple(current)
-			if !ok || len(cell) != 2 {
+			cell, ok := i.EvaluateToWeakHeadNormalForm(current).(RuntimeCons)
+			if !ok {
 				return nil
 			}
-			head, ok := i.EvaluateToNumber(cell[0])
+			head, ok := i.EvaluateToNumber(cell.Head)
 			if !ok || rune(head) != expected {
 				return nil
 			}
-			current = cell[1]
+			current = cell.Tail
 		}
 		// The string's code points are exhausted, so the list must end here.
 		rest, ok := i.EvaluateToTuple(current)
@@ -544,13 +573,23 @@ func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*Nam
 		seen[named] = true
 	}
 
-	forced := i.EvaluateToWeakHeadNormalForm(value)
-	if tuple, isTuple := forced.(RuntimeTuple); isTuple {
-		for index, element := range tuple {
-			tuple[index] = i.EvaluateToFullNormalForm(element, seen)
+	switch forced := i.EvaluateToWeakHeadNormalForm(value).(type) {
+	case RuntimeTuple:
+		for index, element := range forced {
+			forced[index] = i.EvaluateToFullNormalForm(element, seen)
 		}
+		return forced
+	case RuntimeCons:
+		// A RuntimeCons is a value, so we cannot write the forced head and tail
+		// back into it; forcing them is enough, because the memoization happens
+		// in their own thunks. Cycles still terminate via the seen set on the
+		// *NamedValue thunks any cyclic structure must pass through.
+		i.EvaluateToFullNormalForm(forced.Head, seen)
+		i.EvaluateToFullNormalForm(forced.Tail, seen)
+		return forced
+	default:
+		return forced
 	}
-	return forced
 }
 
 type ComparisonPair struct {
@@ -583,6 +622,11 @@ func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool)
 				}
 			}
 			return true
+		}
+	case RuntimeCons:
+		if valB, ok := forcedB.(RuntimeCons); ok {
+			return i.DeepEqual(valA.Head, valB.Head, seen) &&
+				i.DeepEqual(valA.Tail, valB.Tail, seen)
 		}
 	}
 

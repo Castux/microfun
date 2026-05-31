@@ -120,28 +120,28 @@ func init() {
 		},
 		"write": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 			original := a
+		walk:
 			for {
-				cell, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeTuple)
-				if !ok {
+				switch cell := interpreter.EvaluateToWeakHeadNormalForm(a).(type) {
+				case RuntimeCons:
+					number, ok := interpreter.EvaluateToWeakHeadNormalForm(cell.Head).(RuntimeNumber)
+					if !ok {
+						interpreter.builtinError("write expects a list of code points, found a non-number element")
+					}
+					fmt.Printf("%c", rune(int(number)))
+					a = cell.Tail
+
+				case RuntimeTuple:
+					// The only valid non-cons value is the empty list, which ends
+					// the walk; any other tuple arity is an error.
+					if len(cell) != 0 {
+						interpreter.builtinError("write expects a list of code points")
+					}
+					break walk
+
+				default:
 					interpreter.builtinError("write expects a list of code points")
 				}
-
-				if len(cell) == 0 {
-					break
-				}
-
-				if len(cell) != 2 {
-					interpreter.builtinError("write expects a list of code points")
-				}
-
-				number, ok := interpreter.EvaluateToWeakHeadNormalForm(cell[0]).(RuntimeNumber)
-				if !ok {
-					interpreter.builtinError("write expects a list of code points, found a non-number element")
-				}
-
-				fmt.Printf("%c", rune(int(number)))
-
-				a = cell[1]
 			}
 			fmt.Println()
 			return original

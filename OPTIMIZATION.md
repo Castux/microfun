@@ -81,14 +81,28 @@ Reduction applies `First` when the second argument arrives; no Go closure alloca
 
 ---
 
-## 7. Use a dedicated cons-cell type instead of `RuntimeTuple` for lists
+## 7. Use a dedicated cons-cell type instead of `RuntimeTuple` for lists ✅
 
-**Files:** `runtime.go`, `interpreter.go`  
+**Files:** `runtime.go`, `interpreter.go`, `show.go`, `builtins.go`  
 **Problem:** Every list node `[head, tail]` is a `RuntimeTuple` backed by a `[]RuntimeValue`
 slice (two-word header + heap array). For long lists this is O(N) small, scattered
 allocations with poor cache locality. Every consumer checks `len(cell) == 2`.  
 **Fix:** Add a `RuntimeCons struct{ Head, Tail RuntimeValue }` type. Eliminates the slice
 header overhead, removes the length checks, and packs tighter in memory.
+
+Because microfun draws no distinction between a 2-tuple and a list cons cell (a list
+*is* nested 2-tuples — see README §11), the representation is made uniform: **every**
+2-element tuple is a `RuntimeCons`, not just those built by `FoldList` / `FoldString` /
+the stdin stream but also a bare `[a, b]` pair. `RuntimeTuple` is then only ever arity
+0, 1, 3, 4, …; the empty list stays the empty `RuntimeTuple`. Consumers that walk a list
+spine (`MatchPattern` for arity-2 tuple/normalized-list and string patterns, `write`,
+`CollectListSpine`) switch on `RuntimeCons` directly, and the deep operations
+(`EvaluateToFullNormalForm`, `DeepEqual`) and the renderer treat a `RuntimeCons` exactly
+as a length-2 tuple. Since a `RuntimeCons` is a value (not a slice), full-normal-form
+forcing can no longer write the forced head/tail back into the cell, but that is only a
+memoization detail — the head and tail thunks memoize their own weak head normal form, so
+correctness (including cycle termination, which always passes through a `*NamedValue`) is
+unchanged.
 
 ---
 

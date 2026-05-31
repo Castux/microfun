@@ -266,7 +266,8 @@ The variants are:
 | Type | Meaning |
 |------|---------|
 | `RuntimeNumber` | A number (a `float64`). The only primitive. |
-| `RuntimeTuple` | An ordered sequence of values (`[]RuntimeValue`). The only constructor; also how lists and strings are represented. |
+| `RuntimeTuple` | An ordered sequence of values (`[]RuntimeValue`), of arity 0, 1, 3, 4, … The empty tuple is also the empty list. |
+| `RuntimeCons` | A 2-tuple `{Head, Tail}`. Because microfun makes no distinction between a 2-tuple and a list cons cell, *every* 2-element tuple is a `RuntimeCons` — list literals, string code points, the stdin stream, and a bare `[a, b]` pair alike. Avoids the slice header a 2-element `RuntimeTuple` would carry. |
 | `RuntimeApplication` | An *unreduced* application `Function Argument`, plus the source `Pos` for error reporting. |
 | `RuntimeComposition` | An unreduced composition; reducing `(f ∘ g) x` yields `f (g x)`. |
 | `RuntimeClosure` | A multi-lambda paired with the environment of captured upvalues. |
@@ -301,9 +302,11 @@ graph without forcing anything that laziness should defer.
   building nested cons cells).
 - A `Tuple` becomes a `RuntimeTuple` whose elements are the *translations* of the
   sub-expressions — note these are translated eagerly into the value graph, but
-  not reduced.
-- A `List` becomes nested 2-tuples via `FoldList`, the runtime realization of the
-  list-as-cons-cells convention.
+  not reduced. A 2-element tuple instead becomes a `RuntimeCons` (see
+  [§7](#7-runtime-values)), since a 2-tuple and a list cons cell are the same
+  thing.
+- A `List` becomes nested `RuntimeCons` cells via `FoldList`, ending in the empty
+  `RuntimeTuple` — the runtime realization of the list-as-cons-cells convention.
 - An `Operation` is handled by `FoldOperation`, which turns the operator and
   operands into the right nesting of `RuntimeApplication` / `RuntimeComposition`
   nodes (see below).
@@ -391,8 +394,8 @@ The reducer keeps a `control` value in hand and loops:
      - a `RuntimeBuiltin` is simply called with the argument;
      - a `RuntimeComposition` `(f ∘ g)` applied to `x` rewrites the waiting frame
        to hold `g x` and sets `control` to `f`, realizing `f (g x)`;
-     - a `RuntimeNumber` or `RuntimeTuple` with an argument waiting is the error
-       "cannot apply …, it is not a function".
+     - a `RuntimeNumber`, `RuntimeTuple`, or `RuntimeCons` with an argument
+       waiting is the error "cannot apply …, it is not a function".
 
 Because spine unwinding, thunk chains, and closure tail calls all happen by
 mutating `control` and the explicit stack — never by recursive Go calls — the
@@ -424,18 +427,22 @@ pattern forces its argument:
 - **`TuplePattern`**: the argument is reduced to weak head normal form; it must be
   a tuple of the same arity. Sub-patterns are matched against the elements, which
   themselves remain unforced unless a sub-pattern forces them. Match environments
-  are merged.
-- **`ListPattern`**: a list pattern of length *n* is matched as a chain of
-  cons-cells: the head sub-pattern against `tuple[0]`, then a `ListPattern` of the
-  remaining sub-patterns against `tuple[1]`, bottoming out at the empty pattern,
-  which requires the empty tuple. So `[a; b]` matches exactly a proper two-element
-  list and binds `a` and `b` to the elements.
+  are merged. An arity-2 pattern also matches a `RuntimeCons` (the runtime form of
+  a 2-tuple), matching its sub-patterns against the cons cell's head and tail
+  directly — this is the common case, since a normalized list pattern is a chain of
+  arity-2 tuple patterns (below) and most list code destructures cons cells.
+- **`ListPattern`**: the analyzer normalizes every list pattern away before
+  runtime (see [§6](#6-analyzer)), so `MatchPattern` never sees one — a list
+  pattern of length *n* is rewritten to a chain of arity-2 `TuplePattern`s (head,
+  then the rest), bottoming out at the empty `TuplePattern`, which requires the
+  empty list. So `[a; b]` is `[a, [b, []]]` and, via the arity-2 cons matching
+  above, matches exactly a proper two-element list and binds `a` and `b`.
 - **`StringLiteral`**: a flat literal — it matches a value that is exactly the
   list of the string's code points and binds nothing. Because it is not recursive
-  (no sub-patterns), it does not reuse the `ListPattern` machinery: it walks the
-  cons-cell spine directly, comparing each head to the expected code point (as a
-  number pattern would) and requiring the list to end at the same length. `""`
-  matches the empty list.
+  (no sub-patterns), it walks the cons-cell spine directly: each cell must be a
+  `RuntimeCons` whose head equals the expected code point (compared as a number
+  pattern would), and the list must end (at the empty tuple) at the same length.
+  `""` matches the empty list.
 
 Note the laziness contract: matching a tuple, list, or string pattern forces only
 the *spine* needed to check the shape — and, for number and string patterns, the
@@ -448,15 +455,20 @@ Two operations need to look *inside* constructors.
 `EvaluateToFullNormalForm` (the `eval`/`show` builtins) forces a value all the
 way down: it reduces to weak head normal form and, if the result is a tuple,
 recursively forces every element, writing the forced elements back into the tuple
-in place. A `seen` set of `*NamedValue`s breaks cycles, so forcing a
-self-referential structure terminates by stopping when it revisits a thunk.
+in place. A `RuntimeCons` is forced the same way but its head and tail cannot be
+written back — a cons is a value, not a slice — so the work is only memoized in
+those thunks' own weak head normal forms; this is a memoization detail, not a
+correctness one. A `seen` set of `*NamedValue`s breaks cycles, so forcing a
+self-referential structure terminates by stopping when it revisits a thunk
+(every cycle passes through a `*NamedValue`).
 
 `DeepEqual` (the `equal` builtin) compares two values by structure, forcing both
-sides only as far as needed at each level: equal numbers, or tuples of equal
-length with element-wise equal contents. Pointer-identical values short-circuit
-to equal, and a `seen` set of value pairs keeps the comparison of cyclic
-structures from looping. Functions are not structurally comparable, so they
-compare equal only via pointer identity (i.e. the same closure value).
+sides only as far as needed at each level: equal numbers, tuples of equal length
+with element-wise equal contents, or cons cells with equal heads and tails.
+Pointer-identical values short-circuit to equal, and a `seen` set of value pairs
+keeps the comparison of cyclic structures from looping. Functions are not
+structurally comparable, so they compare equal only via pointer identity (i.e. the
+same closure value).
 
 ## 12. Showing values
 
@@ -470,12 +482,13 @@ values the language can produce:
 - `ShowValueFull` removes the caps and is used by `show`.
 
 `WriteValue` reduces a value to weak head normal form and dispatches on its shape.
-For a tuple it calls `WriteTupleOrList`, which decides whether the tuple *looks
-like* a list — a chain of 2-tuples ending in the empty tuple — and if so prints it
-with list syntax `[a; b; c]`, otherwise with tuple syntax `[a, b]`.
+A `RuntimeCons` goes to `WriteConsOrList`, which decides whether the cell *looks
+like* a list — a chain of cons cells ending in the empty tuple — and if so prints
+it with list syntax `[a; b; c]`, otherwise as a plain 2-tuple `[a, b]`.
 `CollectListSpine` walks that chain forcing only the spine (the heads stay lazy
 until rendered) and reports how it ended: a proper list, a non-list, a width
-truncation, or a cycle.
+truncation, or a cycle. A non-cons `RuntimeTuple` (arity 0, 1, 3, 4, …) goes to
+`WriteTuple`, which always uses tuple syntax (the empty tuple prints as `[]`).
 
 Cycles and sharing are handled with an `expanding` set of the `*NamedValue`s
 currently on the path: a value that refers back to a binding being rendered prints

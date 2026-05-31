@@ -68,8 +68,11 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 	case RuntimeNumber:
 		builder.WriteString(FormatNumber(forced))
 
+	case RuntimeCons:
+		i.WriteConsOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
+
 	case RuntimeTuple:
-		i.WriteTupleOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
+		i.WriteTuple(builder, forced, depth, maxDepth, maxWidth, expanding)
 
 	case RuntimeClosure, RuntimeBuiltin, RuntimeComposition, RuntimePartial:
 		if name != "" {
@@ -83,37 +86,42 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 	}
 }
 
-// WriteTupleOrList renders a tuple as a list [a; b; c] when its shape looks like
-// a chain of cons cells, and as a plain tuple {a, b} otherwise.
-func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTuple, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
+// WriteConsOrList renders a cons cell as a list [a; b; c] when its tail chain
+// ends in the empty list, and as a plain 2-tuple [a, b] otherwise.
+func (i *Interpreter) WriteConsOrList(builder *strings.Builder, cons RuntimeCons, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
-	if len(tuple) == 0 {
-		builder.WriteString("[]")
+	heads, ending, tailName := i.CollectListSpine(cons, expanding, maxWidth)
+	if ending != NotAList {
+		builder.WriteByte('[')
+		for index, head := range heads {
+			if index > 0 {
+				builder.WriteString("; ")
+			}
+			i.WriteValue(builder, head, depth+1, maxDepth, maxWidth, expanding)
+		}
+		if ending == Truncated {
+			builder.WriteString("; …")
+		} else if ending == Cyclic {
+			builder.WriteString("; ")
+			builder.WriteString(tailName)
+		} else if ending == ProperList && len(heads) == 1 {
+			builder.WriteString(";")
+		}
+		builder.WriteByte(']')
 		return
 	}
 
-	if len(tuple) == 2 {
-		heads, ending, tailName := i.CollectListSpine(tuple, expanding, maxWidth)
-		if ending != NotAList {
-			builder.WriteByte('[')
-			for index, head := range heads {
-				if index > 0 {
-					builder.WriteString("; ")
-				}
-				i.WriteValue(builder, head, depth+1, maxDepth, maxWidth, expanding)
-			}
-			if ending == Truncated {
-				builder.WriteString("; …")
-			} else if ending == Cyclic {
-				builder.WriteString("; ")
-				builder.WriteString(tailName)
-			} else if ending == ProperList && len(heads) == 1 {
-				builder.WriteString(";")
-			}
-			builder.WriteByte(']')
-			return
-		}
-	}
+	// The tail is not a list, so this cons is really a 2-tuple pair.
+	builder.WriteByte('[')
+	i.WriteValue(builder, cons.Head, depth+1, maxDepth, maxWidth, expanding)
+	builder.WriteString(", ")
+	i.WriteValue(builder, cons.Tail, depth+1, maxDepth, maxWidth, expanding)
+	builder.WriteByte(']')
+}
+
+// WriteTuple renders a non-cons tuple (arity 0, 1, 3, 4, …) as [a, b, c]. The
+// empty tuple, which is also the empty list, prints as [].
+func (i *Interpreter) WriteTuple(builder *strings.Builder, tuple RuntimeTuple, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
 	builder.WriteByte('[')
 	for index, element := range tuple {
@@ -125,11 +133,11 @@ func (i *Interpreter) WriteTupleOrList(builder *strings.Builder, tuple RuntimeTu
 	builder.WriteByte(']')
 }
 
-// CollectListSpine walks a chain of 2-tuples, gathering the (still unforced) head
-// of each cell and reporting how the chain ended. It forces only the spine, so
-// the heads stay lazy until they are rendered. A repeated named value, or one
+// CollectListSpine walks a chain of cons cells, gathering the (still unforced)
+// head of each cell and reporting how the chain ended. It forces only the spine,
+// so the heads stay lazy until they are rendered. A repeated named value, or one
 // already being expanded above, is reported as a cycle rather than followed.
-func (i *Interpreter) CollectListSpine(start RuntimeTuple, expanding map[*NamedValue]bool, maxWidth int) ([]RuntimeValue, ListEnding, string) {
+func (i *Interpreter) CollectListSpine(start RuntimeCons, expanding map[*NamedValue]bool, maxWidth int) ([]RuntimeValue, ListEnding, string) {
 
 	var heads []RuntimeValue
 	seen := make(map[*NamedValue]bool)
@@ -143,22 +151,20 @@ func (i *Interpreter) CollectListSpine(start RuntimeTuple, expanding map[*NamedV
 			seen[named] = true
 		}
 
-		tuple, isTuple := i.EvaluateToWeakHeadNormalForm(current).(RuntimeTuple)
-		if !isTuple {
+		switch forced := i.EvaluateToWeakHeadNormalForm(current).(type) {
+		case RuntimeCons:
+			heads = append(heads, forced.Head)
+			current = forced.Tail
+			if len(heads) >= maxWidth {
+				return heads, Truncated, ""
+			}
+		case RuntimeTuple:
+			if len(forced) == 0 {
+				return heads, ProperList, ""
+			}
 			return nil, NotAList, ""
-		}
-		if len(tuple) == 0 {
-			return heads, ProperList, ""
-		}
-		if len(tuple) != 2 {
+		default:
 			return nil, NotAList, ""
-		}
-
-		heads = append(heads, tuple[0])
-		current = tuple[1]
-
-		if len(heads) >= maxWidth {
-			return heads, Truncated, ""
 		}
 	}
 }
