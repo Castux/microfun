@@ -53,7 +53,7 @@ become flat arrays; name lookup becomes an integer index.
 
 ---
 
-## 5. Avoid map allocation in `MakeClosure` for zero-upvalue closures
+## 5. Avoid map allocation in `MakeClosure` for zero-upvalue closures ✅
 
 **File:** `interpreter.go` — `MakeClosure`  
 **Problem:** `make(Environment)` is called unconditionally, allocating a map even when the
@@ -63,7 +63,7 @@ upvalues consider a fixed-size inline struct before map allocation.
 
 ---
 
-## 6. Avoid heap-allocating Go closures for partial binop application
+## 6. Avoid heap-allocating Go closures for partial binop application ✅
 
 **File:** `builtins.go` — `WrapBinop`  
 **Problem:** Every `add x`, `mul x`, etc. creates a new Go function closure on the heap
@@ -92,7 +92,7 @@ header overhead, removes the length checks, and packs tighter in memory.
 
 ---
 
-## 8. Avoid `[]rune` allocation in `FoldString`
+## 8. Avoid `[]rune` allocation in `FoldString` ✅
 
 **File:** `interpreter.go` — `FoldString`  
 **Problem:** `slices.Backward([]rune(str))` converts the whole string to a rune slice

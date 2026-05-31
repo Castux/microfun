@@ -71,7 +71,7 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 	case RuntimeTuple:
 		i.WriteTupleOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
 
-	case RuntimeClosure, RuntimeBuiltin, RuntimeComposition:
+	case RuntimeClosure, RuntimeBuiltin, RuntimeComposition, RuntimePartial:
 		if name != "" {
 			builder.WriteString(name)
 		} else {

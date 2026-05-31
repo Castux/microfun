@@ -13,6 +13,13 @@ func inputStreamPlaceholder(*Interpreter, RuntimeValue) RuntimeValue {
 type Monop func(float64) float64
 type Binop func(float64, float64) float64
 
+func equalApply(interp *Interpreter, a, b RuntimeValue) RuntimeValue {
+	if interp.DeepEqual(a, b, make(map[ComparisonPair]bool)) {
+		return RuntimeNumber(1)
+	}
+	return RuntimeNumber(0)
+}
+
 func WrapMonop(operation Monop, name string) RuntimeBuiltin {
 	function := func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 		number, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
@@ -28,21 +35,17 @@ func WrapMonop(operation Monop, name string) RuntimeBuiltin {
 }
 
 func WrapBinop(operation Binop, name string) RuntimeBuiltin {
-	outer := func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-		inner := func(interpreter *Interpreter, b RuntimeValue) RuntimeValue {
-			numberA, okA := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
-			numberB, okB := interpreter.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
-
-			if !okA || !okB {
-				interpreter.builtinError("argument to " + name + " is not a number")
-			}
-
-			return RuntimeNumber(operation(float64(numberA), float64(numberB)))
+	apply := func(interp *Interpreter, a, b RuntimeValue) RuntimeValue {
+		numberA, okA := interp.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
+		numberB, okB := interp.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
+		if !okA || !okB {
+			interp.builtinError("argument to " + name + " is not a number")
 		}
-
-		return RuntimeBuiltin(inner)
+		return RuntimeNumber(operation(float64(numberA), float64(numberB)))
 	}
-	return RuntimeBuiltin(outer)
+	return func(interp *Interpreter, a RuntimeValue) RuntimeValue {
+		return RuntimePartial{apply, a}
+	}
 }
 
 // Builtins is populated in init rather than as a plain var initializer: the
@@ -144,13 +147,7 @@ func init() {
 			return original
 		},
 		"equal": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			inner := func(interpreter *Interpreter, b RuntimeValue) RuntimeValue {
-				if interpreter.DeepEqual(a, b, make(map[ComparisonPair]bool)) {
-					return RuntimeNumber(1)
-				}
-				return RuntimeNumber(0)
-			}
-			return RuntimeBuiltin(inner)
+			return RuntimePartial{equalApply, a}
 		},
 		"stdin":  inputStreamPlaceholder,
 		"bstdin": inputStreamPlaceholder,

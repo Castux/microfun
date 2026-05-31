@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"unicode"
+	"unicode/utf8"
 )
 
 type Environment map[string]*NamedValue
@@ -166,9 +167,12 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 }
 
 func (i *Interpreter) MakeClosure(lambdas ...*Lambda) RuntimeClosure {
-	env := make(Environment)
+	var env Environment
 	for _, lambda := range lambdas {
 		for _, upvalue := range lambda.Upvalues {
+			if env == nil {
+				env = make(Environment)
+			}
 			env[upvalue] = i.ResolveName(upvalue).(*NamedValue)
 		}
 	}
@@ -185,11 +189,10 @@ func (i *Interpreter) FoldList(list *List) RuntimeValue {
 
 func (i *Interpreter) FoldString(str string) RuntimeValue {
 	var current RuntimeTuple
-	for _, elem := range slices.Backward([]rune(str)) {
-		current = RuntimeTuple{
-			RuntimeNumber(elem),
-			current,
-		}
+	for len(str) > 0 {
+		r, size := utf8.DecodeLastRuneInString(str)
+		str = str[:len(str)-size]
+		current = RuntimeTuple{RuntimeNumber(r), current}
 	}
 	return current
 }
@@ -409,6 +412,12 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 				i.builtinStack = stack
 				control = function(i, frame.Argument)
 
+			case RuntimePartial:
+				stack = stack[:len(stack)-1]
+				i.builtinPos = frame.Pos
+				i.builtinStack = stack
+				control = function.Apply(i, function.First, frame.Argument)
+
 			case RuntimeComposition:
 				// (function1 *> function2) argument reduces to
 				// function1 (function2 argument).
@@ -442,8 +451,10 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 // holds the reduction stack needed for the trace.
 func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) (RuntimeValue, bool) {
 
-	i.PushEnvironment(closure.Upvalues)
-	defer i.PopEnvironment()
+	if closure.Upvalues != nil {
+		i.PushEnvironment(closure.Upvalues)
+		defer i.PopEnvironment()
+	}
 
 	for _, lambda := range closure.Lambdas {
 		matched := i.MatchPattern(lambda.Pattern, argument)

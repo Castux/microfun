@@ -55,3 +55,13 @@ func (RuntimeClosure) isRuntimeValue() {}
 type RuntimeBuiltin func(*Interpreter, RuntimeValue) RuntimeValue
 
 func (RuntimeBuiltin) isRuntimeValue() {}
+
+// RuntimePartial holds the first argument of a two-argument builtin. Applying
+// it to a second argument calls Apply(interp, First, second) directly, avoiding
+// the Go closure allocation that WrapBinop would otherwise create per call.
+type RuntimePartial struct {
+	Apply func(*Interpreter, RuntimeValue, RuntimeValue) RuntimeValue
+	First RuntimeValue
+}
+
+func (RuntimePartial) isRuntimeValue() {}
