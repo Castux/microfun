@@ -501,45 +501,19 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		return env
 
 	case *ListPattern:
-		right, ok := i.EvaluateToTuple(argument)
-		if !ok {
-			return nil
-		}
-
 		if len(patt.SubPatterns) == 0 {
-			if len(right) == 0 {
-				return make(Environment)
-			} else {
-				return nil
-			}
+			return i.MatchPattern(&TuplePattern{Start: patt.Start, End: patt.End}, argument)
 		}
-
-		if len(right) != 2 {
-			return nil
-		}
-
-		leftEnv := i.MatchPattern(patt.SubPatterns[0], right[0])
-		if leftEnv == nil {
-			return nil
-		}
-		rightEnv := i.MatchPattern(&ListPattern{
-			SubPatterns: patt.SubPatterns[1:],
-			Start:       patt.Start,
-			End:         patt.End,
-		}, right[1])
-		if rightEnv == nil {
-			return nil
-		}
-		maps.Copy(leftEnv, rightEnv)
-		return leftEnv
+		return i.MatchPattern(&TuplePattern{
+			SubPatterns: []Pattern{
+				patt.SubPatterns[0],
+				&ListPattern{SubPatterns: patt.SubPatterns[1:], Start: patt.Start, End: patt.End},
+			},
+			Start: patt.Start,
+			End:   patt.End,
+		}, argument)
 
 	case *StringLiteral:
-		// A string pattern is a literal: it matches a value that is exactly the
-		// list of the string's code points, and binds nothing. Unlike a list
-		// pattern it is not recursive, so rather than reuse that machinery we
-		// just walk the cons-cell spine, comparing each head to the expected code
-		// point (as a number pattern would) and requiring the list to end at the
-		// same length.
 		current := argument
 		for _, expected := range []rune(patt.Value) {
 			cell, ok := i.EvaluateToTuple(current)
