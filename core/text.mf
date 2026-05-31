@@ -6,7 +6,7 @@ import list, math, core in
 module
 
 -- char s: code point of the first (or only) character of string s
-char = head,
+char = head, -- extract the first code point of a string
 
 -- Named code points for characters that cannot appear in string literals
 nul       = 0,   -- \0  null
@@ -95,21 +95,21 @@ toString =
 
 -- Character classification — all functions take a Unicode code point (integer)
 
-isDigit    = c -> and (lte c (head '0')) (lte (head '9') c),
-isLower    = c -> and (lte c (head 'a')) (lte (head 'z') c),
-isUpper    = c -> and (lte c (head 'A')) (lte (head 'Z') c),
-isAlpha    = c -> or (isLower c) (isUpper c),
-isAlphaNum = c -> or (isAlpha c) (isDigit c),
-isSpace    = c -> eq c space > or (eq c tab) > or (eq c lf) > or (eq c cr),
+isDigit    = c -> and (lte c (head '0')) (lte (head '9') c), -- 1 if c is a digit
+isLower    = c -> and (lte c (head 'a')) (lte (head 'z') c), -- 1 if c is lowercase
+isUpper    = c -> and (lte c (head 'A')) (lte (head 'Z') c), -- 1 if c is uppercase
+isAlpha    = c -> or (isLower c) (isUpper c), -- 1 if c is a letter
+isAlphaNum = c -> or (isAlpha c) (isDigit c), -- 1 if c is a letter or digit
+isSpace    = c -> eq c space > or (eq c tab) > or (eq c lf) > or (eq c cr), -- 1 if c is whitespace
 
 -- Character conversion
-digitToInt = c -> sub (head '0') c,
-intToDigit = n -> add (head '0') n,
-toLower    = c -> if (isUpper c) (add (sub (head 'A') (head 'a')) c) c,
-toUpper    = c -> if (isLower c) (sub (sub (head 'A') (head 'a')) c) c,
+digitToInt = c -> sub (head '0') c, -- convert digit character to its numeric value
+intToDigit = n -> add (head '0') n, -- convert numeric value to its digit character
+toLower    = c -> if (isUpper c) (add (sub (head 'A') (head 'a')) c) c, -- convert to lowercase
+toUpper    = c -> if (isLower c) (sub (sub (head 'A') (head 'a')) c) c, -- convert to uppercase
 
-stringToLower = map toLower,
-stringToUpper = map toUpper,
+stringToLower = map toLower, -- convert a whole string to lowercase
+stringToUpper = map toUpper, -- convert a whole string to uppercase
 
 -- stringToInt s: parse a decimal integer string (optional leading '-') as a number.
 -- No validation; non-digit characters produce wrong results.

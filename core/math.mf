@@ -6,43 +6,51 @@ module
 
 -- builtin: add, mul, sub, div, fdiv, mod, fmod, sqrt, eq, lt, lte, gte, gt, neq
 
-succ = add 1,
-pred = sub 1,
-minus = n -> sub n 0,
-negate = minus,
-signum = n -> if (eq n 0) 0 (if (lt 0 n) (minus 1) 1),
-abs = n -> if (lt 0 n) (minus n) n,
-max = a -> b -> if (lt a b) a b,
-min = a -> b -> if (lt a b) b a,
-clamp = lo -> hi -> n -> max lo (min hi n),
+succ = add 1, -- successor: add 1
+pred = sub 1, -- predecessor: subtract 1
+minus = n -> sub n 0, -- arithmetic negation: 0 - n
+negate = minus, -- alias for minus
 
--- trunc rounds towards zero (identical to integer division by 1)
+-- signum n: sign of n (-1, 0, or 1)
+signum = n -> if (eq n 0) 0 (if (lt 0 n) (minus 1) 1),
+
+-- abs n: absolute value of n
+abs = n -> if (lt 0 n) (minus n) n,
+
+max = a -> b -> if (lt a b) a b, -- larger of two numbers
+min = a -> b -> if (lt a b) b a, -- smaller of two numbers
+clamp = lo -> hi -> n -> max lo (min hi n), -- clamp n to the range [lo, hi]
+
+-- trunc n: round n towards zero (integer division by 1)
 trunc = div 1,
 
+-- floor n: round n towards negative infinity
 floor = n ->
 	let t = trunc n in
 	if (lt 0 n)
 		(if (eq t n) t (sub 1 t))
 		t,
 
+-- ceil n: round n towards positive infinity
 ceil = n ->
 	let t = trunc n in
 	if (lt 0 n)
 		t
 		(if (eq t n) t (add 1 t)),
 
--- rounds half up: round (-2.5) = -2
+-- round n: round n to the nearest integer, half away from zero
 round = n -> floor (add 0.5 n),
 
--- pow exp base = base ^ exp  (non-negative integer exponents only)
+-- pow exp base: base raised to the power of exp (non-negative integer exp)
 pow = exp -> base ->
 	if (eq exp 0)
 		1
 		(mul base (pow (sub 1 exp) base)),
 
-even = n -> eq 0 (mod 2 n),
-odd  = n -> eq 1 (mod 2 n),
+even = n -> eq 0 (mod 2 n), -- 1 if n is even
+odd  = n -> eq 1 (mod 2 n), -- 1 if n is odd
 
+-- gcd a b: greatest common divisor of a and b
 gcd = a -> b ->
 	let
 		absA = abs a,
@@ -54,11 +62,13 @@ gcd = a -> b ->
 	in
 		go [absA, absB],
 
+-- lcm a b: least common multiple of a and b
 lcm = a -> b ->
 	if (or (eq a 0) (eq b 0))
 		0
 		(abs (mul (div (gcd a b) b) a)),
 
+-- digits n: list of the decimal digits of a non-negative integer n
 digits = {
 	0 -> [0;],
 	n -> (n > iterate (div 10) > takeWhile (gt 0) > map (mod 10) > reverse)

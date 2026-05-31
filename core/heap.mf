@@ -7,13 +7,13 @@ import core, math, list in
 
 module
 
-empty = [],
+empty = [], -- the empty heap
 
-isEmpty = { [] -> 1, h -> 0 },
+isEmpty = { [] -> 1, h -> 0 }, -- 1 if heap is empty, else 0
 
-singleton = value -> [1, value, [], []],
+singleton = value -> [1, value, [], []], -- a heap containing only one value
 
-rankOf = { [] -> 0, [rank, value, left, right] -> rank },
+rankOf = { [] -> 0, [rank, value, left, right] -> rank }, -- shortest path to an empty node
 
 -- makeNode value left right: internal helper to maintain leftist property (right rank <= left rank)
 makeNode = value -> left -> right ->
@@ -25,37 +25,37 @@ makeNode = value -> left -> right ->
 			[succ rankRight, value, left, right]
 			[succ rankLeft, value, right, left],
 
--- merge cmp h1 h2: merge two heaps using cmp as the priority predicate.
--- If (cmp a b) is 1, a belongs closer to the root than b.
-merge = cmp -> {
+-- merge comparator h1 h2: merge two heaps ($O(\log n)$)
+merge = comparator -> {
 	[] -> h2 -> h2,
 	[rank1, value1, left1, right1] -> {
 		[] -> [rank1, value1, left1, right1],
 		[rank2, value2, left2, right2] ->
-			if (cmp value1 value2)
-				(makeNode value1 left1 (merge cmp right1 [rank2, value2, left2, right2]))
-				(makeNode value2 left2 (merge cmp [rank1, value1, left1, right1] right2))
+			if (comparator value1 value2)
+				(makeNode value1 left1 (merge comparator right1 [rank2, value2, left2, right2]))
+				(makeNode value2 left2 (merge comparator [rank1, value1, left1, right1] right2))
 	}
 },
 
-insert = cmp -> x -> h -> merge cmp (singleton x) h,
+insert = comparator -> x -> h -> merge comparator (singleton x) h, -- insert x into heap h ($O(\log n)$)
 
 peek = {
 	[] -> [],
 	[rank, value, left, right] -> value
-},
+}, -- return the root value of the heap ($O(1)$)
 
-pop = cmp -> {
+pop = comparator -> {
 	[] -> [],
-	[rank, value, left, right] -> merge cmp left right
-},
+	[rank, value, left, right] -> merge comparator left right
+}, -- remove the root and return the new heap ($O(\log n)$)
 
-fromList = cmp -> foldl (h -> x -> insert cmp x h) [],
+fromList = comparator -> foldl (h -> x -> insert comparator x h) [], -- build a heap from a list
 
-toList = cmp -> {
+toList = comparator -> {
 	[] -> [],
-	h -> [peek h, toList cmp (pop cmp h)]
-},
+	h -> [peek h, toList comparator (pop comparator h)]
+}, -- convert a heap to a sorted list (heapsort)
 
--- sort cmp l: Heapsort using the provided cmp.
-sort = cmp -> l -> toList cmp (fromList cmp l)
+-- sort comparator l: Heapsort using the provided comparator.
+sort = comparator -> l -> toList comparator (fromList comparator l)
+

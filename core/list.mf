@@ -6,46 +6,53 @@ module
 
 -- Construction and inspection
 
-cons = h -> t -> [h,t],
+cons = h -> t -> [h,t], -- construct a new list cell: h:t
 
+-- isList x: 1 if x is a proper list, else 0
 isList = {
 	[] -> 1,
 	[x,xs] -> isList xs,
 	n -> 0
 },
 
+-- length l: number of elements in list l
 length = {
 	[] -> 0,
 	[h,t] -> succ (length t)
 },
 
-head = [h,t] -> h,
-tail = [h,t] -> t,
+head = [h,t] -> h, -- first element of a non-empty list
+tail = [h,t] -> t, -- everything but the first element of a non-empty list
 
+-- last l: last element of a non-empty list
 last = {
 	[x, []] -> x,
 	[h, t] -> last t
 },
 
+-- init l: everything but the last element of a non-empty list
 init = {
 	[x, []] -> [],
 	[h, t] -> [h, init t]
 },
 
-empty = { [] -> 1, l -> 0 },
+empty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
 
+-- concat a b: join two lists into one
 concat = {
 	[] -> v -> v,
 	[h,t] -> v -> [h, concat t v]
 },
 
+-- remove e l: remove the first occurrence of e from list l
 remove = e -> {
 	[] -> [],
 	[h,t] -> if (equal e h) t [h, remove e t]
 },
 
-reverse = foldl (flip cons) [],
+reverse = foldl (flip cons) [], -- reverse the order of elements in a list
 
+-- intersperse sep l: place sep between every element in list l
 intersperse = sep -> {
 	[] -> [],
 	[x, []] -> [x;],
@@ -54,26 +61,31 @@ intersperse = sep -> {
 
 -- Higher-order
 
+-- map f l: apply f to every element in list l
 map = f -> {
 	[] -> [],
 	[h,t] -> [f h, map f t]
 },
 
+-- filter f l: keep elements in l for which f returns 1
 filter = f -> {
 	[] -> [],
 	[h,t] -> if (f h) [h, filter f t] (filter f t)
 },
 
+-- find p l: first element of l matching predicate p (returns [val;] or [])
 find = p -> {
 	[] -> [],
 	[h, t] -> if (p h) [h;] (find p t)
 },
 
+-- foldr f acc l: right-associative reduction: f l1 (f l2 (... (f ln acc)))
 foldr = f -> acc -> {
 	[] -> acc,
 	[h,t] -> f h (foldr f acc t)
 },
 
+-- foldl f acc l: left-associative reduction: f (... (f (f acc l1) l2) ...) ln
 foldl = f -> acc -> {
 	[] -> acc,
 	[h,t] -> foldl f (f acc h) t
@@ -81,18 +93,19 @@ foldl = f -> acc -> {
 
 -- Aggregations
 
-sum     = foldr add 0,
-product = foldr mul 1,
+sum     = foldr add 0, -- sum of a list of numbers
+product = foldr mul 1, -- product of a list of numbers
 
-orList  = foldr or 0,
-andList = foldr and 1,
+orList  = foldr or 0, -- logical OR over a list of booleans
+andList = foldr and 1, -- logical AND over a list of booleans
 
-any  = f -> l -> orList (map f l),
-all  = f -> l -> andList (map f l),
-none = f -> l -> not (any f l),
+any  = f -> l -> orList (map f l), -- 1 if f returns 1 for any element in l
+all  = f -> l -> andList (map f l), -- 1 if f returns 1 for all elements in l
+none = f -> l -> not (any f l), -- 1 if f returns 0 for all elements in l
 
 -- Zipping
 
+-- zipWith f a b: combine two lists using function f element-wise
 zipWith = f -> {
 	[]		-> b -> [],
 	[a,as]	-> {
@@ -101,8 +114,9 @@ zipWith = f -> {
 	}
 },
 
-zip = zipWith cons,
+zip = zipWith cons, -- zip two lists into a list of 2-tuples
 
+-- zipWith3 f a b c: combine three lists using function f element-wise
 zipWith3 = f -> {
 	[] -> b -> c -> [],
 	[a, as] -> {
@@ -114,10 +128,11 @@ zipWith3 = f -> {
 	}
 },
 
-zip3 = zipWith3 (a -> b -> c -> [a, b, c]),
+zip3 = zipWith3 (a -> b -> c -> [a, b, c]), -- zip three lists into a list of 3-tuples
 
 -- Slicing
 
+-- take n l: first n elements of list l
 take = {
 	0 -> l -> [],
 	n -> {
@@ -126,6 +141,7 @@ take = {
 	}
 },
 
+-- drop n l: list l without its first n elements
 drop = {
 	0 -> l -> l,
 	n -> {
@@ -134,6 +150,7 @@ drop = {
 	}
 },
 
+-- dropWhile f l: list l without the prefix for which f returns 1
 dropWhile = f -> {
 	[] -> [],
 	[x,xs] -> if (f x)
@@ -141,6 +158,7 @@ dropWhile = f -> {
 		[x,xs]
 },
 
+-- takeWhile f l: the prefix of list l for which f returns 1
 takeWhile = f -> {
 	[] -> [],
 	[x,xs] -> if (f x)
@@ -148,7 +166,7 @@ takeWhile = f -> {
 		[]
 },
 
--- span f l = [[taken while f holds], [rest of list]]
+-- span f l: splits l into [[taken while f holds], [rest of list]]
 span = f -> {
 	[] -> [[], []],
 	[x, xs] -> if (f x)
@@ -156,9 +174,9 @@ span = f -> {
 		[[], [x, xs]]
 },
 
-flatten = foldr concat [],
+flatten = foldr concat [], -- concatenate a list of lists into one list
 
--- range a b = [a; a+1; ...; b], both endpoints inclusive
+-- range a b: [a; a+1; ...; b], inclusive
 range = a -> b ->
 	if (lte b a)
 		[a, range (succ a) b]
@@ -166,46 +184,48 @@ range = a -> b ->
 
 -- Searching and membership
 
-contains = elem -> any (equal elem),
+contains = elem -> any (equal elem), -- 1 if list contains elem, else 0
 
--- maximum / minimum crash on an empty list (same contract as Haskell's maximum/minimum)
+-- maximum l: largest element in list l (crashes on empty list)
 maximum = [h,t] -> foldl max h t,
+-- minimum l: smallest element in list l (crashes on empty list)
 minimum = [h,t] -> foldl min h t,
 
 -- Replication and structural operations
 
+-- replicate n x: list of n copies of x
 replicate = n -> x ->
 	if (eq n 0)
 		[]
 		[x, replicate (sub 1 n) x],
 
--- unzip [[a1,b1]; [a2,b2]; ...] = [[a1;a2;...], [b1;b2;...]]
+-- unzip l: converts [[a1,b1]; ...] into [[a1; ...], [b1; ...]]
 unzip = {
 	[] -> [[], []],
 	[[a,b], rest] ->
 		unzip rest > { [as, bs] -> [[a, as], [b, bs]] }
 },
 
--- nub: remove duplicates, keeping the first occurrence of each value
+-- nub l: remove duplicates, keeping only the first occurrence of each value
 nub = {
 	[] -> [],
 	[h, t] -> [h, nub (filter (x -> not (equal x h)) t)]
 },
 
--- nth n l: zero-based index; runtime error if the index is out of bounds
+-- nth n l: zero-based index into list l
 nth = n -> {
 	[h,t] -> if (eq n 0) h (nth (sub 1 n) t)
 },
 
 -- Sorting
 
--- partition p l = [[elements where p holds], [elements where p does not]]
+-- partition p l: splits l into [matching, rest]
 partition = p ->
 	foldr
 	( x -> [ts,fs] -> if (p x) [[x,ts],fs] [ts,[x,fs]] )
 	[[],[]],
 
--- sortWith f l: quicksort; f pivot elem = 1 if elem belongs before pivot
+-- sortWith f l: quicksort using comparison function f
 sortWith = f -> {
 	[] -> [],
 	[x,xs] -> partition (f x) xs > {
@@ -213,13 +233,12 @@ sortWith = f -> {
 	}
 },
 
--- sort l: ascending sort using the builtin lt comparator
-sort = sortWith lt,
+sort = sortWith lt, -- sort in ascending order using lt
 
 -- Infinite lists
 
-iterate  = f -> x -> [x, iterate f (f x)],
-downFrom = iterate pred,
-upFrom   = iterate succ,
-repeat   = iterate id,
-cycle    = l -> concat l (cycle l)
+iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
+downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
+upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
+repeat   = iterate id, -- lazy infinite list of x
+cycle    = l -> concat l (cycle l) -- lazy infinite cycle of list l
