@@ -93,132 +93,129 @@ func (a *Analyzer) scopeContribution(index int) int {
 	}
 }
 
-func (a *Analyzer) CheckName(name *Name) {
-	foundIndex := -1
-
+// findDefinition searches the scope stack from innermost to outermost and
+// returns the index of the scope where the name was first defined.
+func (a *Analyzer) findDefinition(name string) (int, bool) {
 	for i, scope := range slices.Backward(a.Stack) {
-		if _, ok := scope.Definitions[name.Value]; ok {
+		if _, ok := scope.Definitions[name]; ok {
+			return i, true
+		}
+	}
+	return -1, false
+}
 
-			if scope.Node == nil {
-				name.ResolvedToBuiltin = true
-			} else if module, isModule := scope.Node.(*Module); isModule {
-				name.ResolvedModule = module
-			}
+// computeStackDepth calculates the total number of environments pushed onto
+// the interpreter's stack between two scope indices.
+func (a *Analyzer) computeStackDepth(fromScopeIdx, toScopeIdx int) int {
+	depth := 0
+	for i := fromScopeIdx; i <= toScopeIdx; i++ {
+		depth += a.scopeContribution(i)
+	}
+	return depth
+}
 
-			foundIndex = i
+// ensureCapture ensures that a Lambda captures a name as an upvalue, searching
+// for its definition in the scopes above that lambda. It returns the slot
+// assigned to the upvalue in the lambda's capture environment.
+func (a *Analyzer) ensureCapture(lambda *Lambda, name string) int {
+	// If already captured, just return the slot.
+	if slot := getUpvalueSlot(lambda, name); slot != -1 {
+		return slot
+	}
+
+	// Not captured yet. Record it as an upvalue for this lambda.
+	slot := len(lambda.Upvalues)
+	lambda.Upvalues = append(lambda.Upvalues, name)
+
+	// Now find where to capture it from by searching scopes above the lambda.
+	lambdaIdx := -1
+	for i, scope := range a.Stack {
+		if scope.Node == lambda {
+			lambdaIdx = i
 			break
 		}
 	}
 
-	if foundIndex < 0 {
+	captureDepth := 0
+	for i := lambdaIdx - 1; i >= 0; i-- {
+		scope := a.Stack[i]
+
+		// Is it a local definition in this scope?
+		if _, found := scope.Definitions[name]; found {
+			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
+				Depth: captureDepth,
+				Slot:  scope.Slots[name],
+			})
+			return slot
+		}
+
+		// Is it already an upvalue in this scope?
+		if uvSlot := getUpvalueSlot(scope.Node, name); uvSlot != -1 {
+			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
+				Depth: captureDepth,
+				Slot:  uvSlot,
+			})
+			return slot
+		}
+
+		captureDepth += a.scopeContribution(i)
+	}
+
+	panic("internal error: could not find definition for upvalue capture of " + name)
+}
+
+func (a *Analyzer) CheckName(name *Name) {
+	defIdx, found := a.findDefinition(name.Value)
+	if !found {
 		Log("no definition for "+name.Value, name.FirstPos(), SeverityError)
 		a.Errors++
 		return
 	}
 
-	if name.ResolvedModule != nil {
-		name.ResolvedSlot = a.Stack[foundIndex].Slots[name.Value]
+	scope := a.Stack[defIdx]
+
+	// 1. Resolve to Module
+	if module, isModule := scope.Node.(*Module); isModule {
+		name.ResolvedModule = module
+		name.ResolvedSlot = scope.Slots[name.Value]
 		return
 	}
 
-	if name.ResolvedToBuiltin {
+	// 2. Resolve to Builtin
+	if scope.Node == nil {
+		name.ResolvedToBuiltin = true
 		return
 	}
 
-	// Every Lambda level between the use and the definition must capture the
-	// name as an upvalue.
-	var upvalueLambdas []*Lambda
-	for i := foundIndex + 1; i < len(a.Stack); i++ {
+	// 3. Check for Upvalues. An upvalue is any name defined outside the
+	// innermost lambda enclosing the use.
+	var lastLambda *Lambda
+	var lastLambdaIdx int
+	for i := defIdx + 1; i < len(a.Stack); i++ {
 		if l, ok := a.Stack[i].Node.(*Lambda); ok {
-			upvalueLambdas = append(upvalueLambdas, l)
+			lastLambda = l
+			lastLambdaIdx = i
 		}
 	}
 
-	if len(upvalueLambdas) > 0 {
-		// It's an upvalue.
-		for _, lambda := range upvalueLambdas {
-			// Find or add to this lambda's Upvalues
-			slot := -1
-			for j, uv := range lambda.Upvalues {
-				if uv == name.Value {
-					slot = j
-					break
-				}
-			}
-
-			if slot == -1 {
-				slot = len(lambda.Upvalues)
-				lambda.Upvalues = append(lambda.Upvalues, name.Value)
-
-				// Calculate capture for this lambda.
-				// It looks for the name from the perspective of the lambda's definition.
-				lambdaIdx := -1
-				for k, s := range a.Stack {
-					if s.Node == lambda {
-						lambdaIdx = k
-						break
-					}
-				}
-
-				captureDepth := 0
-				foundDef := false
-				for k := lambdaIdx - 1; k >= 0; k-- {
-					// Is it a local definition in this scope?
-					if _, found := a.Stack[k].Definitions[name.Value]; found {
-						lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
-							Depth: captureDepth,
-							Slot:  a.Stack[k].Slots[name.Value],
-						})
-						foundDef = true
-						break
-					}
-
-					// Is it an upvalue in this scope?
-					if uvSlot := getUpvalueSlot(a.Stack[k].Node, name.Value); uvSlot != -1 {
-						lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
-							Depth: captureDepth,
-							Slot:  uvSlot,
-						})
-						foundDef = true
-						break
-					}
-
-					captureDepth += a.scopeContribution(k)
-				}
-				if !foundDef {
-					panic("internal error: could not find definition for upvalue capture of " + name.Value)
-				}
-			}
-
-			// If this is the innermost lambda, record its upvalue slot.
-			if lambda == upvalueLambdas[len(upvalueLambdas)-1] {
-				// Inner lambda body is inside Lambda (pushed Upvalues) and
-				// then LambdaCase (pushed matched). So depth is 1.
-				innermostIdx := -1
-				for k, s := range a.Stack {
-					if s.Node == lambda {
-						innermostIdx = k
-						break
-					}
-				}
-
-				depthBelow := 0
-				for m := innermostIdx + 1; m < len(a.Stack); m++ {
-					depthBelow += a.scopeContribution(m)
-				}
-
-				name.ResolvedDepth = depthBelow
-				name.ResolvedSlot = slot
+	if lastLambda != nil {
+		// It's an upvalue. Ensure every lambda from the definition down to the
+		// use captures it.
+		var slot int
+		for i := defIdx + 1; i < len(a.Stack); i++ {
+			if l, ok := a.Stack[i].Node.(*Lambda); ok {
+				slot = a.ensureCapture(l, name.Value)
 			}
 		}
+
+		// Depth is from the use (top of stack) down to the innermost lambda's
+		// Upvalues environment.
+		name.ResolvedDepth = a.computeStackDepth(lastLambdaIdx+1, len(a.Stack)-1)
+		name.ResolvedSlot = slot
 	} else {
-		// Local resolution. Calculate depth by counting environments.
-		name.ResolvedSlot = a.Stack[foundIndex].Slots[name.Value]
-		depth := 0
-		for i := foundIndex + 1; i < len(a.Stack); i++ {
-			depth += a.scopeContribution(i)
-		}
-		name.ResolvedDepth = depth
+		// 4. Local resolution.
+		name.ResolvedSlot = scope.Slots[name.Value]
+		name.ResolvedDepth = a.computeStackDepth(defIdx+1, len(a.Stack)-1)
 	}
 }
 
