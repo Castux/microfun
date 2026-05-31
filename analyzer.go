@@ -10,12 +10,12 @@ type Scope struct {
 }
 
 type Analyzer struct {
-	Program *Program
-	Modules map[string]*Module
-	Scopes  map[Node]*Scope
-	Errors  int
-
-	Stack []*Scope
+	Program         *Program
+	Modules         map[string]*Module
+	Scopes          map[Node]*Scope
+	Errors          int
+	Stack           []*Scope
+	ImportedModules map[string]bool
 }
 
 func GetNamesInPattern(patt Pattern) []*Name {
@@ -54,6 +54,7 @@ func (a *Analyzer) AddName(name string, node Node) {
 
 func (a *Analyzer) HandleImports(imports []*Name) {
 	for _, modName := range imports {
+		a.ImportedModules[modName.Value] = true
 		module := a.Modules[modName.Value]
 		a.PushScope(module)
 		for _, export := range module.PublicBindings {
@@ -97,12 +98,12 @@ func (a *Analyzer) CheckName(name *Name) {
 }
 
 func (a *Analyzer) CheckQualifiedName(name *QualifiedName) Node {
-	module, ok := a.Modules[name.Module]
-	if !ok {
-		Log("unknown module "+name.Module, name.FirstPos(), SeverityError)
+	if !a.ImportedModules[name.Module] {
+		Log("module "+name.Module+" was not imported", name.FirstPos(), SeverityError)
 		a.Errors++
 		return nil
 	}
+	module := a.Modules[name.Module]
 	for _, export := range module.PublicBindings {
 		if export.Name.Value == name.Value {
 			return export
@@ -154,8 +155,9 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 
 func (a *Analyzer) ResetToBuiltins() {
 	a.Stack = nil
+	a.ImportedModules = make(map[string]bool)
 	a.PushScope(nil)
-	for builtin, _ := range Builtins {
+	for builtin := range Builtins {
 		a.AddName(builtin, nil)
 	}
 }

@@ -102,19 +102,23 @@ square = x -> mul x x
 ```
 
 Imports make the names of the imported module's bindings available **unqualified**
-in the importing unit; they can also be reached **qualified** as
-`module.name`. When two imported modules export the same name, a later import in
-the `import` clause shadows the earlier one's unqualified name; the qualified
-form `module.name` always reaches the intended binding and so disambiguates.
-Modules may import one another, and **circular imports are permitted** — each
-module is loaded exactly once regardless of import order, and because all module
-bindings are created before any is evaluated, cross-module (and self-) references
-resolve correctly.
+in the importing unit. They can also be reached **qualified** as `module.name`,
+but only for modules explicitly listed in the `import` clause — a module that was
+loaded transitively (because another module imports it) is not in scope and cannot
+be accessed by either form. When two imported modules export the same name, a later
+import in the `import` clause shadows the earlier one's unqualified name; the
+qualified form `module.name` always reaches the intended binding and so
+disambiguates.
 
 ```
 import list, mod2 in
-  show mod2.foo            -- qualified access
+  show mod2.foo            -- qualified access; mod2 must be in the import clause
 ```
+
+Modules may import one another, and **circular imports are permitted** — each
+module is loaded exactly once regardless of import order, and because all module
+bindings are created before any is evaluated, mutually recursive definitions across
+modules resolve correctly.
 
 The standard library modules (`list`, `math`, `text`, etc.) are ordinary modules
 embedded in the binary; see [§14](#14-standard-library) for the full catalogue.

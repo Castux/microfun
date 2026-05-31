@@ -26,7 +26,7 @@ if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 -- ifs [(cond1, val1); (cond2, val2); ...] else
 -- Returns the value paired with the first true condition, or else.
 ifs = l -> else ->
-	l > list.filter first > list.map second > {
+	l > filter first > map second > {
 		[h, rest] -> h,
 		[] -> else
 	},

@@ -10,9 +10,9 @@ succ = add 1,
 pred = sub 1,
 minus = n -> sub n 0,
 negate = minus,
-abs = n -> core.if (lt 0 n) (minus n) n,
-max = a -> b -> core.if (lt a b) a b,
-min = a -> b -> core.if (lt a b) b a,
+abs = n -> if (lt 0 n) (minus n) n,
+max = a -> b -> if (lt a b) a b,
+min = a -> b -> if (lt a b) b a,
 clamp = lo -> hi -> n -> max lo (min hi n),
 
 -- trunc rounds towards zero (identical to integer division by 1)
@@ -20,22 +20,22 @@ trunc = div 1,
 
 floor = n ->
 	let t = trunc n in
-	core.if (lt 0 n)
-		(core.if (eq t n) t (sub 1 t))
+	if (lt 0 n)
+		(if (eq t n) t (sub 1 t))
 		t,
 
 ceil = n ->
 	let t = trunc n in
-	core.if (lt 0 n)
+	if (lt 0 n)
 		t
-		(core.if (eq t n) t (add 1 t)),
+		(if (eq t n) t (add 1 t)),
 
 -- rounds half up: round (-2.5) = -2
 round = n -> floor (add 0.5 n),
 
 -- pow exp base = base ^ exp  (non-negative integer exponents only)
 pow = exp -> base ->
-	core.if (eq exp 0)
+	if (eq exp 0)
 		1
 		(mul base (pow (sub 1 exp) base)),
 
