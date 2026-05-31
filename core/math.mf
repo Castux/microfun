@@ -41,12 +41,6 @@ ceil = n ->
 -- round n: round n to the nearest integer, half away from zero
 round = n -> floor (add 0.5 n),
 
--- pow exp base: base raised to the power of exp (non-negative integer exp)
-pow = exp -> base ->
-	if (eq exp 0)
-		1
-		(mul base (pow (sub 1 exp) base)),
-
 even = n -> eq 0 (mod 2 n), -- 1 if n is even
 odd  = n -> eq 1 (mod 2 n), -- 1 if n is odd
 

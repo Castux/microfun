@@ -56,8 +56,9 @@ runTests [
 	assert "math.ceil-int" (math.ceil 5) 5;
 	assert "math.round" (math.round 3.5) 4;
 	assert "math.round-neg" (math.round (math.negate 2.5)) (math.negate 2);
-	assert "math.pow-exp-0" (math.pow 0 5) 1;
-	assert "math.pow-base-0" (math.pow 3 0) 0;
+	assert "math.pow-exp-0" (pow 0 5) 1;
+	assert "math.pow-base-0" (pow 3 0) 0;
+	assert "math.pow-float" (pow 0.5 9) 3;
 	assert "math.even" (math.even 4) 1;
 	assert "math.odd" (math.odd 4) 0;
 	assert "math.gcd" (math.gcd 48 18) 6;

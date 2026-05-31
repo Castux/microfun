@@ -507,6 +507,7 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `fdiv a b` | 2 | `b / a` (real) | floating-point division |
 | `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10` |
 | `fmod a b` | 2 | `b mod a` (real) | floating-point remainder |
+| `pow a b` | 2 | `b ^ a` (real) | `pow 2 x = x²` |
 | `sqrt a` | 1 | `√a` | |
 | `eq a b` | 2 | `1` if `a = b` else `0` | numbers only |
 | `lt a b` | 2 | `1` if `b < a` else `0` | `lt 0 x = x < 0` |
@@ -624,7 +625,6 @@ Imports `core` (for `if`).
 | `floor n` | round towards −∞ |
 | `ceil n` | round towards +∞ |
 | `round n` | round half-up |
-| `pow exp base` | `base ^ exp` (non-negative integer exponents) |
 | `even n` | `1` if `n mod 2 = 0` |
 | `odd n` | `1` if `n mod 2 ≠ 0` |
 | `gcd a b` | greatest common divisor |

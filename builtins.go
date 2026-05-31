@@ -60,6 +60,7 @@ func init() {
 		"fdiv": WrapBinop(func(a, b float64) float64 { return b / a }, "fdiv"),
 		"div":  WrapBinop(func(a, b float64) float64 { return float64(int(b) / int(a)) }, "div"),
 		"mod":  WrapBinop(func(a, b float64) float64 { return float64(int(b) % int(a)) }, "mod"),
+		"pow":  WrapBinop(func(a, b float64) float64 { return math.Pow(b, a) }, "pow"),
 
 		"fmod": WrapBinop(func(a, b float64) float64 { return math.Mod(b, a) }, "fmod"),
 		"eq": WrapBinop(func(a, b float64) float64 {
