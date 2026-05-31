@@ -185,7 +185,7 @@ traversal live in [node.go](node.go).
 
 Two marker interfaces classify nodes:
 
-- `Expression` (implemented by `Let`, `Lambda`, `MultiLambda`, `Operation`,
+- `Expression` (implemented by `Let`, `Lambda`, `Operation`,
   `Name`, `QualifiedName`, `NumberLiteral`, `StringLiteral`, `Tuple`, `List`),
 - `Pattern` (implemented by `TuplePattern`, `ListPattern`, `Name`,
   `NumberLiteral`, `StringLiteral`).
@@ -206,16 +206,30 @@ way down and `post` on the way up. Both the analyzer and the
 `GetNamesInPattern`/`PrintAST` helpers are built on it, so there is a single
 description of the tree's shape.
 
-The fields `Upvalues` on `Lambda` and `ResolvedModule`/`ResolvedToBuiltin` on
+The fields `Upvalues`/`UpvalueCaptures` on `Lambda`, `FrameSize` on `LambdaCase`
+(and on `Program`/`Binding`), and `Resolution`/`ResolvedModule`/`ResolvedSlot` on
 `Name` are *not* filled by the parser; they are written by the analyzer, as noted
 in their comments.
 
 ## 6. Analyzer
 
 The analyzer ([analyzer.go](analyzer.go)) performs scope resolution. It maintains
-a stack of `Scope`s, each a map from name to the node that defined it, attached to
-the AST node that opened the scope (a `Module`, `Let`, or `Lambda`). It does three
-jobs in one traversal.
+a stack of `Scope`s, each a map from name to its `Definition` (the node that
+defined it and the slot it occupies), attached to the AST node that opened the
+scope (a `Module`, `Let`, `Lambda`, or `LambdaCase`). It does three jobs in one
+traversal.
+
+Alongside the scope stack it maintains a stack of `Frame`s. A frame is the
+local-variable array of one *activation* — a lambda-case body, a module binding's
+right-hand side, or the program body — and a frame is pushed when entering each of
+those. Every `let` and pattern binding inside an activation, through any nesting of
+lets, draws its slot from that one frame: lambda-case and let scopes assign local
+slots from the current frame's running counter, so the interpreter needs only a
+single local array per activation and never pushes a per-let environment. (Module
+exports and builtins are not frame slots: an export's slot is its position in the
+module's environment, and builtins have none.) When a frame closes, its size is
+written onto the activation's root node (`Program.FrameSize`, `Binding.FrameSize`,
+or `LambdaCase.FrameSize`) so the interpreter can allocate it.
 
 ### Name resolution and error checking
 
@@ -223,33 +237,49 @@ jobs in one traversal.
 
 - a `Let` pushes a scope and adds all its binding names — so bindings within one
   `let` are mutually visible, which is what makes recursion and mutual recursion
-  possible;
-- a `Lambda` pushes a scope and adds every name occurring in its pattern;
-- a `Module` pushes a scope with all its public bindings;
+  possible — taking their slots from the current frame;
+- a `Lambda` pushes a scope (its upvalues are tracked on the node itself, not as
+  scope definitions);
+- a `LambdaCase` pushes a fresh frame for its body and a scope holding every name
+  occurring in its pattern;
+- a `Module` pushes a scope with all its public bindings, and each public binding
+  opens its own frame for its right-hand side;
 - a `Name` that is a genuine *use* (not in a pattern, binding, or import position)
   is resolved by `CheckName`;
 - a `QualifiedName` is resolved by `CheckQualifiedName`.
 
-On the way up (`post`), every scope opened by the node just visited is popped.
+On the way up (`post`), every scope and any frame opened by the node just visited
+is popped.
 
-`CheckName` searches the scope stack from innermost outward. If the name is found
-in the synthetic outermost scope (whose `Node` is `nil`), it is a builtin and
-`ResolvedToBuiltin` is set. If it is found in a `Module` scope, `ResolvedModule`
-is set. If it is found nowhere, that is a "no definition for …" error. Duplicate
-definitions in the same scope are reported by `AddName`. The analyzer counts
-errors and `main` aborts if the count is non-zero, so a program with any
-unresolved name never reaches the interpreter.
+`CheckName` searches the scope stack from innermost outward to find the defining
+scope, then sets the name's `Resolution` tag accordingly: a name found in the
+synthetic outermost scope (whose `Node` is `nil`) is a builtin (`ResolveBuiltin`);
+one found in a `Module` scope is `ResolveModule` (and `ResolvedModule` records
+which module); otherwise it is a local binding, resolved as either `ResolveLocal`
+or `ResolveUpvalue` (below). A name found nowhere is a "no definition for …"
+error. Duplicate definitions in the same scope are reported by `AddName`. The
+analyzer counts errors and `main` aborts if the count is non-zero, so a program
+with any unresolved name never reaches the interpreter.
 
-### Upvalue computation
+### Local slots and upvalue capture
 
-This is the analyzer's most important contribution to the runtime. When
-`CheckName` resolves an ordinary (non-builtin, non-module) name, it walks every
-scope *between* the use and the definition; for each one that belongs to a
-`Lambda`, it adds the name to that lambda's `Upvalues` list (avoiding
-duplicates). After analysis, each `Lambda.Upvalues` holds exactly the free
-variables that lambda references from enclosing scopes. The interpreter uses this
-list to build closures that capture precisely those bindings and nothing else
-(see [§8](#8-the-interpreter-translation)).
+A local binding is an **upvalue** if any `Lambda` sits between its definition and
+the use, and a plain **local** otherwise. For a plain local, `CheckName` records
+`ResolveLocal` and the binding's slot in the current frame. For an upvalue, every
+lambda from the definition down to the use must capture it: `CheckName` calls
+`ensureCapture` on each, and the use resolves to `ResolveUpvalue` at the innermost
+lambda's capture slot.
+
+`ensureCapture` builds *flat* closures (à la Lua): each lambda reads its upvalues
+only from its own captured array at runtime, never by climbing a chain of frames.
+It appends the name to the lambda's `Upvalues` list and records an
+`UpvalueCapture` saying where `MakeClosure` should fetch the thunk from in the
+lambda's *enclosing* activation — either that activation's local frame
+(`FromUpvalue == false`) or, when another lambda sits in between, that enclosing
+lambda's own upvalues (`FromUpvalue == true`). Because the lambdas are captured
+outermost-first, the enclosing lambda has always already captured the name by the
+time an inner one chains through it. There is no longer any notion of stack
+*depth*: a capture names a slot in one of exactly two arrays.
 
 ### Builtins as the outermost scope
 
@@ -313,33 +343,43 @@ graph without forcing anything that laziness should defer.
 - An `Operation` is handled by `FoldOperation`, which turns the operator and
   operands into the right nesting of `RuntimeApplication` / `RuntimeComposition`
   nodes (see below).
-- A `Let` pushes a fresh environment, processes its bindings, translates the
-  body, and pops the environment.
-- A `Name` resolves to a builtin (`Builtins[...]`), to a module binding
-  (`ModuleEnvironments[...]`), or to a stack binding (`ResolveName`), guided by
-  the flags the analyzer set.
+- A `Let` translates its bindings into the current frame, then translates the
+  body. There is no environment to push or pop: the bindings simply fill their
+  pre-assigned slots.
+- A `Name` resolves by its `Resolution` tag to a builtin (`Builtins[...]`), a
+  module binding (`ModuleEnvironments[...]`), a captured upvalue (`Upvalues[...]`),
+  or a local in the current frame (`Locals[...]`).
 - A `QualifiedName` resolves directly to the named module's environment entry.
-- A `Lambda` or `MultiLambda` becomes a `RuntimeClosure` via `MakeClosure`.
+- A `Lambda` becomes a `RuntimeClosure` via `MakeClosure`.
 
-### Environments and binding
+### Frames and binding
 
 An `Environment` is a `[]*NamedValue`, a flat array of thunks indexed by slot
-number. The interpreter keeps a stack of them (`Stack`). `ResolveName` accesses
-them directly by stack depth and slot index, both of which are pre-computed by
-the analyzer. `TreatBindings` implements `let` (and module) binding in two
-passes: first it inserts an *empty* `NamedValue` into each slot so that all names
-in the group are in scope, then it fills each `Value` by translating its
+number. The interpreter holds exactly two at a time: `Locals`, the frame of the
+activation currently being translated (its pattern bindings and all of its lets),
+and `Upvalues`, the array its closure captured. A `Name` indexes one of these by
+the slot the analyzer pre-computed — no search, no stack to climb. Because
+`RunExpression` never crosses a lambda boundary (a nested lambda becomes a closure
+whose body is walked only in a *later* activation), one frame suffices per
+activation and lets never need their own; the frame is allocated once when the
+activation starts, sized by the analyzer.
+
+`TreatBindings` implements `let` binding into the current frame in two passes:
+first it inserts an *empty* `NamedValue` into each binding's slot so that all
+names in the group are in scope, then it fills each `Value` by translating its
 expression. The two-pass order is what lets a binding's right-hand side refer to
 names defined later in the same group, and to itself — the foundation of
 recursion and of self-referential lazy structures like `fibonacci`.
 
 ### Closures capture by reference
 
-`MakeClosure` builds the closure's environment from the `UpvalueCaptures` the
-analyzer computed: for each upvalue it looks up the *current* `*NamedValue` by
-stack depth and slot index and stores that pointer. The closure therefore
-captures the live thunks of its free variables — sharing, not copying — so a
-value forced through the closure is also forced for everyone else holding the
+`MakeClosure` builds the closure's captured array from the `UpvalueCaptures` the
+analyzer computed: for each upvalue it reads the *current* `*NamedValue` from
+either `Locals` or `Upvalues` (per the capture's `FromUpvalue` flag) at the given
+slot and stores that pointer. Since `MakeClosure` runs in the enclosing
+activation, those are exactly the frames the captured names live in. The closure
+therefore captures the live thunks of its free variables — sharing, not copying —
+so a value forced through the closure is also forced for everyone else holding the
 same binding.
 
 ### Operators become application/composition graphs
@@ -413,12 +453,15 @@ them.
 
 ## 10. Pattern matching
 
-`ApplyClosure` performs one β-reduction. It pushes the closure's captured
-environment, then tries each lambda clause in order: `MatchPattern` returns an
-environment of fresh bindings on success or `nil` on failure. On the first
-success the clause body is translated (with the match environment in scope) and
-returned; if no clause matches, it returns `(nil, false)` and the caller raises
-the "no pattern matched" error, because the caller still holds the reduction stack
+`ApplyClosure` performs one β-reduction. It tries each lambda clause in order:
+`MatchPattern` returns the clause's activation **frame** — sized by the analyzer
+to hold the pattern's bindings (filled into their slots) plus the lets the body
+will later add — on success, or `nil` on failure. On the first success it makes
+that frame the current `Locals` and the closure's captured array the current
+`Upvalues`, translates the clause body against them, then restores the caller's
+frames (so a nested application triggered while matching cannot observe ours) and
+returns. If no clause matches, it returns `(nil, false)` and the caller raises the
+"no pattern matched" error, because the caller still holds the reduction stack
 needed for the trace.
 
 `MatchPattern` ([interpreter.go](interpreter.go)) embodies exactly how much each
@@ -545,9 +588,10 @@ and for the same reason:
    so they may refer to each other (including across modules) regardless of load
    order.
 2. For every module, fill each placeholder's `Value` by translating its binding
-   expression.
+   expression against a fresh `Locals` frame sized for that binding (each
+   right-hand side is its own activation).
 
-Only then is the program body translated and reduced. The program's result is
+Only then is the program body translated — against its own frame — and reduced. The program's result is
 forced to weak head normal form by `Run`; any deeper output comes from the
 program explicitly calling `peek`, `show`, or `write`.
 

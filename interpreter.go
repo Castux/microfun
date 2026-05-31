@@ -16,7 +16,15 @@ type Interpreter struct {
 	Modules map[string]*Module
 
 	ModuleEnvironments map[string]Environment
-	Stack              []Environment
+
+	// Locals and Upvalues are the two environments of the activation currently
+	// being translated by RunExpression. Locals holds this activation's let and
+	// pattern bindings — one flat frame per activation, never pushed per let (see
+	// Frame in the analyzer); Upvalues holds the values its closure captured. A
+	// Name resolves to a slot in one of these, to a module environment, or to a
+	// builtin.
+	Locals   Environment
+	Upvalues Environment
 
 	// Standard input is exposed to programs as the shared lazy lists stdin (code
 	// points) and bstdin (bytes). stdinReader is the single buffered reader they
@@ -39,26 +47,6 @@ func (i *Interpreter) builtinError(message string) {
 	i.raiseRuntimeError(message, i.builtinPos, i.builtinStack)
 }
 
-func (i *Interpreter) PushNewEnvironment(size int) Environment {
-	env := make(Environment, size)
-	i.Stack = append(i.Stack, env)
-	return env
-}
-
-func (i *Interpreter) PushEnvironment(env Environment) {
-	i.Stack = append(i.Stack, env)
-}
-
-func (i *Interpreter) PopEnvironment() (env Environment) {
-	env = i.Stack[len(i.Stack)-1]
-	i.Stack = i.Stack[:len(i.Stack)-1]
-	return
-}
-
-func (i *Interpreter) ResolveName(depth, slot int) RuntimeValue {
-	return i.Stack[len(i.Stack)-1-depth][slot]
-}
-
 func (i *Interpreter) Run() RuntimeValue {
 
 	// First create environments for all modules
@@ -72,29 +60,34 @@ func (i *Interpreter) Run() RuntimeValue {
 		i.ModuleEnvironments[modName] = env
 	}
 
-	// Then fill up these environments
+	// Then fill up these environments. Each binding's right-hand side is its own
+	// activation, so it runs against a fresh local frame sized by the analyzer.
 
 	for modName, module := range i.Modules {
 		for j, binding := range module.PublicBindings {
+			i.Locals = make(Environment, binding.FrameSize)
 			i.ModuleEnvironments[modName][j].Value = i.RunExpression(binding.Expression)
 		}
 	}
 
 	// Then run program itself
 
+	i.Locals = make(Environment, i.Program.FrameSize)
 	mainValue := i.RunExpression(i.Program.Body)
 	return i.EvaluateToWeakHeadNormalForm(mainValue)
 }
 
+// TreatBindings binds a let's bindings into the current activation frame. It
+// works in two passes — first an empty thunk per name, then the values — so a
+// right-hand side may refer to names defined later in the same let, and to
+// itself, which is what makes recursion and self-referential lazy structures
+// work.
 func (i *Interpreter) TreatBindings(bindings []*Binding) {
-
-	env := i.Stack[len(i.Stack)-1]
-	for j, binding := range bindings {
-		env[j] = &NamedValue{Name: binding.Name.Value}
+	for _, binding := range bindings {
+		i.Locals[binding.Name.ResolvedSlot] = &NamedValue{Name: binding.Name.Value}
 	}
-
-	for j, binding := range bindings {
-		env[j].Value = i.RunExpression(binding.Expression)
+	for _, binding := range bindings {
+		i.Locals[binding.Name.ResolvedSlot].Value = i.RunExpression(binding.Expression)
 	}
 }
 
@@ -129,14 +122,14 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 		return i.FoldOperation(e)
 
 	case *Let:
-		i.PushNewEnvironment(len(e.Bindings))
+		// The bindings fill their slots in the current activation frame; there is
+		// no environment to push or pop.
 		i.TreatBindings(e.Bindings)
-		value := i.RunExpression(e.Expression)
-		i.PopEnvironment()
-		return value
+		return i.RunExpression(e.Expression)
 
 	case *Name:
-		if e.ResolvedToBuiltin {
+		switch e.Resolution {
+		case ResolveBuiltin:
 			// stdin and bstdin are values (lazy input lists), not callable
 			// functions, so they are resolved here rather than via the Builtins
 			// map; their map entries exist only so the analyzer knows the names.
@@ -147,10 +140,13 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 				return i.StdinBytes()
 			}
 			return Builtins[e.Value]
-		} else if e.ResolvedModule != nil {
+		case ResolveModule:
 			return i.ModuleEnvironments[e.ResolvedModule.Name][e.ResolvedSlot]
+		case ResolveUpvalue:
+			return i.Upvalues[e.ResolvedSlot]
+		default: // ResolveLocal
+			return i.Locals[e.ResolvedSlot]
 		}
-		return i.ResolveName(e.ResolvedDepth, e.ResolvedSlot)
 
 	case *QualifiedName:
 		return i.ModuleEnvironments[e.Module][e.ResolvedSlot]
@@ -168,8 +164,14 @@ func (i *Interpreter) MakeClosure(lambda *Lambda) RuntimeClosure {
 
 	if len(lambda.UpvalueCaptures) > 0 {
 		env = make(Environment, len(lambda.UpvalueCaptures))
-		for j, cap := range lambda.UpvalueCaptures {
-			env[j] = i.ResolveName(cap.Depth, cap.Slot).(*NamedValue)
+		for j, capture := range lambda.UpvalueCaptures {
+			// The captured thunks live in the enclosing activation, which is the
+			// one running now, so they are read from the current frames.
+			if capture.FromUpvalue {
+				env[j] = i.Upvalues[capture.Slot]
+			} else {
+				env[j] = i.Locals[capture.Slot]
+			}
 		}
 	}
 	return RuntimeClosure{env, lambda.Cases}
@@ -441,23 +443,25 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 
 // ApplyClosure performs one beta reduction: it matches the argument against the
 // closure's patterns and returns the body of the first lambda that matches,
-// ready to be reduced further. Names in the body are resolved against the
-// environment here, so the returned value no longer depends on the stack. The
-// boolean is false when no lambda matched; the caller reports the failure, as it
-// holds the reduction stack needed for the trace.
+// ready to be reduced further. Names in the body are resolved against this
+// activation's frames here, so the returned value no longer depends on which
+// frames are current. The boolean is false when no lambda matched; the caller
+// reports the failure, as it holds the reduction stack needed for the trace.
 func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue) (RuntimeValue, bool) {
 
-	i.PushEnvironment(closure.Upvalues)
-	defer i.PopEnvironment()
-
 	for _, lcase := range closure.Cases {
-		matched := i.MatchPattern(lcase.Pattern, argument)
-		if matched != nil {
-			i.PushEnvironment(matched)
-			body := i.RunExpression(lcase.Expression)
-			i.PopEnvironment()
-			return body, true
+		frame := i.MatchPattern(lcase, argument)
+		if frame == nil {
+			continue
 		}
+		// Translate the matched body in this activation's frames, then restore the
+		// caller's: a nested application (for instance one triggered while matching
+		// a later argument) must not observe ours.
+		savedLocals, savedUpvalues := i.Locals, i.Upvalues
+		i.Locals, i.Upvalues = frame, closure.Upvalues
+		body := i.RunExpression(lcase.Expression)
+		i.Locals, i.Upvalues = savedLocals, savedUpvalues
+		return body, true
 	}
 
 	return nil, false
@@ -473,11 +477,14 @@ func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
 	return tuple, ok
 }
 
-func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Environment {
-	names := GetNamesInPattern(pattern)
-	env := make(Environment, len(names))
-	if i.matchPatternInto(pattern, argument, env) {
-		return env
+// MatchPattern tries to match a lambda case's pattern against the argument. On
+// success it returns the activation frame for the case body — sized to hold the
+// pattern's bindings (in their slots) and the lets the body will later add — or
+// nil if the pattern does not match.
+func (i *Interpreter) MatchPattern(lcase *LambdaCase, argument RuntimeValue) Environment {
+	frame := make(Environment, lcase.FrameSize)
+	if i.matchPatternInto(lcase.Pattern, argument, frame) {
+		return frame
 	}
 	return nil
 }

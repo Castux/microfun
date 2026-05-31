@@ -52,6 +52,24 @@ sub-environments) and `MakeClosure` creates one per closure, even for the trivia
 a `[]*NamedValue` slice indexed by a compile-time slot number. Closures and match results
 become flat arrays; name lookup becomes an integer index.
 
+A first cut addressed names by a `(depth, slot)` pair — how many runtime environments
+to climb, then which slot — which forced the analyzer to model the interpreter's
+environment stack frame-for-frame (`scopeContribution` / `computeStackDepth`) and made a
+`Lambda` scope an empty placeholder standing in for the upvalue frame it would push. That
+was replaced by a simpler model with no depth. The key fact is that `RunExpression` never
+crosses a lambda boundary (a nested `\…` becomes a closure via `MakeClosure`; its body is
+walked only in a *later* activation), so within one activation the only environments are
+the lets — and those can all be merged. Each activation (a lambda-case body, a module
+binding's right-hand side, or the program body) now has **one** flat *frame* holding its
+pattern variables and every `let` binding in it, allocated once when the activation
+starts. A `Name` then resolves to one of four places via a `NameResolution` tag —
+`Local` (a slot in the current frame), `Upvalue` (a slot in the closure's captured
+array), `Module`, or `Builtin` — with no depth to compute. The interpreter keeps just two
+fields, `Locals` and `Upvalues`, instead of an environment stack; `let` stops pushing and
+popping and simply fills its slots in the current frame. This is both simpler (the
+analyzer no longer simulates the runtime stack) and a little faster (one frame per
+activation rather than one array per let plus one per match plus one for upvalues).
+
 ---
 
 ## 5. Avoid map allocation in `MakeClosure` for zero-upvalue closures ✅

@@ -4,10 +4,34 @@ import (
 	"slices"
 )
 
+// A Scope is a lexical name-visibility region. The builtin and module scopes
+// resolve names to those namespaces; let and lambda-case scopes hold local
+// bindings, whose Slot indexes the activation frame they belong to (see Frame).
 type Scope struct {
-	Node
-	Definitions map[string]Node
-	Slots       map[string]int
+	Node        Node
+	Definitions map[string]Definition
+}
+
+type Definition struct {
+	Node Node
+	Slot int
+}
+
+// A Frame is the local-variable array of one activation: a lambda-case body, a
+// module binding's right-hand side, or the program body. Every let and pattern
+// binding in that activation — through any nesting of lets — draws its slot from
+// the same frame, so the interpreter needs only one local array per activation
+// and never pushes a per-let environment. Size is the running slot count, copied
+// onto the activation's root node when the frame closes.
+type Frame struct {
+	Root Node
+	Size int
+}
+
+func (f *Frame) allocate() int {
+	slot := f.Size
+	f.Size++
+	return slot
 }
 
 type Analyzer struct {
@@ -15,6 +39,7 @@ type Analyzer struct {
 	Modules         map[string]*Module
 	Errors          int
 	Stack           []*Scope
+	Frames          []*Frame
 	ImportedModules map[string]bool
 }
 
@@ -29,41 +54,86 @@ func GetNamesInPattern(patt Pattern) []*Name {
 }
 
 func (a *Analyzer) PushScope(node Node) {
-	scope := &Scope{
-		Definitions: make(map[string]Node),
-		Slots:       make(map[string]int),
+	a.Stack = append(a.Stack, &Scope{
 		Node:        node,
-	}
-	a.Stack = append(a.Stack, scope)
+		Definitions: make(map[string]Definition),
+	})
 }
 
 func (a *Analyzer) PopScope() {
 	a.Stack = a.Stack[:len(a.Stack)-1]
 }
 
-func (a *Analyzer) AddName(name string, node Node) {
-	scope := a.Stack[len(a.Stack)-1]
+func (a *Analyzer) currentScope() *Scope {
+	return a.Stack[len(a.Stack)-1]
+}
 
-	if defNode, found := scope.Definitions[name]; found {
+// scopeIndex returns the stack position of the scope opened by node.
+func (a *Analyzer) scopeIndex(node Node) int {
+	for i, scope := range a.Stack {
+		if scope.Node == node {
+			return i
+		}
+	}
+	return -1
+}
+
+func (a *Analyzer) PushFrame(root Node) {
+	a.Frames = append(a.Frames, &Frame{Root: root})
+}
+
+func (a *Analyzer) PopFrame() {
+	frame := a.Frames[len(a.Frames)-1]
+	a.Frames = a.Frames[:len(a.Frames)-1]
+	switch root := frame.Root.(type) {
+	case *Program:
+		root.FrameSize = frame.Size
+	case *Binding:
+		root.FrameSize = frame.Size
+	case *LambdaCase:
+		root.FrameSize = frame.Size
+	}
+}
+
+func (a *Analyzer) currentFrame() *Frame {
+	return a.Frames[len(a.Frames)-1]
+}
+
+func (a *Analyzer) AddName(name string, node Node) {
+	scope := a.currentScope()
+
+	if existing, found := scope.Definitions[name]; found {
 		var pos SourcePos
 		if node != nil {
 			pos = node.FirstPos()
 		}
 		Log(name+" was already defined", pos, SeverityInfo)
-		Log("here", defNode.FirstPos(), SeverityError)
+		Log("here", existing.Node.FirstPos(), SeverityError)
 		a.Errors++
 	}
-	scope.Definitions[name] = node
-	slot := len(scope.Slots)
-	scope.Slots[name] = slot
 
-	if node != nil {
-		switch n := node.(type) {
-		case *Name:
-			n.ResolvedSlot = slot
-		case *Binding:
-			n.Name.ResolvedSlot = slot
-		}
+	slot := a.assignSlot(scope)
+	scope.Definitions[name] = Definition{Node: node, Slot: slot}
+
+	switch n := node.(type) {
+	case *Name:
+		n.ResolvedSlot = slot
+	case *Binding:
+		n.Name.ResolvedSlot = slot
+	}
+}
+
+// assignSlot picks the slot a new binding occupies. Builtins have no runtime
+// slot; a module export's slot is its position in the module's environment; a
+// local binding takes the next slot in the enclosing activation frame.
+func (a *Analyzer) assignSlot(scope *Scope) int {
+	switch scope.Node.(type) {
+	case nil:
+		return 0
+	case *Module:
+		return len(scope.Definitions)
+	default:
+		return a.currentFrame().allocate()
 	}
 }
 
@@ -78,19 +148,6 @@ func (a *Analyzer) HandleImports(imports []*Name) {
 	}
 }
 
-func (a *Analyzer) scopeContribution(index int) int {
-	switch a.Stack[index].Node.(type) {
-	case *Let:
-		return 1
-	case *Lambda:
-		return 1 // pushes Upvalues
-	case *LambdaCase:
-		return 1 // pushes matched
-	default:
-		return 0
-	}
-}
-
 // findDefinition searches the scope stack from innermost to outermost and
 // returns the index of the scope where the name was first defined.
 func (a *Analyzer) findDefinition(name string) (int, bool) {
@@ -102,61 +159,37 @@ func (a *Analyzer) findDefinition(name string) (int, bool) {
 	return -1, false
 }
 
-// computeStackDepth calculates the total number of environments pushed onto
-// the interpreter's stack between two scope indices.
-func (a *Analyzer) computeStackDepth(fromScopeIdx, toScopeIdx int) int {
-	depth := 0
-	for i := fromScopeIdx; i <= toScopeIdx; i++ {
-		depth += a.scopeContribution(i)
-	}
-	return depth
-}
-
-// ensureCapture ensures that a Lambda captures a name as an upvalue, searching
-// for its definition in the scopes above that lambda. It returns the slot
-// assigned to the upvalue in the lambda's capture environment.
+// ensureCapture makes lambda capture name as an upvalue (if it has not already)
+// and records where MakeClosure should fetch it from in lambda's enclosing
+// activation: from that activation's local frame, or — when another lambda sits
+// in between — from that enclosing lambda's own upvalues. Returns the slot the
+// upvalue occupies in lambda's capture array.
 func (a *Analyzer) ensureCapture(lambda *Lambda, name string) int {
-	// If already captured, just return the slot.
 	if slot := getUpvalueSlot(lambda, name); slot != -1 {
 		return slot
 	}
 
-	// Not captured yet. Record it as an upvalue for this lambda.
 	slot := len(lambda.Upvalues)
 	lambda.Upvalues = append(lambda.Upvalues, name)
 
-	// Now find where to capture it from by searching scopes above the lambda.
-	lambdaIdx := -1
-	for i, scope := range a.Stack {
-		if scope.Node == lambda {
-			lambdaIdx = i
-			break
-		}
-	}
-
-	captureDepth := 0
-	for i := lambdaIdx - 1; i >= 0; i-- {
+	// Search the scopes enclosing the lambda for the name's source.
+	for i := a.scopeIndex(lambda) - 1; i >= 0; i-- {
 		scope := a.Stack[i]
 
-		// Is it a local definition in this scope?
-		if _, found := scope.Definitions[name]; found {
-			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
-				Depth: captureDepth,
-				Slot:  scope.Slots[name],
-			})
+		// Defined as a local of the enclosing activation: capture from its frame.
+		if def, found := scope.Definitions[name]; found {
+			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures,
+				UpvalueCapture{FromUpvalue: false, Slot: def.Slot})
 			return slot
 		}
 
-		// Is it already an upvalue in this scope?
-		if uvSlot := getUpvalueSlot(scope.Node, name); uvSlot != -1 {
-			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
-				Depth: captureDepth,
-				Slot:  uvSlot,
-			})
+		// An enclosing lambda is reached before the definition, so the name is one
+		// of its upvalues: chain the capture through it.
+		if enclosing, ok := scope.Node.(*Lambda); ok {
+			lambda.UpvalueCaptures = append(lambda.UpvalueCaptures,
+				UpvalueCapture{FromUpvalue: true, Slot: getUpvalueSlot(enclosing, name)})
 			return slot
 		}
-
-		captureDepth += a.scopeContribution(i)
 	}
 
 	panic("internal error: could not find definition for upvalue capture of " + name)
@@ -172,48 +205,29 @@ func (a *Analyzer) CheckName(name *Name) {
 
 	scope := a.Stack[defIdx]
 
-	// 1. Resolve to Module
-	if module, isModule := scope.Node.(*Module); isModule {
-		name.ResolvedModule = module
-		name.ResolvedSlot = scope.Slots[name.Value]
-		return
-	}
+	switch node := scope.Node.(type) {
+	case nil:
+		// Found in the synthetic outermost scope: a builtin.
+		name.Resolution = ResolveBuiltin
 
-	// 2. Resolve to Builtin
-	if scope.Node == nil {
-		name.ResolvedToBuiltin = true
-		return
-	}
+	case *Module:
+		name.Resolution = ResolveModule
+		name.ResolvedModule = node
+		name.ResolvedSlot = scope.Definitions[name.Value].Slot
 
-	// 3. Check for Upvalues. An upvalue is any name defined outside the
-	// innermost lambda enclosing the use.
-	var lastLambda *Lambda
-	var lastLambdaIdx int
-	for i := defIdx + 1; i < len(a.Stack); i++ {
-		if l, ok := a.Stack[i].Node.(*Lambda); ok {
-			lastLambda = l
-			lastLambdaIdx = i
-		}
-	}
-
-	if lastLambda != nil {
-		// It's an upvalue. Ensure every lambda from the definition down to the
-		// use captures it.
-		var slot int
+	default:
+		// A local binding (let or pattern). It is an upvalue if any lambda sits
+		// between its definition and this use: every such lambda must capture it,
+		// and the use then reads the innermost lambda's upvalue slot. With no
+		// lambda in between it is a plain local in the current activation frame.
+		name.Resolution = ResolveLocal
+		name.ResolvedSlot = scope.Definitions[name.Value].Slot
 		for i := defIdx + 1; i < len(a.Stack); i++ {
-			if l, ok := a.Stack[i].Node.(*Lambda); ok {
-				slot = a.ensureCapture(l, name.Value)
+			if lambda, ok := a.Stack[i].Node.(*Lambda); ok {
+				name.Resolution = ResolveUpvalue
+				name.ResolvedSlot = a.ensureCapture(lambda, name.Value)
 			}
 		}
-
-		// Depth is from the use (top of stack) down to the innermost lambda's
-		// Upvalues environment.
-		name.ResolvedDepth = a.computeStackDepth(lastLambdaIdx+1, len(a.Stack)-1)
-		name.ResolvedSlot = slot
-	} else {
-		// 4. Local resolution.
-		name.ResolvedSlot = scope.Slots[name.Value]
-		name.ResolvedDepth = a.computeStackDepth(defIdx+1, len(a.Stack)-1)
 	}
 }
 
@@ -251,11 +265,19 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 		switch node := n.(type) {
 		case *Program:
 			a.HandleImports(node.Imports)
+			a.PushFrame(node) // the program body is an activation
 		case *Module:
 			a.HandleImports(node.Imports)
 			a.PushScope(node)
 			for _, binding := range node.PublicBindings {
 				a.AddName(binding.Name.Value, binding)
+			}
+		case *Binding:
+			// A module's public binding is its own activation (run by its own
+			// RunExpression call), so it gets a frame; a let binding shares the
+			// enclosing one and is handled under *Let.
+			if _, inModule := a.currentScope().Node.(*Module); inModule {
+				a.PushFrame(node)
 			}
 		case *Let:
 			a.PushScope(node)
@@ -266,6 +288,7 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 			a.PushScope(node)
 		case *LambdaCase:
 			node.Pattern = NormalizePattern(node.Pattern)
+			a.PushFrame(node) // the case body is an activation
 			a.PushScope(node)
 			for _, name := range GetNamesInPattern(node.Pattern) {
 				a.AddName(name.Value, name)
@@ -280,8 +303,11 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 	}
 
 	post := func(n Node) {
-		for a.Stack[len(a.Stack)-1].Node == n {
+		for len(a.Stack) > 0 && a.currentScope().Node == n {
 			a.PopScope()
+		}
+		if len(a.Frames) > 0 && a.currentFrame().Root == n {
+			a.PopFrame()
 		}
 	}
 
@@ -290,6 +316,7 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 
 func (a *Analyzer) ResetToBuiltins() {
 	a.Stack = nil
+	a.Frames = nil
 	a.ImportedModules = make(map[string]bool)
 	a.PushScope(nil)
 	for builtin := range Builtins {

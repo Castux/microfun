@@ -4,6 +4,8 @@ type Program struct {
 	Imports []*Name
 	Body    Expression
 
+	FrameSize int // added by analyzer: slots the body's activation frame needs
+
 	Start SourcePos
 }
 
@@ -18,6 +20,8 @@ type Module struct {
 type Binding struct {
 	Name       *Name
 	Expression Expression
+
+	FrameSize int // added by analyzer: slots the RHS's activation frame needs (module bindings only)
 }
 
 type Expression interface {
@@ -54,11 +58,16 @@ type Lambda struct {
 type LambdaCase struct {
 	Pattern    Pattern
 	Expression Expression
+
+	FrameSize int // added by analyzer: slots this case's activation frame needs
 }
 
+// UpvalueCapture tells MakeClosure where to find one upvalue in the enclosing
+// activation when a closure is built: either in that activation's own captured
+// upvalues (FromUpvalue) or in its local frame, at the given slot.
 type UpvalueCapture struct {
-	Depth int
-	Slot  int
+	FromUpvalue bool
+	Slot        int
 }
 
 type Pattern interface {
@@ -89,16 +98,26 @@ type Operation struct {
 	Operands []Expression
 }
 
+// NameResolution records where a resolved Name lives, telling the interpreter
+// which environment to index with ResolvedSlot. It is filled by the analyzer.
+type NameResolution byte
+
+const (
+	ResolveLocal   NameResolution = iota // a slot in the current activation's frame
+	ResolveUpvalue                       // a slot in the enclosing closure's captured upvalues
+	ResolveModule                        // a slot in ResolvedModule's environment
+	ResolveBuiltin                       // a builtin function (or the stdin/bstdin streams)
+)
+
 type Name struct {
-	Value             string
-	InPattern         bool
-	InImport          bool
-	InBinding         bool
-	ResolvedModule    *Module // added by analyzer
-	ResolvedToBuiltin bool    // added by analyzer
-	ResolvedSlot      int     // added by analyzer: index in environment
-	ResolvedDepth     int     // added by analyzer: steps up the stack
-	Pos               SourcePos
+	Value          string
+	InPattern      bool
+	InImport       bool
+	InBinding      bool
+	Resolution     NameResolution // added by analyzer
+	ResolvedModule *Module        // added by analyzer: set when Resolution == ResolveModule
+	ResolvedSlot   int            // added by analyzer: index in the resolved environment
+	Pos            SourcePos
 }
 
 type QualifiedName struct {
