@@ -501,17 +501,7 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 		return env
 
 	case *ListPattern:
-		if len(patt.SubPatterns) == 0 {
-			return i.MatchPattern(&TuplePattern{Start: patt.Start, End: patt.End}, argument)
-		}
-		return i.MatchPattern(&TuplePattern{
-			SubPatterns: []Pattern{
-				patt.SubPatterns[0],
-				&ListPattern{SubPatterns: patt.SubPatterns[1:], Start: patt.Start, End: patt.End},
-			},
-			Start: patt.Start,
-			End:   patt.End,
-		}, argument)
+		panic("internal error: ListPattern reached MatchPattern without normalization")
 
 	case *StringLiteral:
 		current := argument

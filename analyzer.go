@@ -131,6 +131,7 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 				a.AddName(binding.Name.Value, binding)
 			}
 		case *Lambda:
+			node.Pattern = NormalizePattern(node.Pattern)
 			a.PushScope(node)
 			for _, name := range GetNamesInPattern(node.Pattern) {
 				a.AddName(name.Value, name)
@@ -169,6 +170,33 @@ func (a *Analyzer) Run() {
 	for _, module := range a.Modules {
 		a.ResetToBuiltins()
 		a.AnalyzeTopLevel(module)
+	}
+}
+
+// NormalizePattern converts a ListPattern to its equivalent nested TuplePattern
+// structure so that MatchPattern never has to allocate AST nodes at runtime.
+// TuplePattern sub-patterns are normalized in place; all other pattern types are
+// returned unchanged.
+func NormalizePattern(patt Pattern) Pattern {
+	switch p := patt.(type) {
+	case *ListPattern:
+		// Build right-to-left: [] → TuplePattern{}, then wrap each element.
+		result := &TuplePattern{Start: p.Start, End: p.End}
+		for i := len(p.SubPatterns) - 1; i >= 0; i-- {
+			result = &TuplePattern{
+				SubPatterns: []Pattern{NormalizePattern(p.SubPatterns[i]), result},
+				Start:       p.Start,
+				End:         p.End,
+			}
+		}
+		return result
+	case *TuplePattern:
+		for i, sub := range p.SubPatterns {
+			p.SubPatterns[i] = NormalizePattern(sub)
+		}
+		return p
+	default:
+		return patt
 	}
 }
 
