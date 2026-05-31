@@ -98,7 +98,7 @@ isLower    = c -> and (lte c (head 'a')) (lte (head 'z') c),
 isUpper    = c -> and (lte c (head 'A')) (lte (head 'Z') c),
 isAlpha    = c -> or (isLower c) (isUpper c),
 isAlphaNum = c -> or (isAlpha c) (isDigit c),
-isSpace    = c -> contains c [space; tab; lf; cr],
+isSpace    = c -> eq c space > or (eq c tab) > or (eq c lf) > or (eq c cr),
 
 -- Character conversion
 digitToInt = c -> sub (head '0') c,
