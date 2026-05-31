@@ -27,7 +27,7 @@
 -- numbers and recursing, which produced every tree in many build orders and
 -- leaned on a slow final pass to remove the flood of duplicates.
 
-import prelude in
+import list, core, text, comb in
 
 let
 	target  = 800,
@@ -43,7 +43,7 @@ let
 	-- node is emitted only in its canonical, legal form: + and * only when
 	-- right <= left (so a+b and b+a don't both appear), - only when it stays
 	-- positive, and / only when it divides evenly and is not a trivial ÷1.
-	-- (Recall the prelude's lte/gt compare their second argument to the first.)
+	-- (Recall the builtins lte/gt compare their second argument to the first.)
 
 	combineNodes = left -> right ->
 		let lv = value left, rv = value right in
@@ -62,13 +62,6 @@ let
 			> flatten,
 
 	-- Subsets and partitions ----------------------------------------------
-	--
-	-- All subsets of a list, as order-preserving sublists (the power set).
-
-	subsetsOf = {
-		[] -> [ []; ],
-		[h, t] -> let rest = subsetsOf t in concat rest (map (cons h) rest)
-	},
 
 	-- Every assignment of the elements to a [left, right] pair, then those
 	-- where both sides are non-empty: the ordered partitions of the subset.
@@ -117,7 +110,7 @@ let
 
 	bySize = a -> b -> lt (length a) (length b),
 
-	memo = subsetsOf numbers
+	memo = subsets numbers
 		> filter (not <* empty)
 		> sortWith bySize
 		> foldl addSubset [],
