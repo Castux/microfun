@@ -514,6 +514,10 @@ func (i *Interpreter) MatchPattern(pattern Pattern, argument RuntimeValue) Envir
 			}
 		}
 
+		if len(right) != 2 {
+			return nil
+		}
+
 		leftEnv := i.MatchPattern(patt.SubPatterns[0], right[0])
 		if leftEnv == nil {
 			return nil
