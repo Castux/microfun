@@ -29,31 +29,30 @@ join = separator -> {
 },
 
 -- padLeft n fill s: left-pad string s with single-char string fill to minimum width n
-padLeft = n -> fill -> s ->
+padLeft = n -> fill -> s -> let
+	padLen = n > sub (length s) > max 0
+in
 	concat
-		(flatten (replicate (max 0 (sub (length s) n)) fill))
+		(flatten (replicate padLen fill))
 		s,
 
 -- intToString n: render an integer as a string.
 -- Produces wrong output for non-integers; use floatToString for fractional numbers.
-intToString = n ->
-	let
-		digit = [ n > mod 10 > add (head '0'); ]
-	in
-		ifs [
-			[lt 0 n,  concat '-' (intToString (minus n))];
-			[lt 10 n, digit]
-		]	(concat (intToString (div 10 n)) digit),
+intToString = n -> let
+	sign = if (lt 0 n) '-' '',
+	digs = abs n > digits > map intToDigit
+in
+	concat sign digs,
 
 -- floatToString precision n: render n with exactly `precision` decimal digits.
 -- Explicit precision is required; the appropriate number of digits is context-dependent.
 floatToString = precision -> n ->
 	let
-		sign  = if (lt 0 n) '-' [],
+		sign  = if (lt 0 n) '-' '',
 		absN  = abs n,
 		whole = trunc absN,
 		scale = pow precision 10,
-		frac  = trunc (mul scale (sub whole absN))
+		frac  = absN > sub whole > mul scale > trunc
 	in
 		flatten [sign; intToString whole; '.'; padLeft precision '0' (intToString frac)],
 
@@ -126,11 +125,9 @@ stringToFloat = s ->
 		zero         = head '0',
 		neg          = head '-',
 		dot          = head '.',
-		digitVal     = c -> sub zero c,
-		parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitVal c)) 0,
-		parseFrac     = foldr (c -> acc -> fdiv 10 (add acc (digitVal c))) 0,
-		parseUnsigned = u ->
-			u > span (c -> neq c dot) > {
+		parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitToInt c)) 0,
+		parseFrac     = foldr (c -> acc -> fdiv 10 (add acc (digitToInt c))) 0,
+		parseUnsigned = span (c -> neq c dot) *> {
 				[intPart, []]        -> parsePositive intPart,
 				[intPart, [d, frac]] -> add (parsePositive intPart) (parseFrac frac)
 			}

@@ -1,6 +1,6 @@
 -- math.mf: numeric operations.
 -- Imports core for `if`, which is used throughout.
-import core in
+import core, list in
 
 module
 
@@ -40,4 +40,9 @@ pow = exp -> base ->
 		(mul base (pow (sub 1 exp) base)),
 
 even = n -> eq 0 (mod 2 n),
-odd  = n -> eq 1 (mod 2 n)
+odd  = n -> eq 1 (mod 2 n),
+
+digits = {
+	0 -> [0;],
+	n -> (n > iterate (div 10) > takeWhile (gt 0) > map (mod 10) > reverse)
+}
