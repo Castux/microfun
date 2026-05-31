@@ -76,6 +76,32 @@ func init() {
 				return 0
 			}
 		}, "lt"),
+		// Derived comparisons follow the same threshold-first, value-second convention
+		// as eq and lt: (lte 10 x) = "x ≤ 10", (gte 0 x) = "x ≥ 0", etc.
+		"neq": WrapBinop(func(a, b float64) float64 {
+			if a != b {
+				return 1
+			}
+			return 0
+		}, "neq"),
+		"lte": WrapBinop(func(a, b float64) float64 {
+			if b <= a {
+				return 1
+			}
+			return 0
+		}, "lte"),
+		"gte": WrapBinop(func(a, b float64) float64 {
+			if b >= a {
+				return 1
+			}
+			return 0
+		}, "gte"),
+		"gt": WrapBinop(func(a, b float64) float64 {
+			if b > a {
+				return 1
+			}
+			return 0
+		}, "gt"),
 		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
 		"eval": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
 			return interpreter.EvaluateToFullNormalForm(a, make(map[*NamedValue]bool))

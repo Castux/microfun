@@ -1,46 +1,18 @@
--- math.mf: numbers, booleans, and comparisons.
--- Imports list for the implementation of `ifs` (which filters a condition list).
--- Circular with list (list imports math for `if`, `succ`, etc.) — permitted by the language.
-import func, list in
+-- math.mf: numeric operations.
+-- Imports core for `if`, which is used throughout.
+import core in
 
 module
 
--- Booleans
-
-if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
-
--- ifs [(cond1, val1); (cond2, val2); ...] else
--- Returns the value paired with the first true condition, or else.
-ifs = l -> else ->
-	l > list.filter func.first > list.map func.second > {
-		[h, rest] -> h,
-		[] -> else
-	},
-
-and = a -> b -> if a b 0,
-or  = a -> b -> if a 1 b,
-not = { 0 -> 1, 1 -> 0 },
-
--- Comparisons
--- Convention (same as the builtins): threshold first, value second.
--- e.g. (lt 0) = "is negative", (gte 0) = "is non-negative", (lte 10) = "at most 10"
--- builtin: eq, lt
-
-neq = a -> b -> not (eq a b),
-gte = a -> b -> not (lt a b),
-gt  = a -> b -> not (lte a b),
-lte = a -> b -> or (lt a b) (eq a b),
-
--- Numbers
--- builtin: add, mul, sub, div, fdiv, mod, fmod, sqrt
+-- builtin: add, mul, sub, div, fdiv, mod, fmod, sqrt, eq, lt, lte, gte, gt, neq
 
 succ = add 1,
 pred = sub 1,
 minus = n -> sub n 0,
 negate = minus,
-abs = n -> if (lt 0 n) (minus n) n,
-max = a -> b -> if (lt a b) a b,
-min = a -> b -> if (lt a b) b a,
+abs = n -> core.if (lt 0 n) (minus n) n,
+max = a -> b -> core.if (lt a b) a b,
+min = a -> b -> core.if (lt a b) b a,
 clamp = lo -> hi -> n -> max lo (min hi n),
 
 -- trunc rounds towards zero (identical to integer division by 1)
@@ -48,22 +20,22 @@ trunc = div 1,
 
 floor = n ->
 	let t = trunc n in
-	if (lt 0 n)
-		(if (eq t n) t (sub 1 t))
+	core.if (lt 0 n)
+		(core.if (eq t n) t (sub 1 t))
 		t,
 
 ceil = n ->
 	let t = trunc n in
-	if (lt 0 n)
+	core.if (lt 0 n)
 		t
-		(if (eq t n) t (add 1 t)),
+		(core.if (eq t n) t (add 1 t)),
 
 -- rounds half up: round (-2.5) = -2
 round = n -> floor (add 0.5 n),
 
 -- pow exp base = base ^ exp  (non-negative integer exponents only)
 pow = exp -> base ->
-	if (eq exp 0)
+	core.if (eq exp 0)
 		1
 		(mul base (pow (sub 1 exp) base)),
 

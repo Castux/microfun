@@ -1,0 +1,36 @@
+-- core.mf: foundational combinators, tuple accessors, and boolean logic.
+-- Imports list for `ifs` (which uses list.filter and list.map).
+-- Circular with list (list imports core for `if`, `not`, etc.) — permitted by the language.
+import list in
+
+module
+
+-- Combinators
+
+id = x -> x,
+compose = f -> g -> x -> f (g x),
+flip = f -> x -> y -> f y x,
+curry = f -> x -> y -> f [x,y],
+uncurry = f -> [x,y] -> f x y,
+const = c -> x -> c,
+
+-- Tuple accessors
+
+first = [a,b] -> a,
+second = [a,b] -> b,
+
+-- Booleans and control flow
+
+if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
+
+-- ifs [(cond1, val1); (cond2, val2); ...] else
+-- Returns the value paired with the first true condition, or else.
+ifs = l -> else ->
+	l > list.filter first > list.map second > {
+		[h, rest] -> h,
+		[] -> else
+	},
+
+and = a -> b -> if a b 0,
+or  = a -> b -> if a 1 b,
+not = { 0 -> 1, 1 -> 0 }

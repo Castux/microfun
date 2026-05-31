@@ -1,12 +1,12 @@
 -- comb.mf: combinatorics — sorting, partitioning, and set-like operations on lists.
-import list, math in
+import list, math, core in
 
 module
 
 -- partition p l = [[elements where p holds], [elements where p does not]]
 partition = p ->
 	list.foldr
-	( x -> [ts,fs] -> math.if (p x) [[x,ts],fs] [ts,[x,fs]] )
+	( x -> [ts,fs] -> core.if (p x) [[x,ts],fs] [ts,[x,fs]] )
 	[[],[]],
 
 -- sortWith f l: quicksort; f is a comparison predicate (f pivot element = 1 if element < pivot)

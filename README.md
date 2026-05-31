@@ -489,8 +489,10 @@ everything else is defined in the standard library modules in microfun itself.
 The binary arithmetic and comparison builtins take their arguments in an order
 chosen for **partial application and piping**: the *first* argument is the
 right-hand operand. This makes `sub 1` mean "subtract one", `mod 10` mean "reduce
-modulo ten", `div 2` mean "halve", and `lt 0` mean "is greater than zero". The
-exact semantics:
+modulo ten", `div 2` mean "halve", and `lt 0` mean "is greater than zero". All
+comparison builtins follow the same **threshold-first, value-second** convention:
+`(lt 0)`, `(lte 0)`, `(gte 0)`, `(gt 0)` read naturally as predicates meaning
+"is negative", "is non-positive", "is non-negative", and "is positive".
 
 | Builtin | Arity | Result | Notes |
 |---------|-------|--------|-------|
@@ -503,7 +505,11 @@ exact semantics:
 | `fmod a b` | 2 | `b mod a` (real) | floating-point remainder |
 | `sqrt a` | 1 | `√a` | |
 | `eq a b` | 2 | `1` if `a = b` else `0` | numbers only |
-| `lt a b` | 2 | `1` if `b < a` else `0` | argument order: `lt 0 x = x < 0` |
+| `lt a b` | 2 | `1` if `b < a` else `0` | `lt 0 x = x < 0` |
+| `lte a b` | 2 | `1` if `b ≤ a` else `0` | `lte 10 x = x ≤ 10` |
+| `gte a b` | 2 | `1` if `b ≥ a` else `0` | `gte 0 x = x ≥ 0` |
+| `gt a b` | 2 | `1` if `b > a` else `0` | `gt 0 x = x > 0` |
+| `neq a b` | 2 | `1` if `a ≠ b` else `0` | numbers only |
 | `equal a b` | 2 | `1` if `a` and `b` are structurally equal else `0` | works on any values; forces as needed; functions compare equal only by identity |
 | `eval a` | 1 | `a`, forced to full normal form | identity otherwise; breaks laziness |
 | `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
@@ -562,9 +568,11 @@ are permitted and handled correctly (see [§3](#3-programs-and-modules)).
 
 ---
 
-#### `func` — functional combinators
+#### `core` — combinators, tuple accessors, and boolean logic
 
-No imports.
+Imports `list` (for `ifs`; circular with `list` — permitted).
+
+**Combinators**
 
 | Name | Description |
 |------|-------------|
@@ -577,33 +585,24 @@ No imports.
 | `first [a, b]` | first element of a 2-tuple |
 | `second [a, b]` | second element of a 2-tuple |
 
----
-
-#### `math` — numbers, booleans, and comparisons
-
-Imports `func` and `list` (for `ifs`; circular with `list` — permitted).
-
-**Booleans / control**
+**Booleans / control flow**
 
 | Name | Description |
 |------|-------------|
 | `if cond t f` | conditional; `cond` must be `0` or `1` |
 | `ifs [(c1,v1); …] else` | first `vi` whose `ci` is `1`, or `else` |
-| `and a b` | logical and |
-| `or a b` | logical or |
+| `and a b` | logical and (short-circuits: if `a` is 0, `b` is not evaluated) |
+| `or a b` | logical or (short-circuits: if `a` is 1, `b` is not evaluated) |
 | `not b` | logical not |
 
-**Comparisons** — convention matches the builtins: threshold first, value second,
-so `lt 0` means "is negative" and `gte 0` means "is non-negative".
+---
 
-| Name | Description |
-|------|-------------|
-| `neq a b` | `b ≠ a` |
-| `lte a b` | `b ≤ a` |
-| `gte a b` | `b ≥ a` |
-| `gt a b` | `b > a` |
+#### `math` — numeric operations
 
-**Numbers** (builtins: `add`, `mul`, `sub`, `div`, `fdiv`, `mod`, `fmod`, `sqrt`)
+Imports `core` (for `if`).
+
+**Numbers** (builtins: `add`, `mul`, `sub`, `div`, `fdiv`, `mod`, `fmod`, `sqrt`,
+`eq`, `lt`, `lte`, `gte`, `gt`, `neq`)
 
 | Name | Description |
 |------|-------------|
@@ -626,7 +625,7 @@ so `lt 0` means "is negative" and `gte 0` means "is non-negative".
 
 #### `list` — list operations and infinite lists
 
-Imports `math` and `func` (circular with `math` — permitted).
+Imports `math` and `core` (circular with `core` — permitted).
 
 **Construction and inspection**
 `cons`, `isList`, `length`, `head`, `tail`, `empty`, `concat`, `remove`, `reverse`
@@ -670,7 +669,7 @@ import list in
 
 #### `comb` — sorting and combinatorics
 
-Imports `list` and `math`.
+Imports `list`, `math`, and `core`.
 
 | Name | Description |
 |------|-------------|
@@ -683,8 +682,8 @@ Imports `list` and `math`.
 
 #### `text` — string formatting and value rendering
 
-Imports `list` and `math`. Strings are lists of Unicode code points, so all
-`list` functions work on them; this module adds higher-level formatting.
+Imports `list`, `math`, and `core`. Strings are lists of Unicode code points, so
+all `list` functions work on them; this module adds higher-level formatting.
 
 | Name | Description |
 |------|-------------|

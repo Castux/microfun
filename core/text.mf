@@ -1,7 +1,7 @@
 -- text.mf: string formatting and value rendering.
 -- Strings in microfun are lists of Unicode code points, so all list operations
 -- work on them directly. This module adds higher-level formatting utilities.
-import list, math in
+import list, math, core in
 
 module
 
@@ -26,7 +26,7 @@ intToString = n ->
 	let
 		digit = [ n > mod 10 > add (list.head '0'); ]
 	in
-		math.ifs [
+		core.ifs [
 			[lt 0 n,  list.concat '-' (intToString (math.minus n))];
 			[lt 10 n, digit]
 		]	(list.concat (intToString (div 10 n)) digit),
@@ -35,7 +35,7 @@ intToString = n ->
 -- Explicit precision is required; the appropriate number of digits is context-dependent.
 floatToString = precision -> n ->
 	let
-		sign  = math.if (lt 0 n) '-' [],
+		sign  = core.if (lt 0 n) '-' [],
 		absN  = math.abs n,
 		whole = math.trunc absN,
 		scale = math.pow precision 10,
@@ -71,8 +71,8 @@ toString =
 			let
 				asList = tupleToList t
 			in
-				math.if (list.isList asList)
+				core.if (list.isList asList)
 					(list.flatten ['[' ; asList > list.map toString > join ', ' ; ']'])
 					(intToString asList)
 	in
-		x -> math.if (list.isList x) (listToString x) (tupleToString x)
+		x -> core.if (list.isList x) (listToString x) (tupleToString x)
