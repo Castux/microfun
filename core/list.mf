@@ -22,6 +22,16 @@ length = {
 head = [h,t] -> h,
 tail = [h,t] -> t,
 
+last = {
+	[x, []] -> x,
+	[h, t] -> last t
+},
+
+init = {
+	[x, []] -> [],
+	[h, t] -> [h, init t]
+},
+
 empty = { [] -> 1, l -> 0 },
 
 concat = {
@@ -36,6 +46,12 @@ remove = e -> {
 
 reverse = foldl (flip cons) [],
 
+intersperse = sep -> {
+	[] -> [],
+	[x, []] -> [x;],
+	[h, t] -> [h, [sep, intersperse sep t]]
+},
+
 -- Higher-order
 
 map = f -> {
@@ -46,6 +62,11 @@ map = f -> {
 filter = f -> {
 	[] -> [],
 	[h,t] -> if (f h) [h, filter f t] (filter f t)
+},
+
+find = p -> {
+	[] -> [],
+	[h, t] -> if (p h) [h;] (find p t)
 },
 
 foldr = f -> acc -> {
@@ -81,6 +102,19 @@ zipWith = f -> {
 },
 
 zip = zipWith cons,
+
+zipWith3 = f -> {
+	[] -> b -> c -> [],
+	[a, as] -> {
+		[] -> c -> [],
+		[b, bs] -> {
+			[] -> [],
+			[c, cs] -> [f a b c, zipWith3 f as bs cs]
+		}
+	}
+},
+
+zip3 = zipWith3 (a -> b -> c -> [a, b, c]),
 
 -- Slicing
 

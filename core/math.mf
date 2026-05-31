@@ -10,6 +10,7 @@ succ = add 1,
 pred = sub 1,
 minus = n -> sub n 0,
 negate = minus,
+signum = n -> if (eq n 0) 0 (if (lt 0 n) (minus 1) 1),
 abs = n -> if (lt 0 n) (minus n) n,
 max = a -> b -> if (lt a b) a b,
 min = a -> b -> if (lt a b) b a,
@@ -41,6 +42,22 @@ pow = exp -> base ->
 
 even = n -> eq 0 (mod 2 n),
 odd  = n -> eq 1 (mod 2 n),
+
+gcd = a -> b ->
+	let
+		absA = abs a,
+		absB = abs b,
+		go = {
+			[x, 0] -> x,
+			[x, y] -> go [y, mod y x]
+		}
+	in
+		go [absA, absB],
+
+lcm = a -> b ->
+	if (or (eq a 0) (eq b 0))
+		0
+		(abs (mul (div (gcd a b) b) a)),
 
 digits = {
 	0 -> [0;],

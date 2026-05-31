@@ -36,6 +36,9 @@ in
 		(flatten (replicate padLen fill))
 		s,
 
+-- trim s: remove leading and trailing whitespace from string s
+trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
+
 -- intToString n: render an integer as a string.
 -- Produces wrong output for non-integers; use floatToString for fractional numbers.
 intToString = n -> let
@@ -105,6 +108,9 @@ intToDigit = n -> add (head '0') n,
 toLower    = c -> if (isUpper c) (add (sub (head 'A') (head 'a')) c) c,
 toUpper    = c -> if (isLower c) (sub (sub (head 'A') (head 'a')) c) c,
 
+stringToLower = map toLower,
+stringToUpper = map toUpper,
+
 -- stringToInt s: parse a decimal integer string (optional leading '-') as a number.
 -- No validation; non-digit characters produce wrong results.
 stringToInt = s ->
@@ -117,6 +123,12 @@ stringToInt = s ->
 			[] -> 0,
 			[c, rest] -> if (equal c neg) (minus (parsePositive rest)) (parsePositive s)
 		},
+
+-- startsWith prefix s: 1 if string s begins with prefix, else 0
+startsWith = prefix -> s -> equal prefix (take (length prefix) s),
+
+-- endsWith suffix s: 1 if string s ends with suffix, else 0
+endsWith = suffix -> s -> let lenS = length s, lenP = length suffix in equal suffix (drop (sub lenP lenS) s),
 
 -- stringToFloat s: parse a decimal float string (optional leading '-', optional '.').
 -- No validation; non-digit/non-dot characters produce wrong results.

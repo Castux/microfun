@@ -586,6 +586,8 @@ Imports `list` (for `ifs`; circular with `list` — permitted).
 | `curry f` | `curry f x y = f [x, y]` |
 | `uncurry f` | `uncurry f [x, y] = f x y` |
 | `const c` | constant function: `const c x = c` |
+| `on f g` | apply `g` to two arguments then `f`: `(on f g) x y = f (g x) (g y)` |
+| `fix f` | fixed-point combinator: `fix f = f (fix f)` |
 | `first [a, b]` | first element of a 2-tuple |
 | `second [a, b]` | second element of a 2-tuple |
 
@@ -613,6 +615,7 @@ Imports `core` (for `if`).
 | `succ` | `add 1` |
 | `pred` | `sub 1` |
 | `minus n` / `negate n` | arithmetic negation |
+| `signum n` | sign of `n`: `-1`, `0`, or `1` |
 | `abs n` | absolute value |
 | `max a b` | larger of `a`, `b` |
 | `min a b` | smaller of `a`, `b` |
@@ -624,6 +627,8 @@ Imports `core` (for `if`).
 | `pow exp base` | `base ^ exp` (non-negative integer exponents) |
 | `even n` | `1` if `n mod 2 = 0` |
 | `odd n` | `1` if `n mod 2 ≠ 0` |
+| `gcd a b` | greatest common divisor |
+| `lcm a b` | least common multiple |
 
 ---
 
@@ -632,16 +637,16 @@ Imports `core` (for `if`).
 Imports `math` and `core` (circular with `core` — permitted).
 
 **Construction and inspection**
-`cons`, `isList`, `length`, `head`, `tail`, `empty`, `concat`, `remove`, `reverse`
+`cons`, `isList`, `length`, `head`, `tail`, `last`, `init`, `empty`, `concat`, `remove`, `reverse`, `intersperse`
 
 **Higher-order**
-`map`, `filter`, `foldr`, `foldl`
+`map`, `filter`, `find`, `foldr`, `foldl`
 
 **Aggregations**
 `sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
 
 **Zipping**
-`zipWith`, `zip`
+`zipWith`, `zip`, `zipWith3`, `zip3`
 
 **Slicing**
 `take`, `drop`, `takeWhile`, `dropWhile`, `span`
@@ -702,6 +707,31 @@ import list, comb in
 
 ---
 
+#### `heap` — purely functional priority queues (leftist heaps)
+
+Imports `core`, `math`, and `list`.
+
+Provides $O(\log n)$ insertion, merging, and popping. This is a **max-priority heap**.
+
+To achieve standard behaviors with built-in comparators:
+- Use `lt` for a **max-heap** (root is the largest element).
+- Use `gt` for a **min-heap** (root is the smallest element).
+
+| Name | Description |
+|------|-------------|
+| `empty` | the empty heap |
+| `isEmpty h` | `1` if `h` is empty |
+| `singleton x` | a heap containing only `x` |
+| `merge cmp h1 h2` | merge two heaps ($O(\log n)$) |
+| `insert cmp x h` | insert `x` into `h` ($O(\log n)$) |
+| `peek h` | return the root element |
+| `pop comparator h` | remove the root element and return the new heap ($O(\log n)$) |
+| `fromList comparator l` | build a heap from a list |
+| `toList comparator h` | convert a heap to a sorted list (heapsort) |
+| `sort comparator l` | Heapsort using the provided comparator |
+
+---
+
 #### `text` — string formatting, parsing, and value rendering
 
 Imports `list`, `math`, and `core`. Strings are lists of Unicode code points, so
@@ -733,6 +763,8 @@ character of a string, and is the idiomatic way to write character literals:
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
+| `intersperse sep l` | intercalate `sep` between each element in the list |
+| `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with single-char string `fill` to width `n` |
 | `intToString n` | render an integer as a string (wrong output for non-integers) |
 | `floatToString prec n` | render `n` with exactly `prec` decimal digits |
@@ -754,6 +786,8 @@ All functions below take a Unicode code point (an integer, as found in a microfu
 | `isSpace c` | `1` if `c` is `space`, `tab`, `lf`, or `cr` |
 | `toLower c` | lowercase the character; non-uppercase returned unchanged |
 | `toUpper c` | uppercase the character; non-lowercase returned unchanged |
+| `stringToLower s` | lowercase a whole string |
+| `stringToUpper s` | uppercase a whole string |
 | `digitToInt c` | digit character → integer (`char '5'` → `5`) |
 | `intToDigit n` | integer → digit character (`5` → `char '5'`) |
 
@@ -763,6 +797,8 @@ All functions below take a Unicode code point (an integer, as found in a microfu
 |------|-------------|
 | `stringToInt s` | parse a decimal integer string (optional leading `'-'`) |
 | `stringToFloat s` | parse a decimal float string (optional `'-'` and `'.'`) |
+| `startsWith pref s` | `1` if `s` begins with `pref` |
+| `endsWith suff s` | `1` if `s` ends with `suff` |
 | `split sep s` | split `s` on separator `sep`; returns a list of strings |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
