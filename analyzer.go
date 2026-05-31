@@ -85,12 +85,9 @@ func (a *Analyzer) scopeContribution(index int) int {
 	case *Let:
 		return 1
 	case *Lambda:
-		if index == 0 || isNotMultiLambda(a.Stack[index-1].Node) {
-			return 2 // bare lambda: pushes Upvalues then matched
-		}
-		return 1 // multi-lambda clause: pushes matched (Upvalues pushed by parent)
-	case *MultiLambda:
 		return 1 // pushes Upvalues
+	case *LambdaCase:
+		return 1 // pushes matched
 	default:
 		return 0
 	}
@@ -128,41 +125,21 @@ func (a *Analyzer) CheckName(name *Name) {
 		return
 	}
 
-	// Every closure level between the use and the definition must capture the
-	// name as an upvalue. A closure level is a MultiLambda, or a Lambda that
-	// is NOT part of a MultiLambda.
-	var upvalueNodes []Node
+	// Every Lambda level between the use and the definition must capture the
+	// name as an upvalue.
+	var upvalueLambdas []*Lambda
 	for i := foundIndex + 1; i < len(a.Stack); i++ {
-		switch n := a.Stack[i].Node.(type) {
-		case *MultiLambda:
-			upvalueNodes = append(upvalueNodes, n)
-		case *Lambda:
-			// A Lambda that is NOT part of a MultiLambda (its parent in the stack
-			// is not a MultiLambda).
-			if i == 0 || isNotMultiLambda(a.Stack[i-1].Node) {
-				upvalueNodes = append(upvalueNodes, n)
-			}
+		if l, ok := a.Stack[i].Node.(*Lambda); ok {
+			upvalueLambdas = append(upvalueLambdas, l)
 		}
 	}
 
-	if len(upvalueNodes) > 0 {
+	if len(upvalueLambdas) > 0 {
 		// It's an upvalue.
-		for _, n := range upvalueNodes {
-			// Find or add to this node's Upvalues
-			var upvalues *[]string
-			var captures *[]UpvalueCapture
-
-			switch node := n.(type) {
-			case *Lambda:
-				upvalues = &node.Upvalues
-				captures = &node.UpvalueCaptures
-			case *MultiLambda:
-				upvalues = &node.Upvalues
-				captures = &node.UpvalueCaptures
-			}
-
+		for _, lambda := range upvalueLambdas {
+			// Find or add to this lambda's Upvalues
 			slot := -1
-			for j, uv := range *upvalues {
+			for j, uv := range lambda.Upvalues {
 				if uv == name.Value {
 					slot = j
 					break
@@ -170,24 +147,25 @@ func (a *Analyzer) CheckName(name *Name) {
 			}
 
 			if slot == -1 {
-				slot = len(*upvalues)
-				*upvalues = append(*upvalues, name.Value)
+				slot = len(lambda.Upvalues)
+				lambda.Upvalues = append(lambda.Upvalues, name.Value)
 
-				// Calculate capture for this node.
-				nodeIdx := -1
+				// Calculate capture for this lambda.
+				// It looks for the name from the perspective of the lambda's definition.
+				lambdaIdx := -1
 				for k, s := range a.Stack {
-					if s.Node == n {
-						nodeIdx = k
+					if s.Node == lambda {
+						lambdaIdx = k
 						break
 					}
 				}
 
 				captureDepth := 0
 				foundDef := false
-				for k := nodeIdx - 1; k >= 0; k-- {
+				for k := lambdaIdx - 1; k >= 0; k-- {
 					// Is it a local definition in this scope?
 					if _, found := a.Stack[k].Definitions[name.Value]; found {
-						*captures = append(*captures, UpvalueCapture{
+						lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
 							Depth: captureDepth,
 							Slot:  a.Stack[k].Slots[name.Value],
 						})
@@ -197,12 +175,8 @@ func (a *Analyzer) CheckName(name *Name) {
 
 					// Is it an upvalue in this scope?
 					if uvSlot := getUpvalueSlot(a.Stack[k].Node, name.Value); uvSlot != -1 {
-						depth := captureDepth
-						if _, ok := a.Stack[k].Node.(*Lambda); ok && (k == 0 || isNotMultiLambda(a.Stack[k-1].Node)) {
-							depth += 1 // Bare lambda: Upvalues are 1 step above matched
-						}
-						*captures = append(*captures, UpvalueCapture{
-							Depth: depth,
+						lambda.UpvalueCaptures = append(lambda.UpvalueCaptures, UpvalueCapture{
+							Depth: captureDepth,
 							Slot:  uvSlot,
 						})
 						foundDef = true
@@ -216,27 +190,24 @@ func (a *Analyzer) CheckName(name *Name) {
 				}
 			}
 
-			// If this is the innermost closure level, record its upvalue slot.
-			if n == upvalueNodes[len(upvalueNodes)-1] {
+			// If this is the innermost lambda, record its upvalue slot.
+			if lambda == upvalueLambdas[len(upvalueLambdas)-1] {
+				// Inner lambda body is inside Lambda (pushed Upvalues) and
+				// then LambdaCase (pushed matched). So depth is 1.
 				innermostIdx := -1
 				for k, s := range a.Stack {
-					if s.Node == n {
+					if s.Node == lambda {
 						innermostIdx = k
 						break
 					}
 				}
 
-				matchedIdx := innermostIdx
-				if _, ok := n.(*MultiLambda); ok {
-					matchedIdx = innermostIdx + 1
-				}
-
 				depthBelow := 0
-				for m := matchedIdx + 1; m < len(a.Stack); m++ {
+				for m := innermostIdx + 1; m < len(a.Stack); m++ {
 					depthBelow += a.scopeContribution(m)
 				}
 
-				name.ResolvedDepth = 1 + depthBelow
+				name.ResolvedDepth = depthBelow
 				name.ResolvedSlot = slot
 			}
 		}
@@ -251,22 +222,12 @@ func (a *Analyzer) CheckName(name *Name) {
 	}
 }
 
-func isNotMultiLambda(n Node) bool {
-	_, ok := n.(*MultiLambda)
-	return !ok
-}
-
 func getUpvalueSlot(n Node, name string) int {
-	var uv []string
-	switch node := n.(type) {
-	case *Lambda:
-		uv = node.Upvalues
-	case *MultiLambda:
-		uv = node.Upvalues
-	}
-	for i, v := range uv {
-		if v == name {
-			return i
+	if lambda, ok := n.(*Lambda); ok {
+		for i, v := range lambda.Upvalues {
+			if v == name {
+				return i
+			}
 		}
 	}
 	return -1
@@ -306,9 +267,9 @@ func (a *Analyzer) AnalyzeTopLevel(root Node) {
 			for _, binding := range node.Bindings {
 				a.AddName(binding.Name.Value, binding)
 			}
-		case *MultiLambda:
-			a.PushScope(node)
 		case *Lambda:
+			a.PushScope(node)
+		case *LambdaCase:
 			node.Pattern = NormalizePattern(node.Pattern)
 			a.PushScope(node)
 			for _, name := range GetNamesInPattern(node.Pattern) {

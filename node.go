@@ -32,11 +32,11 @@ func (x *Binding) LastPos() SourcePos  { return x.Expression.LastPos() }
 func (x *Let) FirstPos() SourcePos { return x.Start }
 func (x *Let) LastPos() SourcePos  { return x.Expression.LastPos() }
 
-func (x *Lambda) FirstPos() SourcePos { return x.Pattern.FirstPos() }
-func (x *Lambda) LastPos() SourcePos  { return x.Expression.LastPos() }
+func (x *Lambda) FirstPos() SourcePos { return x.Start }
+func (x *Lambda) LastPos() SourcePos  { return x.End }
 
-func (x *MultiLambda) FirstPos() SourcePos { return x.Start }
-func (x *MultiLambda) LastPos() SourcePos  { return x.End }
+func (x *LambdaCase) FirstPos() SourcePos { return x.Pattern.FirstPos() }
+func (x *LambdaCase) LastPos() SourcePos  { return x.Expression.LastPos() }
 
 func (x *TuplePattern) FirstPos() SourcePos { return x.Start }
 func (x *TuplePattern) LastPos() SourcePos  { return x.End }
@@ -95,11 +95,11 @@ func Traverse(node Node, pre, post func(n Node)) {
 		Traverse(n.Expression, pre, post)
 
 	case *Lambda:
+		TraverseList(n.Cases, pre, post)
+
+	case *LambdaCase:
 		Traverse(n.Pattern, pre, post)
 		Traverse(n.Expression, pre, post)
-
-	case *MultiLambda:
-		TraverseList(n.Lambdas, pre, post)
 
 	case *TuplePattern:
 		TraverseList(n.SubPatterns, pre, post)

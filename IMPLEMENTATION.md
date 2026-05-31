@@ -150,8 +150,8 @@ finds:
 - `[ e , e , … ]` → a `Tuple`,
 - `[ e ; ]` or `[ e ; e ; … ]` → a `List`.
 
-Curly braces `{ … }` always produce a `MultiLambda`. Parentheses `( … )` are
-*only* grouping; there is no tuple syntax using parentheses.
+Curly braces `{ … }` produce a `Lambda` with multiple cases. Parentheses
+`( … )` are *only* grouping; there is no tuple syntax using parentheses.
 
 ### Patterns are re-interpreted expressions
 
@@ -165,7 +165,10 @@ for anything else, which the caller reports as "invalid pattern for lambda". Thi
 is why a tuple pattern and a tuple expression share exactly the same surface
 syntax: they *are* the same syntax, distinguished only by whether a `->` follows.
 
-Inside a `MultiLambda`, each clause is parsed by `ParseLambda`, which does the
+The parser wraps every lambda (whether a naked `pattern -> body` or a multi-case
+`{ … }`) into a `Lambda` node holding a slice of `LambdaCase`s.
+
+Inside a `Lambda`, each clause is parsed by `ParseLambdaCase`, which does the
 same expression-then-`ToPattern` dance and then `Expect`s the `->`.
 
 ### Qualified names

@@ -155,35 +155,24 @@ func (i *Interpreter) RunExpression(expression Expression) RuntimeValue {
 	case *QualifiedName:
 		return i.ModuleEnvironments[e.Module][e.ResolvedSlot]
 
-	case *MultiLambda:
-		return i.MakeClosureFromNode(e, e.Lambdas...)
-
 	case *Lambda:
-		return i.MakeClosureFromNode(e, e)
+		return i.MakeClosure(e)
 
 	default:
 		panic("unimplemented expression " + NodeType(expression))
 	}
 }
 
-func (i *Interpreter) MakeClosureFromNode(holder Node, lambdas ...*Lambda) RuntimeClosure {
+func (i *Interpreter) MakeClosure(lambda *Lambda) RuntimeClosure {
 	var env Environment
-	var uvCaptures []UpvalueCapture
 
-	switch h := holder.(type) {
-	case *Lambda:
-		uvCaptures = h.UpvalueCaptures
-	case *MultiLambda:
-		uvCaptures = h.UpvalueCaptures
-	}
-
-	if len(uvCaptures) > 0 {
-		env = make(Environment, len(uvCaptures))
-		for j, cap := range uvCaptures {
+	if len(lambda.UpvalueCaptures) > 0 {
+		env = make(Environment, len(lambda.UpvalueCaptures))
+		for j, cap := range lambda.UpvalueCaptures {
 			env[j] = i.ResolveName(cap.Depth, cap.Slot).(*NamedValue)
 		}
 	}
-	return RuntimeClosure{env, lambdas}
+	return RuntimeClosure{env, lambda.Cases}
 }
 
 func (i *Interpreter) FoldList(list *List) RuntimeValue {
@@ -402,8 +391,8 @@ func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeVa
 			case RuntimeClosure:
 				body, matched := i.ApplyClosure(function, frame.Argument)
 				if !matched {
-					pos := function.Lambdas[0].Pattern.FirstPos().To(
-						function.Lambdas[len(function.Lambdas)-1].Pattern.LastPos())
+					pos := function.Cases[0].Pattern.FirstPos().To(
+						function.Cases[len(function.Cases)-1].Pattern.LastPos())
 					i.raiseRuntimeError(
 						"no pattern matched value "+i.ShowValue(frame.Argument),
 						pos, stack)
@@ -461,11 +450,11 @@ func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue
 	i.PushEnvironment(closure.Upvalues)
 	defer i.PopEnvironment()
 
-	for _, lambda := range closure.Lambdas {
-		matched := i.MatchPattern(lambda.Pattern, argument)
+	for _, lcase := range closure.Cases {
+		matched := i.MatchPattern(lcase.Pattern, argument)
 		if matched != nil {
 			i.PushEnvironment(matched)
-			body := i.RunExpression(lambda.Expression)
+			body := i.RunExpression(lcase.Expression)
 			i.PopEnvironment()
 			return body, true
 		}

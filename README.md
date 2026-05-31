@@ -174,12 +174,13 @@ Operand     := Application | AtomicExpr
 Application := AtomicExpr+
 
 AtomicExpr := QualifiedName | Name | Number | String
-            | Tuple | List | MultiLambda | '(' Expr ')'
+            | Tuple | List | Lambda | '(' Expr ')'
 QualifiedName := Name '.' Name
 
 Tuple       := '[' ']' | '[' Expr ( ',' Expr )* ']'
 List        := '[' Expr ';' ']' | '[' Expr ( ';' Expr )+ ']'
-MultiLambda := '{' Lambda ( ',' Lambda )* '}'
+Lambda      := LambdaCase | '{' LambdaCase ( ',' LambdaCase )* '}'
+LambdaCase  := Pattern '->' Expr
 ```
 
 Notes:

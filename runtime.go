@@ -63,7 +63,7 @@ func (RuntimeComposition) isRuntimeValue() {}
 
 type RuntimeClosure struct {
 	Upvalues Environment
-	Lambdas  []*Lambda
+	Cases    []*LambdaCase
 }
 
 func (RuntimeClosure) isRuntimeValue() {}

@@ -27,7 +27,6 @@ type Expression interface {
 
 func (x Let) isExpr()           {}
 func (x Lambda) isExpr()        {}
-func (x MultiLambda) isExpr()   {}
 func (x Operation) isExpr()     {}
 func (x Name) isExpr()          {}
 func (x QualifiedName) isExpr() {}
@@ -44,27 +43,22 @@ type Let struct {
 }
 
 type Lambda struct {
-	Pattern    Pattern
-	Expression Expression
+	Cases []*LambdaCase
 
-	// If this lambda is part of a MultiLambda, these are nil and the
-	// MultiLambda's fields are used instead.
 	Upvalues        []string         // added by analyzer for display/traces
 	UpvalueCaptures []UpvalueCapture // added by analyzer for MakeClosure
+
+	Start, End SourcePos
+}
+
+type LambdaCase struct {
+	Pattern    Pattern
+	Expression Expression
 }
 
 type UpvalueCapture struct {
 	Depth int
 	Slot  int
-}
-
-type MultiLambda struct {
-	Lambdas []*Lambda
-
-	Upvalues        []string         // added by analyzer
-	UpvalueCaptures []UpvalueCapture // added by analyzer
-
-	Start, End SourcePos
 }
 
 type Pattern interface {

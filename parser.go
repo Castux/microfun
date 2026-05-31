@@ -143,7 +143,11 @@ func (p *Parser) ParseExpression() Expression {
 			panic("expect")
 		}
 		body := p.ParseExpression()
-		expr = &Lambda{Pattern: patt, Expression: body}
+		expr = &Lambda{
+			Cases: []*LambdaCase{{Pattern: patt, Expression: body}},
+			Start: expr.FirstPos(),
+			End:   p.PrevPos(),
+		}
 
 	}
 	return expr
@@ -166,22 +170,20 @@ func (p *Parser) ParseLet() *Let {
 	return &Let{Bindings: bindings, Expression: expr, Start: start}
 }
 
-func (p *Parser) ParseLambda() *Lambda {
-
-	start := p.Peek(0).Pos
+func (p *Parser) ParseLambdaCase() *LambdaCase {
 
 	expr := p.ParseOperation()
 	patt := ToPattern(expr)
 
 	if patt == nil {
-		Log("invalid pattern for lambda", start.To(p.Peek(-1).Pos), SeverityError)
+		Log("invalid pattern for lambda", expr.FirstPos().To(p.Peek(-1).Pos), SeverityError)
 		panic("expect")
 	}
 
 	p.Expect("->")
 
 	body := p.ParseExpression()
-	return &Lambda{Pattern: patt, Expression: body}
+	return &LambdaCase{Pattern: patt, Expression: body}
 }
 
 func (p *Parser) ParseBinding() *Binding {
@@ -304,16 +306,16 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 	}
 
 	if p.Accept("{") {
-		lambdas := []*Lambda{}
+		cases := []*LambdaCase{}
 		for {
-			lambdas = append(lambdas, p.ParseLambda())
+			cases = append(cases, p.ParseLambdaCase())
 			if !p.Accept(",") {
 				break
 			}
 		}
 		p.Expect("}")
 
-		return &MultiLambda{Lambdas: lambdas, Start: start, End: p.PrevPos()}
+		return &Lambda{Cases: cases, Start: start, End: p.PrevPos()}
 	}
 
 	if mandatory {
