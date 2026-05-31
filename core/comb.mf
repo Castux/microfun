@@ -3,8 +3,8 @@ import list, math, core in
 
 module
 
--- uniquePairs l: all ordered pairs [a, b] where a appears before b in l
-uniquePairs = choose 2, -- all ordered pairs [a, b] where a appears before b in l
+-- pairs l: all ordered pairs [a, b] where a appears before b in l
+pairs = choose 2, -- all ordered pairs [a, b] where a appears before b in l
 
 -- subsets l: power set — all subsets of l (including empty, shortest first)
 subsets = {

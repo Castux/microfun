@@ -25,37 +25,36 @@ makeNode = value -> left -> right ->
 			[succ rankRight, value, left, right]
 			[succ rankLeft, value, right, left],
 
--- merge comparator h1 h2: merge two heaps ($O(\log n)$)
-merge = comparator -> {
+-- merge cmp h1 h2: merge two heaps ($O(\log n)$)
+merge = cmp -> {
 	[] -> h2 -> h2,
 	[rank1, value1, left1, right1] -> {
 		[] -> [rank1, value1, left1, right1],
 		[rank2, value2, left2, right2] ->
-			if (comparator value1 value2)
-				(makeNode value1 left1 (merge comparator right1 [rank2, value2, left2, right2]))
-				(makeNode value2 left2 (merge comparator [rank1, value1, left1, right1] right2))
+			if (cmp value1 value2)
+				(makeNode value1 left1 (merge cmp right1 [rank2, value2, left2, right2]))
+				(makeNode value2 left2 (merge cmp [rank1, value1, left1, right1] right2))
 	}
 },
 
-insert = comparator -> x -> h -> merge comparator (singleton x) h, -- insert x into heap h ($O(\log n)$)
+insert = cmp -> x -> h -> merge cmp (singleton x) h, -- insert x into heap h ($O(\log n)$)
 
 peek = {
 	[] -> [],
 	[rank, value, left, right] -> value
 }, -- return the root value of the heap ($O(1)$)
 
-pop = comparator -> {
+pop = cmp -> {
 	[] -> [],
-	[rank, value, left, right] -> merge comparator left right
+	[rank, value, left, right] -> merge cmp left right
 }, -- remove the root and return the new heap ($O(\log n)$)
 
-fromList = comparator -> foldl (h -> x -> insert comparator x h) [], -- build a heap from a list
+fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a list
 
-toList = comparator -> {
+toList = cmp -> {
 	[] -> [],
-	h -> [peek h, toList comparator (pop comparator h)]
+	h -> [peek h, toList cmp (pop cmp h)]
 }, -- convert a heap to a sorted list (heapsort)
 
--- sort comparator l: Heapsort using the provided comparator.
-sort = comparator -> l -> toList comparator (fromList comparator l)
-
+-- sort cmp l: Heapsort using the provided cmp.
+sort = cmp -> l -> toList cmp (fromList cmp l)

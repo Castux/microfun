@@ -693,7 +693,7 @@ Imports `list`, `math`, and `core`.
 | `subsets l` | power set — all subsets of `l` (including `[]`, shortest first) |
 | `subsetsWithRest n l` | all ways to pick `n` elements; each result is `[chosen, rest]` |
 | `choose n l` | all `n`-element subsets of `l` (= `map first (subsetsWithRest n l)`) |
-| `uniquePairs l` | all ordered pairs `[a, b]` where `a` appears before `b` (= `choose 2`) |
+| `pairs l` | all ordered pairs `[a, b]` where `a` appears before `b` (= `choose 2`) |
 | `crossPairs a b` | Cartesian product — all pairs `[x, y]` with `x` from `a`, `y` from `b` |
 | `permutations l` | all permutations of `l` |
 
