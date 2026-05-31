@@ -13,7 +13,6 @@ type Scope struct {
 type Analyzer struct {
 	Program         *Program
 	Modules         map[string]*Module
-	Scopes          map[Node]*Scope
 	Errors          int
 	Stack           []*Scope
 	ImportedModules map[string]bool
@@ -36,7 +35,6 @@ func (a *Analyzer) PushScope(node Node) {
 		Node:        node,
 	}
 	a.Stack = append(a.Stack, scope)
-	a.Scopes[node] = scope
 }
 
 func (a *Analyzer) PopScope() {
@@ -338,7 +336,6 @@ func NormalizePattern(patt Pattern) Pattern {
 
 func Analyze(program *Program, modules map[string]*Module) *Analyzer {
 	analyzer := &Analyzer{
-		Scopes:  make(map[Node]*Scope),
 		Program: program,
 		Modules: modules,
 	}
