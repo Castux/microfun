@@ -1,0 +1,3 @@
+import core, list in
+let nats = upFrom 0, fibs = concat [0;1] (zipWith add fibs (tail fibs)) in
+show [take 5 nats; take 8 fibs]

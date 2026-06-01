@@ -1,0 +1,8 @@
+import core, list in
+let
+  ones = [1, ones],
+  evens = [0, map (add 2) evens],
+  isEven = n -> if (eq 0 n) 1 (isOdd (sub 1 n)),
+  isOdd = n -> if (eq 0 n) 0 (isEven (sub 1 n))
+in
+show [take 3 ones; take 4 evens; isEven 10; isOdd 7]

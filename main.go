@@ -44,7 +44,7 @@ func LexModule(name string) []Token {
 		return LexContent(corePath, string(text))
 	}
 
-	fmt.Printf("Module not found: %s\n", name, path)
+	fmt.Printf("Module not found: %s (looked for %s and %s)\n", name, path, corePath)
 	return nil
 }
 
@@ -83,12 +83,29 @@ func LoadModules(imports []*Name) map[string]*Module {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: microfun <path>")
+	mode := "interp"
+	dumpIR := false
+
+	var path string
+	for _, arg := range os.Args[1:] {
+		switch {
+		case arg == "--mode=interp" || arg == "--mode=compiled":
+			mode = arg[len("--mode="):]
+		case arg == "--dump-ir":
+			dumpIR = true
+		case len(arg) > 0 && arg[0] == '-':
+			fmt.Printf("Unknown flag: %s\n", arg)
+			os.Exit(1)
+		default:
+			path = arg
+		}
+	}
+
+	if path == "" {
+		fmt.Println("Usage: microfun [--mode=interp|compiled] [--dump-ir] <path>")
 		os.Exit(1)
 	}
 
-	path := os.Args[1]
 	program := LoadProgram(path)
 	modules := LoadModules(program.Imports)
 
@@ -98,5 +115,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	Interpret(analyzer)
+	if dumpIR {
+		fmt.Print(DisassembleProgram(Compile(analyzer)))
+		return
+	}
+
+	if mode == "compiled" {
+		RunVM(NewVM(Compile(analyzer), analyzer.Modules))
+	} else {
+		Interpret(analyzer)
+	}
 }

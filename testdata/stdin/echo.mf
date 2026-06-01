@@ -1,0 +1,2 @@
+import core, list in
+stdin > write

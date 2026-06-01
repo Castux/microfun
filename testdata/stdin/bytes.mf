@@ -1,0 +1,2 @@
+import core, list in
+bstdin > take 5 > show

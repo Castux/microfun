@@ -55,15 +55,25 @@ works — the lexer, parser, analyzer, and the lazy reduction engine — see
 ## 2. Running a program
 
 ```
-microfun <path>
+microfun [--mode=interp|compiled] [--dump-ir] <path>
 ```
 
-The interpreter loads the file at `<path>` as a program, loads any modules it
+microfun loads the file at `<path>` as a program, loads any modules it
 imports, analyzes everything, and evaluates the program body. Anything the
 program prints via `peek`, `show`, or `write` appears on standard output. A
 lexical, syntactic, or name-resolution error is reported with a located
 diagnostic and the program does not run; a run-time error is reported with a
 source location and a reduction trace.
+
+**Execution backends.** There are two, with identical observable behaviour.
+`--mode=interp` (the default) runs the AST tree-walking interpreter.
+`--mode=compiled` compiles each function body and pattern to an in-process
+bytecode first, then runs that. The compiled backend exists to remove the
+per-call AST re-traversal; it builds the same values and reduces them the same
+way, so any program produces the same output in either mode. `--dump-ir` prints
+the disassembled bytecode and exits, for inspecting what the compiler produced.
+See [IMPLEMENTATION.md §16](IMPLEMENTATION.md#16-the-compiled-backend-bytecode)
+and [BYTECODE.md](BYTECODE.md).
 
 **Module search order.** For each import `name`, the interpreter first looks for
 `./name.mf` in the current working directory. If that file does not exist, it

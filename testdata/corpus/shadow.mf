@@ -1,0 +1,5 @@
+import core in
+let x = 1 in
+let f = y -> let z = mul y 10 in z in
+let g = x -> add x 1 in
+show [x; f 5; g 100; let x = 99 in x]

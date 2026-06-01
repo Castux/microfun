@@ -1,0 +1,3 @@
+import core, list, text in
+let unq = reverse [1;2;3] in
+show [unq; list.length [1;2;3;4]; text.toString 42]

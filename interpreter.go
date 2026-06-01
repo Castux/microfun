@@ -1,21 +1,21 @@
 package main
 
 import (
-	"bufio"
-	"io"
 	"os"
 	"slices"
-	"unicode"
 	"unicode/utf8"
 )
 
 type Environment []*NamedValue
 
+// Interpreter is the AST tree-walking backend. It embeds the shared *Runtime
+// (reducer, builtins, show, stdin, errors) and adds the activation it is
+// currently translating with RunExpression.
 type Interpreter struct {
+	*Runtime
+
 	Program *Program
 	Modules map[string]*Module
-
-	ModuleEnvironments map[string]Environment
 
 	// Locals and Upvalues are the two environments of the activation currently
 	// being translated by RunExpression. Locals holds this activation's let and
@@ -25,26 +25,6 @@ type Interpreter struct {
 	// builtin.
 	Locals   Environment
 	Upvalues Environment
-
-	// Standard input is exposed to programs as the shared lazy lists stdin (code
-	// points) and bstdin (bytes). stdinReader is the single buffered reader they
-	// both draw from; the two stream heads are built once and memoized so that
-	// every reference to stdin / bstdin sees the same, once-read sequence.
-	stdinReader  *bufio.Reader
-	stdinStream  *NamedValue
-	bstdinStream *NamedValue
-
-	// Set just before a builtin is applied, so that a builtin hitting a runtime
-	// error (e.g. a non-number argument) can report it at the application's
-	// source span with the reduction trace, via builtinError.
-	builtinPos   SourcePos
-	builtinStack []StackFrame
-}
-
-// builtinError reports a runtime error raised from inside a builtin, using the
-// source span and reduction stack of the application currently being reduced.
-func (i *Interpreter) builtinError(message string) {
-	i.raiseRuntimeError(message, i.builtinPos, i.builtinStack)
 }
 
 func (i *Interpreter) Run() RuntimeValue {
@@ -174,7 +154,7 @@ func (i *Interpreter) MakeClosure(lambda *Lambda) RuntimeClosure {
 			}
 		}
 	}
-	return RuntimeClosure{env, lambda.Cases}
+	return RuntimeClosure{Upvalues: env, Cases: lambda.Cases}
 }
 
 func (i *Interpreter) FoldList(list *List) RuntimeValue {
@@ -186,6 +166,13 @@ func (i *Interpreter) FoldList(list *List) RuntimeValue {
 }
 
 func (i *Interpreter) FoldString(str string) RuntimeValue {
+	return foldString(str)
+}
+
+// foldString decodes a string literal into a cons list of code points ending in
+// the empty tuple, the runtime representation of a string. It is shared by the
+// interpreter (per evaluation) and the compiler (once, into a shared constant).
+func foldString(str string) RuntimeValue {
 	var current RuntimeValue = RuntimeTuple{} // the empty list terminates the chain
 	for len(str) > 0 {
 		r, size := utf8.DecodeLastRuneInString(str)
@@ -193,77 +180,6 @@ func (i *Interpreter) FoldString(str string) RuntimeValue {
 		current = RuntimeCons{RuntimeNumber(r), current}
 	}
 	return current
-}
-
-func (i *Interpreter) stdin() *bufio.Reader {
-	if i.stdinReader == nil {
-		i.stdinReader = bufio.NewReader(os.Stdin)
-	}
-	return i.stdinReader
-}
-
-// makeInputStream builds the head of a shared, lazy cons-list backed by standard
-// input. The head is a thunk that, when forced, calls readCell to read one item:
-// readCell returns the item as a number, or ok = false at end of input. A read
-// item becomes a cons cell [item, tail] whose tail is another such thunk, so the
-// stream is produced one cell at a time and each cell, once forced, is memoized
-// by its NamedValue. The thunk is realized as an application of a reader builtin
-// to a dummy argument, reusing the ordinary reduction machinery rather than a
-// dedicated runtime value; the builtin closes over itself to build each tail.
-func (i *Interpreter) makeInputStream(readCell func() (RuntimeNumber, bool)) *NamedValue {
-	var reader RuntimeBuiltin
-	reader = func(*Interpreter, RuntimeValue) RuntimeValue {
-		value, ok := readCell()
-		if !ok {
-			return RuntimeTuple{} // end of input is the empty list
-		}
-		tail := &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
-		return RuntimeCons{value, tail}
-	}
-	return &NamedValue{Value: RuntimeApplication{Function: reader, Argument: RuntimeNumber(0)}}
-}
-
-// StdinCodePoints returns stdin: the standard input decoded as a lazy list of
-// Unicode code points. A byte sequence that is not valid UTF-8 is a runtime
-// error.
-func (i *Interpreter) StdinCodePoints() *NamedValue {
-	if i.stdinStream == nil {
-		i.stdinStream = i.makeInputStream(func() (RuntimeNumber, bool) {
-			r, size, err := i.stdin().ReadRune()
-			if err == io.EOF {
-				return 0, false
-			}
-			if err != nil {
-				i.builtinError("error reading standard input: " + err.Error())
-			}
-			// ReadRune does not fail on malformed input: it yields U+FFFD with a
-			// size of one byte. A genuine U+FFFD is three bytes, so size == 1 is
-			// the unambiguous signal of an invalid byte.
-			if r == unicode.ReplacementChar && size == 1 {
-				i.builtinError("invalid UTF-8 byte on standard input")
-			}
-			return RuntimeNumber(r), true
-		})
-	}
-	return i.stdinStream
-}
-
-// StdinBytes returns bstdin: the standard input as a lazy list of raw byte
-// values, without any decoding.
-func (i *Interpreter) StdinBytes() *NamedValue {
-	if i.bstdinStream == nil {
-		i.bstdinStream = i.makeInputStream(func() (RuntimeNumber, bool) {
-			b, err := i.stdin().ReadByte()
-			if err == io.EOF {
-				return 0, false
-			}
-			if err != nil {
-				i.builtinError("error reading standard input: " + err.Error())
-			}
-			return RuntimeNumber(b), true
-		})
-	}
-	return i.bstdinStream
 }
 
 func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
@@ -316,131 +232,6 @@ func (i *Interpreter) FoldOperation(op *Operation) RuntimeValue {
 	}
 }
 
-// A StackFrame is one entry on the explicit reduction stack used by
-// EvaluateToWeakHeadNormalForm. It is either an argument waiting to be applied
-// to the function on its left (Kind == argumentFrame), or a thunk waiting to be
-// updated with its weak head normal form once that form is known (Kind ==
-// updateFrame).
-const (
-	argumentFrame byte = iota
-	updateFrame
-)
-
-type StackFrame struct {
-	Kind     byte
-	Thunk    *NamedValue  // set when Kind == updateFrame
-	Argument RuntimeValue // set when Kind == argumentFrame
-	// Pos is the source span of the application this argument came from, used to
-	// report a failure to apply at its origin. It may be a zero SourcePos.
-	Pos SourcePos // set when Kind == argumentFrame
-}
-
-// EvaluateToWeakHeadNormalForm reduces a value until its outermost shape is
-// known: either a constructor (a number or a tuple, whose contents are left
-// untouched as thunks) or a function value that has no argument left to consume
-// (a closure, a builtin, or a composition).
-//
-// The reduction runs on the explicit stack below rather than on the Go call
-// stack. Unwinding the spine of an application, following a chain of thunks, and
-// tail calls (a closure body that is itself an application) therefore all run in
-// constant Go stack space, which is what lets an infinite list be consumed one
-// cell at a time without overflowing.
-func (i *Interpreter) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeValue {
-
-	control := value
-	var stack []StackFrame
-
-	for {
-		// If the value in hand can still be reduced, take one step down the tree
-		// and remember on the stack where to resume.
-		switch reducible := control.(type) {
-		case RuntimeApplication:
-			stack = append(stack, StackFrame{Argument: reducible.Argument, Pos: reducible.Pos})
-			control = reducible.Function
-			continue
-
-		case *NamedValue:
-			if reducible.Forced {
-				control = reducible.Value
-				continue
-			}
-			if reducible.Value == nil {
-				panic("internal error: forced thunk " + reducible.Name + " before its value was computed")
-			}
-			stack = append(stack, StackFrame{Kind: updateFrame, Thunk: reducible})
-			control = reducible.Value
-			continue
-		}
-
-		// Otherwise the value in hand is a constructor or a function value. What
-		// to do with it depends on the frame we come back up to.
-		if len(stack) == 0 {
-			return control
-		}
-
-		frame := stack[len(stack)-1]
-		switch frame.Kind {
-		case updateFrame:
-			// We have reached the weak head normal form of this thunk. Memoize
-			// it so it is never reduced again, then keep coming back up.
-			frame.Thunk.Value = control
-			frame.Thunk.Forced = true
-			stack = stack[:len(stack)-1]
-
-		case argumentFrame:
-			// An argument is waiting, so the value in hand is applied to it.
-			switch function := control.(type) {
-			case RuntimeClosure:
-				body, matched := i.ApplyClosure(function, frame.Argument)
-				if !matched {
-					pos := function.Cases[0].Pattern.FirstPos().To(
-						function.Cases[len(function.Cases)-1].Pattern.LastPos())
-					i.raiseRuntimeError(
-						"no pattern matched value "+i.ShowValue(frame.Argument),
-						pos, stack)
-				}
-				stack = stack[:len(stack)-1]
-				control = body
-
-			case RuntimeBuiltin:
-				stack = stack[:len(stack)-1]
-				// Record where this builtin was applied so that a runtime error
-				// raised inside it (via builtinError) is located and traced.
-				i.builtinPos = frame.Pos
-				i.builtinStack = stack
-				control = function(i, frame.Argument)
-
-			case RuntimePartial:
-				stack = stack[:len(stack)-1]
-				i.builtinPos = frame.Pos
-				i.builtinStack = stack
-				control = function.Apply(i, function.First, frame.Argument)
-
-			case RuntimeComposition:
-				// (function1 *> function2) argument reduces to
-				// function1 (function2 argument).
-				stack[len(stack)-1] = StackFrame{
-					Argument: RuntimeApplication{
-						Function: function.Function2,
-						Argument: frame.Argument,
-						Pos:      frame.Pos,
-					},
-					Pos: frame.Pos,
-				}
-				control = function.Function1
-
-			case RuntimeNumber, RuntimeTuple, RuntimeCons:
-				i.raiseRuntimeError(
-					"cannot apply "+i.ShowValue(function)+", it is not a function",
-					frame.Pos, stack)
-
-			default:
-				panic("internal error: cannot apply value of unexpected runtime type")
-			}
-		}
-	}
-}
-
 // ApplyClosure performs one beta reduction: it matches the argument against the
 // closure's patterns and returns the body of the first lambda that matches,
 // ready to be reduced further. Names in the body are resolved against this
@@ -465,16 +256,6 @@ func (i *Interpreter) ApplyClosure(closure RuntimeClosure, argument RuntimeValue
 	}
 
 	return nil, false
-}
-
-func (i *Interpreter) EvaluateToNumber(value RuntimeValue) (RuntimeNumber, bool) {
-	number, ok := i.EvaluateToWeakHeadNormalForm(value).(RuntimeNumber)
-	return number, ok
-}
-
-func (i *Interpreter) EvaluateToTuple(value RuntimeValue) (RuntimeTuple, bool) {
-	tuple, ok := i.EvaluateToWeakHeadNormalForm(value).(RuntimeTuple)
-	return tuple, ok
 }
 
 // MatchPattern tries to match a lambda case's pattern against the argument. On
@@ -532,92 +313,7 @@ func (i *Interpreter) matchPatternInto(pattern Pattern, argument RuntimeValue, e
 		panic("internal error: ListPattern reached MatchPattern without normalization")
 
 	case *StringLiteral:
-		current := argument
-		for _, expected := range []rune(patt.Value) {
-			cell, ok := i.EvaluateToWeakHeadNormalForm(current).(RuntimeCons)
-			if !ok {
-				return false
-			}
-			head, ok := i.EvaluateToNumber(cell.Head)
-			if !ok || rune(head) != expected {
-				return false
-			}
-			current = cell.Tail
-		}
-		// The string's code points are exhausted, so the list must end here.
-		rest, ok := i.EvaluateToTuple(current)
-		if !ok || len(rest) != 0 {
-			return false
-		}
-		return true
-	}
-
-	return false
-}
-
-func (i *Interpreter) EvaluateToFullNormalForm(value RuntimeValue, seen map[*NamedValue]bool) RuntimeValue {
-	if named, isNamed := value.(*NamedValue); isNamed {
-		if seen[named] {
-			return named
-		}
-		seen[named] = true
-	}
-
-	switch forced := i.EvaluateToWeakHeadNormalForm(value).(type) {
-	case RuntimeTuple:
-		for index, element := range forced {
-			forced[index] = i.EvaluateToFullNormalForm(element, seen)
-		}
-		return forced
-	case RuntimeCons:
-		// A RuntimeCons is a value, so we cannot write the forced head and tail
-		// back into it; forcing them is enough, because the memoization happens
-		// in their own thunks. Cycles still terminate via the seen set on the
-		// *NamedValue thunks any cyclic structure must pass through.
-		i.EvaluateToFullNormalForm(forced.Head, seen)
-		i.EvaluateToFullNormalForm(forced.Tail, seen)
-		return forced
-	default:
-		return forced
-	}
-}
-
-type ComparisonPair struct {
-	a, b *RuntimeValue
-}
-
-func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool) bool {
-	pair := ComparisonPair{&a, &b}
-	if seen[pair] {
-		return true
-	}
-	seen[pair] = true
-
-	forcedA := i.EvaluateToWeakHeadNormalForm(a)
-	forcedB := i.EvaluateToWeakHeadNormalForm(b)
-
-	switch valA := forcedA.(type) {
-	case RuntimeNumber:
-		if valB, ok := forcedB.(RuntimeNumber); ok {
-			return valA == valB
-		}
-	case RuntimeTuple:
-		if valB, ok := forcedB.(RuntimeTuple); ok {
-			if len(valA) != len(valB) {
-				return false
-			}
-			for j := range valA {
-				if !i.DeepEqual(valA[j], valB[j], seen) {
-					return false
-				}
-			}
-			return true
-		}
-	case RuntimeCons:
-		if valB, ok := forcedB.(RuntimeCons); ok {
-			return i.DeepEqual(valA.Head, valB.Head, seen) &&
-				i.DeepEqual(valA.Tail, valB.Tail, seen)
-		}
+		return i.matchStringSpine(argument, []rune(patt.Value))
 	}
 
 	return false
@@ -625,10 +321,13 @@ func (i *Interpreter) DeepEqual(a, b RuntimeValue, seen map[ComparisonPair]bool)
 
 func Interpret(analyzer *Analyzer) (result RuntimeValue) {
 	interpreter := &Interpreter{
-		Program:            analyzer.Program,
-		Modules:            analyzer.Modules,
-		ModuleEnvironments: make(map[string]Environment),
+		Runtime: &Runtime{
+			ModuleEnvironments: make(map[string]Environment),
+		},
+		Program: analyzer.Program,
+		Modules: analyzer.Modules,
 	}
+	interpreter.applyClosure = interpreter.ApplyClosure
 
 	// A RuntimeError is a program error we can report cleanly; anything else is
 	// an interpreter bug, so we re-panic to keep its Go stack trace.

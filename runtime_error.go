@@ -47,7 +47,7 @@ func collectTrace(stack []StackFrame) []string {
 
 // raiseRuntimeError stops the program with a reportable error. pos may be a zero
 // SourcePos (File nil), in which case the error is reported without a location.
-func (i *Interpreter) raiseRuntimeError(message string, pos SourcePos, stack []StackFrame) {
+func (rt *Runtime) raiseRuntimeError(message string, pos SourcePos, stack []StackFrame) {
 	panic(&RuntimeError{
 		Message: message,
 		Pos:     pos,

@@ -6,10 +6,20 @@ the runtime represents and reduces values. It is a companion to
 [README.md](README.md), which defines the language itself; here we are concerned
 with *mechanism* rather than *meaning*.
 
-The implementation is a tree-walking interpreter written in Go. There is no
-bytecode and no separate compilation step: the analyzer annotates the AST in
-place, and the interpreter translates that AST into a graph of runtime values
-that it reduces on demand.
+The implementation is written in Go and has **two interchangeable execution
+backends** over one shared runtime. The default is a tree-walking interpreter:
+the analyzer annotates the AST in place, and the interpreter translates that AST
+into a graph of runtime values that it reduces on demand. The second is a
+**bytecode backend** (`--mode=compiled`) that compiles each activation body and
+each pattern to a flat instruction stream once, then executes those streams to
+build the *same* runtime-value graph the interpreter would, fed to the *same*
+reducer. The two backends are differentially equivalent by construction — they
+produce identical output — and share the reducer, builtins, `show`, equality,
+stdin streaming, and error machinery. The compiled backend is described in
+[§16](#16-the-compiled-backend-bytecode); its design rationale is in
+[BYTECODE.md](BYTECODE.md). Everything in §§7–15 describes the interpreter and
+the shared runtime, and applies to both backends except where it names
+`RunExpression` / `matchPatternInto`, whose bytecode analogues §16 covers.
 
 ## Contents
 
@@ -28,6 +38,7 @@ that it reduces on demand.
 13. [Runtime errors and the reduction trace](#13-runtime-errors-and-the-reduction-trace)
 14. [Modules and program startup](#14-modules-and-program-startup)
 15. [Built-in functions](#15-built-in-functions)
+16. [The compiled backend (bytecode)](#16-the-compiled-backend-bytecode)
 
 ---
 
@@ -51,6 +62,12 @@ source text ──Lex──► tokens ──ParseProgram──► AST ──Anal
    graph of *runtime values* and reduces the program body to weak head normal
    form, printing whatever the program's side-effecting builtins (`peek`,
    `show`, `write`) emit along the way.
+
+Stage 4 has two implementations selected by the `--mode` flag (default
+`interp`): the tree-walking interpreter above, or a bytecode backend
+(`--mode=compiled`) that first **Compiles** the annotated AST to an IR
+([compiler.go](compiler.go)) and then runs it on the VM ([vm.go](vm.go)). Both
+drive the one shared reducer; see [§16](#16-the-compiled-backend-bytecode).
 
 Modules referenced by the program's `import` clause are loaded, parsed, and
 analyzed before interpretation begins (see
@@ -303,8 +320,8 @@ The variants are:
 | `RuntimeCons` | A 2-tuple `{Head, Tail}`. Because microfun makes no distinction between a 2-tuple and a list cons cell, *every* 2-element tuple is a `RuntimeCons` — list literals, string code points, the stdin stream, and a bare `[a, b]` pair alike. Avoids the slice header a 2-element `RuntimeTuple` would carry. |
 | `RuntimeApplication` | An *unreduced* application `Function Argument`, plus the source `Pos` for error reporting. |
 | `RuntimeComposition` | An unreduced composition; reducing `(f ∘ g) x` yields `f (g x)`. |
-| `RuntimeClosure` | A multi-lambda paired with the environment of captured upvalues. |
-| `RuntimeBuiltin` | A Go function `func(*Interpreter, RuntimeValue) RuntimeValue`. |
+| `RuntimeClosure` | A multi-lambda paired with the environment of captured upvalues. Carries both backend representations (AST `Cases` or compiled `Compiled`); exactly one is set per run. |
+| `RuntimeBuiltin` | A Go function `func(*Runtime, RuntimeValue) RuntimeValue`. |
 | `*NamedValue` | A **thunk**: a possibly-deferred computation that memoizes its result. |
 
 `NamedValue` is the mechanism behind laziness and sharing:
@@ -401,7 +418,9 @@ of the value graph it builds:
 
 ## 9. The interpreter: reduction
 
-`EvaluateToWeakHeadNormalForm` is the heart of the interpreter. It reduces a value
+`EvaluateToWeakHeadNormalForm` is the heart of the shared runtime
+([runtime_core.go](runtime_core.go)) — both backends drive this one reducer. It
+reduces a value
 until its *outermost shape* is known — a number or tuple (a constructor, whose
 contents are left as unforced thunks), or a function value with no argument left
 to consume (a closure, builtin, or composition). It does **not** reduce inside a
@@ -433,9 +452,10 @@ The reducer keeps a `control` value in hand and loops:
    - an `UpdateFrame` means we just finished forcing a thunk: memoize the result
      (`Thunk.Value = control; Thunk.Forced = true`) and pop;
    - an `ArgumentFrame` means a function is being applied:
-     - a `RuntimeClosure` is β-reduced by `ApplyClosure`; the matched body becomes
-       the new `control` (a **tail call** — no Go stack growth); a non-match
-       raises a located runtime error;
+     - a `RuntimeClosure` is β-reduced by the active backend's apply hook
+       (`Runtime.applyClosure`: the interpreter's `ApplyClosure` or the VM's
+       bytecode apply); the matched body becomes the new `control` (a **tail
+       call** — no Go stack growth); a non-match raises a located runtime error;
      - a `RuntimeBuiltin` is simply called with the argument;
      - a `RuntimeComposition` `(f ∘ g)` applied to `x` rewrites the waiting frame
        to hold `g x` and sets `control` to `f`, realizing `f (g x)`;
@@ -598,7 +618,8 @@ program explicitly calling `peek`, `show`, or `write`.
 ## 15. Built-in functions
 
 Builtins ([builtins.go](builtins.go)) are Go functions of type
-`func(*Interpreter, RuntimeValue) RuntimeValue`. Curried binary builtins are
+`func(*Runtime, RuntimeValue) RuntimeValue` — they take the shared runtime, not a
+backend, so the same builtins serve both the interpreter and the VM. Curried binary builtins are
 built by `WrapBinop`, which returns a builtin that captures the first argument and
 returns a second builtin for the second argument; `WrapMonop` is the unary
 analogue. Both force their numeric arguments to weak head normal form and
@@ -610,7 +631,7 @@ A builtin that hits a type error (a non-number argument, or a value `write`
 cannot read as a list of code points) reports it through the ordinary
 `RuntimeError` path rather than crashing the interpreter. Because a builtin does
 not itself hold the source span or reduction stack, the reducer records them on
-the interpreter (`builtinPos`, `builtinStack`) immediately before each builtin is
+the runtime (`builtinPos`, `builtinStack`) immediately before each builtin is
 applied; the builtin then calls `builtinError`, which raises a located,
 traced `RuntimeError` exactly as `raiseRuntimeError` does for pattern-match and
 application failures.
@@ -636,7 +657,7 @@ standard input presented as a lazy cons-list (of Unicode code points and of raw
 bytes respectively). They illustrate how an effectful, blocking input source fits
 into the lazy model with no new runtime machinery.
 
-A stream is built by `makeInputStream` ([interpreter.go](interpreter.go)). Its
+A stream is built by `makeInputStream` ([runtime_core.go](runtime_core.go)). Its
 head is a `*NamedValue` thunk whose deferred value is a `RuntimeApplication` of a
 *reader* builtin to a dummy argument. Forcing the head therefore reduces that
 application through the ordinary `EvaluateToWeakHeadNormalForm` path: the reader
@@ -652,8 +673,108 @@ malformed input — it yields U+FFFD with a byte size of one — so invalid UTF-
 detected as `r == unicode.ReplacementChar && size == 1` (a genuine U+FFFD is three
 bytes) and raised as a `RuntimeError`. `StdinBytes` (`bstdin`) reads with
 `ReadByte` and does no decoding. Both stream heads are created once and cached on
-the `Interpreter` (`stdinStream`, `bstdinStream`), so every reference to the name
+the `Runtime` (`stdinStream`, `bstdinStream`), so every reference to the name
 resolves to the same shared, once-read sequence; the resolution happens directly
-in `RunExpression`'s `*Name` case, not through the `Builtins` map. The map still
+in `RunExpression`'s `*Name` case (and the VM's `OpStdin`/`OpBstdin`), not through
+the `Builtins` map. The map still
 holds `stdin`/`bstdin` entries (an `inputStreamPlaceholder` that panics if ever
 called) only so the analyzer recognizes the names as defined.
+
+## 16. The compiled backend (bytecode)
+
+The compiled backend (`--mode=compiled`) replaces the two repetitive AST walks —
+body translation (`RunExpression`) and pattern matching (`matchPatternInto`) —
+with flat instruction streams compiled **once** per activation and pattern. It
+does **not** replace reduction: executing the bytecode builds the very same lazy
+`RuntimeValue` graph the interpreter builds, which the **unchanged** reducer of
+[§9](#9-the-interpreter-reduction) then forces. The two backends are therefore
+equivalent by construction. The design rationale — and the optimizations
+deliberately left for later — are in [BYTECODE.md](BYTECODE.md); this section
+documents what exists.
+
+### Three pieces: Runtime, Interpreter, VM
+
+Everything that does not depend on *how a closure's body and pattern are
+represented* lives on a shared `Runtime` ([runtime_core.go](runtime_core.go)):
+the module environments, the reducer and its `EvaluateTo…` helpers, `DeepEqual`,
+the stdin streams, `show`, and the `RuntimeError`/trace machinery. The one
+representation-specific step — applying a `RuntimeClosure` — is reached through a
+hook:
+
+```go
+applyClosure func(RuntimeClosure, RuntimeValue) (RuntimeValue, bool)
+```
+
+`Interpreter` ([interpreter.go](interpreter.go)) embeds `*Runtime` and sets the
+hook to its AST `ApplyClosure`; `VM` ([vm.go](vm.go)) embeds `*Runtime` and sets
+it to the bytecode apply. A run is uniformly one mode, so the call target is
+constant. `RuntimeClosure` carries both representations (`Cases` for the
+interpreter, `Compiled *CompiledLambda` for the VM); exactly one is set per run.
+This is the maximum-sharing split: the reducer, every builtin, `show`,
+`DeepEqual`, stdin, and the error/trace code exist once and serve both backends.
+
+### The IR
+
+The IR ([ir.go](ir.go)) is built by `Compile` ([compiler.go](compiler.go)) from
+the analyzed AST, after `Analyze` has filled every `Resolution`/`ResolvedSlot`,
+`UpvalueCaptures`, and `FrameSize` — the compiler reads them, it never recomputes
+scoping. The units are:
+
+- A **`CodeBlock`** per activation (the program body, each module binding's RHS,
+  each lambda-case body): a dense `[]Instr` stream plus interned pools of
+  constants, binding names, application source spans, and lambda templates. An
+  `Instr` is `{Op, A, B}` with operands that are pool indices, never pointers.
+- A **`CompiledLambda`** per `*Lambda`: the template `OpMakeClosure`
+  instantiates, holding one `CompiledCase` per lambda case (a matcher program
+  plus the case body `CodeBlock`) and the analyzer's `UpvalueCaptures`.
+- A **`CompiledProgram`**: the program body block plus, per module, one block per
+  public binding in `PublicBindings` order — matching `Interpreter.Run` so
+  environment slots line up.
+
+The **builder opcodes** mirror `RunExpression` + `FoldOperation` + `FoldList`
+(`FoldString` is compiled to a shared constant, decoded once): `OpConst`,
+`OpStdin`/`OpBstdin`, `OpLoadLocal`/`OpLoadUpvalue`, `OpBuildCons`/`OpBuildTuple`/
+`OpBuildApp`/`OpBuildCompose`, `OpMakeClosure`, and `OpNewThunk`/`OpStoreThunk`
+(the two-pass `let` lowering). The **matcher opcodes** mirror `matchPatternInto`:
+`MOpNumber`, `MOpBind`, `MOpTuple` (reproducing the cons/tuple duality), and
+`MOpString` (which shares `matchStringSpine` with the interpreter). A reference
+into another module's environment, whose target does not exist at compile time,
+is a `ModuleRef` constant resolved at run time against `ModuleEnvironments` —
+exact parity with the interpreter's map lookup.
+
+### The builder VM and matcher VM
+
+`runBlock` ([vm.go](vm.go)) is the analogue of `RunExpression`: it executes a
+`CodeBlock` against the current `Locals`/`Upvalues` over a small operand stack of
+`RuntimeValue`s and returns the single value left on it. Like `RunExpression`, it
+**never forces** — it only constructs the lazy graph. Because building never
+forces, it never re-enters the reducer, so a single operand stack is reused
+across activations (the VM is non-reentrant *for building*).
+
+`runMatcher` is the analogue of `matchPatternInto`: a pre-order matcher program
+over a subject stack initialized with the argument; each composite pattern pushes
+its children (reversed, so the leftmost matches first). Unlike `runBlock`, the
+matcher **does** force subjects (`MOpNumber`/`MOpTuple`/`MOpString`), and a force
+can re-enter the reducer and thus another `runMatcher`, so each match uses a
+fresh subject slice rather than a shared stack — mirroring the interpreter's
+fresh per-match frame. `applyClosure` (the VM's hook) allocates a `FrameSize`
+frame per case, runs the matcher into it, and on success runs the case body
+block with the frame as `Locals` and the closure's captures as `Upvalues`.
+
+### Diagnostics and the CLI
+
+Diagnostics need no hot-path cost: because the IR builds the same graph, the same
+positions and names flow into errors. `OpBuildApp` carries the application span
+(for "cannot apply"); `OpNewThunk` and `MOpBind` set `NamedValue.Name` (for the
+reduction trace); "no pattern matched" uses `RuntimeClosure.noMatchPos`, which
+reaches the AST cases through `Compiled.Source`. For tooling, each `CodeBlock`
+also keeps a `Source` anchor and a sparse `Debug` table, and
+[disasm.go](disasm.go) renders a whole program for the `--dump-ir` flag — both
+consulted only off the hot path.
+
+`main` selects the backend: `--mode=interp` (default) runs `Interpret`;
+`--mode=compiled` runs `RunVM(NewVM(Compile(analyzer), …))` under the same
+`RuntimeError` recovery boundary; `--dump-ir` disassembles and exits. The
+backends' equivalence is locked in by [differential_test.go](differential_test.go),
+which runs every example and a feature/error/stdin corpus in both modes and
+asserts byte-identical output and exit codes.

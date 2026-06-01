@@ -8,6 +8,17 @@ realization of [OPTIMIZATION.md §2](OPTIMIZATION.md), extended (per the task
 brief) to a full compilation of programs and modules rather than just lambda
 bodies.
 
+> **Implementation status.** This plan has been implemented in full
+> (`runtime_core.go`, `ir.go`, `compiler.go`, `vm.go`, `disasm.go`, the `--mode`
+> / `--dump-ir` flags, and the differential gate `differential_test.go`). The
+> design holds as written with **one correction**: the matcher's subject stack
+> is *not* shared across calls (see [§7](#7-the-matcher-vm-runmatcher)) — unlike
+> the builder's operand stack, the matcher forces, so it can re-enter itself and
+> a shared stack would corrupt. It uses a fresh per-match slice instead, which
+> also matches the interpreter's fresh per-match frame. The user-facing docs of
+> record for the shipped backend are [IMPLEMENTATION.md §16](IMPLEMENTATION.md#16-the-compiled-backend-bytecode)
+> and [README.md §2](README.md#2-running-a-program).
+
 It is a design/architecture document. It assumes the implementation described in
 [IMPLEMENTATION.md](IMPLEMENTATION.md) (especially §6 analyzer, §7 runtime
 values, §8 translation, §9 reduction, §10 pattern matching) and the language of
@@ -538,9 +549,13 @@ Subject stack empties exactly when the program ends → success.
 **Frame allocation.** As today (`MatchPattern`), the VM allocates a fresh frame
 of `CompiledCase.FrameSize` per case attempt and runs the matcher into it; on
 failure the partially-filled frame is discarded and the next case tries a fresh
-one. The subject stack is reusable for the same non-reentrancy reason as the
-operand stack. (A footnote optimization defers binds so a failed match allocates
-nothing.)
+one. **The subject stack is *not* shared** the way the operand stack is: the
+matcher forces (`MOpNumber`/`MOpTuple`/`MOpString`), a force can re-enter the
+reducer and thus another `runMatcher`, so a shared stack would be corrupted by
+reentrancy. `runMatcher` therefore uses a fresh subject slice per call — the same
+non-reentrancy argument that *justifies* sharing the operand stack (building
+never forces) *forbids* sharing the subject stack. (A footnote optimization
+defers binds so a failed match allocates nothing.)
 
 ### 7.1 The bytecode `applyClosure`
 
@@ -816,9 +831,11 @@ Optionally `--dump-ir` to disassemble and exit (uses [§9](#9-debug-data-and-dia
   `MOpNumber`/`MOpString`/`MOpTuple` force, and only as far as
   `matchPatternInto` does. Forcing during building would change evaluation order
   and break infinite/self-referential structures.
-- **Operand/subject stack reuse depends on non-reentrancy.** If a future change
+- **Operand stack reuse depends on non-reentrancy.** If a future change
   ever makes `runBlock` force mid-build (it must not), the shared `opstack`
-  becomes unsafe; the invariant must be stated in code comments.
+  becomes unsafe; the invariant must be stated in code comments. The subject
+  stack does *not* get this reuse — the matcher forces, so it is reentrant — and
+  uses a fresh slice per match (correction to the original plan; see §7).
 - **`RuntimeClosure` dual fields.** Exactly one of `Cases`/`Compiled` is set per
   run; mixing modes within one run is unsupported and the driver guarantees it
   cannot happen.
@@ -938,16 +955,17 @@ substrate they build on.
 
 ## 16. Documentation to update
 
-- **IMPLEMENTATION.md**: its opening still says "There is no bytecode and no
-  separate compilation step." Add a section (after §9 reduction, or a new §8.5)
-  describing the compiled backend, the `Runtime`/`Interpreter`/`VM` split, the IR
-  formats, and the builder/matcher VMs — at the same level of detail as the
-  existing interpreter sections.
-- **README.md §2 (Running a program)**: document the `--mode` flag (and
-  `--dump-ir` if added).
-- **OPTIMIZATION.md §2**: mark the lambda-body precompilation as realized by this
-  plan, linking here.
-- This file (**BYTECODE.md**) is the design of record; keep it in step with the
-  implementation as phases land.
+Done as part of the implementation:
+
+- **IMPLEMENTATION.md**: the opening no longer claims "no bytecode"; a new §16
+  describes the compiled backend, the `Runtime`/`Interpreter`/`VM` split, the IR
+  formats, and the builder/matcher VMs, and §§1, 7, 9, 15 were updated where they
+  named the old `*Interpreter` builtin signature or single backend.
+- **README.md §2 (Running a program)**: documents the `--mode` and `--dump-ir`
+  flags.
+- **OPTIMIZATION.md**: removed from the repository before this work landed; the
+  lambda-body precompilation it footnoted is realized here.
+- This file (**BYTECODE.md**) is the design of record; the implementation
+  follows it with the one §7 subject-stack correction noted at the top.
 </content>
 </invoke>
