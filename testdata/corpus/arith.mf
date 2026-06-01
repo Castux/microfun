@@ -1,3 +1,0 @@
-import core, math in
-let x = add 3 (mul 4 5), y = sub 100 x, z = pow 2 10 in
-show [x, y, z, div 17 5, mod 17 5, sqrt 144]

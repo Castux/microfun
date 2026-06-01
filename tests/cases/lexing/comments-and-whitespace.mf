@@ -1,0 +1,3 @@
+-- Comments run to end of line; whitespace between tokens is insignificant.
+import core in    -- a trailing comment
+   show     [ 1 ;   2 ;3 ]

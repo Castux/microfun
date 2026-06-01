@@ -1,2 +1,0 @@
-import core in
-write [1; 2; 'x'; 4]

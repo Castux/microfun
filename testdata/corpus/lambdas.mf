@@ -1,6 +1,0 @@
-import core in
-let
-  f = { 0 -> 'zero', 1 -> 'one', n -> 'many' },
-  g = a -> b -> c -> add a (mul b c)
-in
-show [f 0, f 1, f 5, g 1 2 3]

@@ -1,2 +1,0 @@
-import core in
-add 1 'hello' > eval

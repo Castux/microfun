@@ -1,9 +1,0 @@
-import core, list in
-let inc = add 1, dbl = mul 2 in
-show [
-  3 > inc > dbl;
-  dbl < inc < 3;
-  (inc *> dbl) 3;
-  (inc <* dbl) 3;
-  [1;2;3;4] > map inc > filter (lt 3)
-]

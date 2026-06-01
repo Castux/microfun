@@ -1,0 +1,3 @@
+-- A string literal with no closing quote does not lex.
+import core, list in
+write 'hello

@@ -1,3 +1,0 @@
-import core, list in
-let add5 = add 5, ge0 = gte 0, e3 = equal 3 in
-show [map add5 [1;2;3]; map ge0 [-1; 0; 1]; e3 3; e3 4]

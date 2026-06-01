@@ -1,0 +1,3 @@
+-- Both single- and double-quoted string literals lex identically.
+import core, list in
+write (concat 'foo' "bar")

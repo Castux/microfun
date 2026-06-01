@@ -1,2 +1,0 @@
-import core, text, list in
-show [join ', ' ['a';'b';'c']; toString 3.14; concat 'foo' 'bar']

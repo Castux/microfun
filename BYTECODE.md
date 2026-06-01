@@ -877,8 +877,12 @@ Because both backends must produce identical output, validation is largely
    applying a non-function, non-number to an arithmetic builtin, invalid UTF-8 on
    stdin, `write` of a non-code-point list) must produce the same located
    diagnostic and the same `while reducing: …` trace in both modes.
-4. **Add `_test.go`** harnesses (there are none today) that run the corpus in
-   both modes and diff, so the equivalence is a regression gate.
+4. **Regression harness (implemented).** The corpus lives under `tests/cases/`,
+   categorized by language feature with ≥2 cases each (plus the error and stdin
+   cases of items 1–3); a sibling `<name>.in` is fed as raw stdin. It is run by
+   `tests/run.sh`, `tests/run.ps1`, and the `go test` gate
+   `differential_test.go` (`TestCorpus` + `TestExamples`), each asserting
+   byte-identical output and exit code. See [tests/README.md](tests/README.md).
 5. **Disassembly sanity**: `--dump-ir` on representative programs, eyeballed
    against the expected lowering (esp. operator nesting and `let` two-pass).
 
