@@ -61,7 +61,7 @@ source text ──Lex──► tokens ──ParseProgram──► AST ──Anal
 4. **Interpret** ([interpreter.go](interpreter.go)) translates the AST into a
    graph of *runtime values* and reduces the program body to weak head normal
    form, printing whatever the program's side-effecting builtins (`peek`,
-   `show`, `write`) emit along the way.
+   `show`, `write`, `bwrite`) emit along the way.
 
 Stage 4 has two implementations selected by the `--mode` flag (default
 `interp`): the tree-walking interpreter above, or a bytecode backend
@@ -644,11 +644,15 @@ initializer. `init` runs after all variable initialization and before `main`, so
 the map is fully built before the interpreter ever runs.
 
 `eval` forces full normal form; `peek` prints the width/depth-limited rendering;
-`show` prints the unlimited rendering; `write` walks a list of code points and
-prints them as characters; `equal` is `DeepEqual`. All of the higher-level
-numeric, logical, list, and string functions are *not* builtins — they are
-defined in the standard library modules (`math`, `list`, `text`, etc.) in
-microfun itself.
+`show` prints the unlimited rendering; `write` walks a list of Unicode code
+points, validates each (must be an integer in the range 0–0x10FFFF and not a
+surrogate half), and prints the corresponding characters followed by a newline;
+`bwrite` does the same for raw bytes (must be integers 0–255) and writes them
+to standard output with no newline; `equal` is `DeepEqual`. Both `write` and
+`bwrite` raise a `RuntimeError` on the first invalid element — non-integer,
+out-of-range, or non-number. All of the higher-level numeric, logical, list,
+and string functions are *not* builtins — they are defined in the standard
+library modules (`math`, `list`, `text`, etc.) in microfun itself.
 
 ### Standard input as a lazy stream
 

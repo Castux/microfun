@@ -1,0 +1,4 @@
+tests/cases/errors/unbound-name.mf:3:6: no definition for undefined_name
+show [31;1mundefined_name[0m
+     [31;1m^^^^^^^^^^^^^^[0m
+Analyzer found 1 errors

@@ -1,7 +1,11 @@
 package main
 
-import "math"
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"os"
+	"unicode/utf8"
+)
 
 // inputStreamPlaceholder stands in the Builtins map for stdin and bstdin so the
 // analyzer accepts those names. They are not callable functions but lazy input
@@ -48,6 +52,31 @@ func WrapBinop(operation Binop, name string) RuntimeBuiltin {
 	}
 }
 
+func walkList(rt *Runtime, a RuntimeValue, name string, expected string, action func(RuntimeNumber)) {
+	for {
+		switch cell := rt.EvaluateToWeakHeadNormalForm(a).(type) {
+		case RuntimeCons:
+			number, ok := rt.EvaluateToWeakHeadNormalForm(cell.Head).(RuntimeNumber)
+			if !ok {
+				rt.builtinError(name + " expects a " + expected + ", found a non-number element")
+			}
+			action(number)
+			a = cell.Tail
+
+		case RuntimeTuple:
+			// The only valid non-cons value is the empty list, which ends
+			// the walk; any other tuple arity is an error.
+			if len(cell) != 0 {
+				rt.builtinError(name + " expects a " + expected)
+			}
+			return
+
+		default:
+			rt.builtinError(name + " expects a " + expected)
+		}
+	}
+}
+
 // Builtins is populated in init rather than as a plain var initializer: the
 // builtin bodies call interpreter methods that transitively read Builtins (the
 // name resolver looks builtins up here), which Go would otherwise reject as an
@@ -69,19 +98,15 @@ func init() {
 		"eq": WrapBinop(func(a, b float64) float64 {
 			if a == b {
 				return 1
-			} else {
-				return 0
 			}
+			return 0
 		}, "eq"),
 		"lt": WrapBinop(func(a, b float64) float64 {
 			if b < a {
 				return 1
-			} else {
-				return 0
 			}
+			return 0
 		}, "lt"),
-		// Derived comparisons follow the same threshold-first, value-second convention
-		// as eq and lt: (lte 10 x) = "x ≤ 10", (gte 0 x) = "x ≥ 0", etc.
 		"neq": WrapBinop(func(a, b float64) float64 {
 			if a != b {
 				return 1
@@ -119,32 +144,25 @@ func init() {
 			return a
 		},
 		"write": func(rt *Runtime, a RuntimeValue) RuntimeValue {
-			original := a
-		walk:
-			for {
-				switch cell := rt.EvaluateToWeakHeadNormalForm(a).(type) {
-				case RuntimeCons:
-					number, ok := rt.EvaluateToWeakHeadNormalForm(cell.Head).(RuntimeNumber)
-					if !ok {
-						rt.builtinError("write expects a list of code points, found a non-number element")
-					}
-					fmt.Printf("%c", rune(int(number)))
-					a = cell.Tail
-
-				case RuntimeTuple:
-					// The only valid non-cons value is the empty list, which ends
-					// the walk; any other tuple arity is an error.
-					if len(cell) != 0 {
-						rt.builtinError("write expects a list of code points")
-					}
-					break walk
-
-				default:
-					rt.builtinError("write expects a list of code points")
+			walkList(rt, a, "write", "list of code points", func(r RuntimeNumber) {
+				v := float64(r)
+				if v != math.Trunc(v) || !utf8.ValidRune(rune(v)) {
+					rt.builtinError(fmt.Sprintf("write expects a list of code points, found invalid code point %g", v))
 				}
-			}
+				fmt.Printf("%c", rune(r))
+			})
 			fmt.Println()
-			return original
+			return a
+		},
+		"bwrite": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			walkList(rt, a, "bwrite", "list of numbers", func(r RuntimeNumber) {
+				v := float64(r)
+				if v != math.Trunc(v) || v < 0 || v > 255 {
+					rt.builtinError(fmt.Sprintf("bwrite expects a list of numbers, found invalid byte value %g", v))
+				}
+				os.Stdout.Write([]byte{byte(r)})
+			})
+			return a
 		},
 		"equal": func(rt *Runtime, a RuntimeValue) RuntimeValue {
 			return RuntimePartial{equalApply, a}

@@ -33,7 +33,7 @@ works — the lexer, parser, analyzer, and the lazy reduction engine — see
 
 - **A program is an expression.** There are no statements. Running a program
   evaluates its single body expression; output happens only through the
-  side-effecting builtins `peek`, `show`, and `write`.
+  side-effecting builtins `peek`, `show`, `write`, and `bwrite`.
 - **One primitive, one constructor.** The only primitive type is the number; the
   only way to build compound data is the tuple. Lists and strings are not
   separate types — they are conventions built on tuples (see
@@ -60,7 +60,8 @@ microfun [--mode=interp|compiled] [--dump-ir] <path>
 
 microfun loads the file at `<path>` as a program, loads any modules it
 imports, analyzes everything, and evaluates the program body. Anything the
-program prints via `peek`, `show`, or `write` appears on standard output. A
+program prints via `peek`, `show`, `write`, or `bwrite` appears on standard
+output. A
 lexical, syntactic, or name-resolution error is reported with a located
 diagnostic and the program does not run; a run-time error is reported with a
 source location and a reduction trace.
@@ -478,10 +479,10 @@ and then only to the depth required. Reduction is forced by:
   binds;
 - **calling an arithmetic or comparison builtin** — the numeric arguments are
   reduced to numbers and type-checked;
-- **`eval` / `show` / `peek` / `write`** — `eval` and `show` force a value to
-  *full* normal form (everything inside it); `peek` does the same but with output
-  bounded in width and depth; `write` forces the spine and elements of a code-point
-  list.
+- **`eval` / `show` / `peek` / `write` / `bwrite`** — `eval` and `show` force a
+  value to *full* normal form (everything inside it); `peek` does the same but
+  with output bounded in width and depth; `write` and `bwrite` force the spine
+  and elements of their list argument.
 
 A bound expression is **memoized**: once reduced to weak head normal form, the
 result is shared, so it is never recomputed and further reduction resumes where it
@@ -531,6 +532,7 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
 | `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
 | `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
+| `bwrite a` | 1 | `a` | prints `a` as raw bytes (list of numbers); see below |
 | `stdin` | — (a value) | standard input as a lazy list of Unicode code points | see below |
 | `bstdin` | — (a value) | standard input as a lazy list of raw byte values | see below |
 
@@ -539,7 +541,7 @@ returns its argument so it can be inserted into an expression. `add`, `mul`, and
 `eq` are commutative, so their argument order is immaterial.
 
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
-a code-point list, is a run-time error.
+a code-point list, or `bwrite` cannot read as a byte list, is a run-time error.
 
 ### Standard input
 
