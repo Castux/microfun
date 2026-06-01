@@ -10,7 +10,7 @@ bodies.
 
 > **Implementation status.** This plan has been implemented in full
 > (`runtime_core.go`, `ir.go`, `compiler.go`, `vm.go`, `disasm.go`, the `--mode`
-> / `--dump-ir` flags, and the differential gate `differential_test.go`). The
+> / `--dump-ir` flags). The
 > design holds as written with **one correction**: the matcher's subject stack
 > is *not* shared across calls (see [§7](#7-the-matcher-vm-runmatcher)) — unlike
 > the builder's operand stack, the matcher forces, so it can re-enter itself and
@@ -880,9 +880,8 @@ Because both backends must produce identical output, validation is largely
 4. **Regression harness (implemented).** The corpus lives under `tests/cases/`,
    categorized by language feature with ≥2 cases each (plus the error and stdin
    cases of items 1–3); a sibling `<name>.in` is fed as raw stdin. It is run by
-   `tests/run.sh`, `tests/run.ps1`, and the `go test` gate
-   `differential_test.go` (`TestCorpus` + `TestExamples`), each asserting
-   byte-identical output and exit code. See [tests/README.md](tests/README.md).
+   `tests/run.sh` and `tests/run.ps1`, each asserting byte-identical output
+   and exit code. See [tests/README.md](tests/README.md).
 5. **Disassembly sanity**: `--dump-ir` on representative programs, eyeballed
    against the expected lowering (esp. operator nesting and `let` two-pass).
 

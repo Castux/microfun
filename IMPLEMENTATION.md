@@ -778,7 +778,6 @@ consulted only off the hot path.
 backends' equivalence is locked in by a differential corpus under
 [tests/](tests/) — a categorized set of small programs (≥2 per language feature,
 plus error and stdin cases) run in both modes and asserted byte-identical by
-`tests/run.sh`, `tests/run.ps1`, and the `go test` gate
-[differential_test.go](differential_test.go) (which also runs the larger
+`tests/run.sh` and `tests/run.ps1` (which also run the larger
 `examples/` programs). These are compiler-correctness tests, distinct from the
 in-language standard-library unit tests in `examples/core_tests.mf`.

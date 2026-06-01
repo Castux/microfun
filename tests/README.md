@@ -12,14 +12,13 @@ library computes rather than whether the two backends agree.
 
 ## Running
 
-Three equivalent ways, pick whichever fits your loop:
+Two equivalent ways, pick whichever fits your loop:
 
 ```sh
 tests/run.sh                 # bash (Git Bash / WSL / macOS / Linux)
 tests/run.sh patterns        # only the "patterns" category
 pwsh tests/run.ps1           # PowerShell (Windows)
 powershell -File tests/run.ps1 patterns
-go test -run TestCorpus      # the go-test gate (also TestExamples)
 ```
 
 Each builds the binary, runs every case in both modes, and prints a categorized
