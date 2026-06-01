@@ -55,7 +55,19 @@ var colors = map[Severity]int{
 	SeverityInfo:  34, // Blue
 }
 
+// colorEnabled is true when stderr is an interactive terminal and NO_COLOR is unset.
+var colorEnabled = func() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	fi, err := os.Stderr.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}()
+
 func colorText(txt string, color int) string {
+	if !colorEnabled {
+		return txt
+	}
 	return fmt.Sprintf("\x1b[%d;1m%s\x1b[0m", color, txt)
 }
 

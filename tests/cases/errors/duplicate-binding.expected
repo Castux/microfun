@@ -1,7 +1,7 @@
 tests/cases/errors/duplicate-binding.mf:3:12: x was already defined
-let x = 1, [34;1mx[0m = 2 in show x
-           [34;1m^[0m
+let x = 1, x = 2 in show x
+           ^
 tests/cases/errors/duplicate-binding.mf:3:5: here
-let [31;1mx[0m = 1, x = 2 in show x
-    [31;1m^[0m
+let x = 1, x = 2 in show x
+    ^
 Analyzer found 1 errors
