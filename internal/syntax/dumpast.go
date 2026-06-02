@@ -37,7 +37,7 @@ func DumpAST(program *Program, modules map[string]*Module) string {
 		sb.WriteByte('\n')
 	}
 	sb.WriteString("program\n")
-	writeASTExpr(&sb, program.Body, 1)
+	writeASTExpr(&sb, program.Body, "", true)
 
 	var names []string
 	for name := range modules {
@@ -46,111 +46,165 @@ func DumpAST(program *Program, modules map[string]*Module) string {
 	sort.Strings(names)
 	for _, name := range names {
 		fmt.Fprintf(&sb, "\nmodule %s\n", name)
-		for _, b := range modules[name].PublicBindings {
-			fmt.Fprintf(&sb, "  bind %s\n", b.Name.Value)
-			writeASTExpr(&sb, b.Expression, 2)
+		bindings := modules[name].PublicBindings
+		for i, b := range bindings {
+			isLast := i == len(bindings)-1
+			astLine(&sb, "", isLast, "bind %s", b.Name.Value)
+			nextPrefix := "    "
+			if !isLast {
+				nextPrefix = "│   "
+			}
+			writeASTExpr(&sb, b.Expression, nextPrefix, true)
 		}
 	}
 	return sb.String()
 }
 
-func astIndent(sb *strings.Builder, indent int) {
-	for i := 0; i < indent; i++ {
-		sb.WriteString("  ")
+// astLine writes one tree node: prefix, a prong (├── or └──), and the node content.
+func astLine(sb *strings.Builder, prefix string, isLast bool, format string, args ...any) {
+	sb.WriteString(prefix)
+	if isLast {
+		sb.WriteString("└── ")
+	} else {
+		sb.WriteString("├── ")
 	}
-}
-
-// line writes one tree node: indentation, a kind tag, and an optional inline value.
-func astLine(sb *strings.Builder, indent int, format string, args ...any) {
-	astIndent(sb, indent)
 	fmt.Fprintf(sb, format, args...)
 	sb.WriteByte('\n')
 }
 
-func writeASTExpr(sb *strings.Builder, expr Expression, indent int) {
+func writeASTExpr(sb *strings.Builder, expr Expression, prefix string, isLast bool) {
 	switch e := expr.(type) {
 	case *NumberLiteral:
-		astLine(sb, indent, "num %s", formatNumber(e.Value))
+		astLine(sb, prefix, isLast, "num %s", formatNumber(e.Value))
 
 	case *StringLiteral:
-		astLine(sb, indent, "str %q", e.Value)
+		astLine(sb, prefix, isLast, "str %q", e.Value)
 
 	case *Name:
-		astLine(sb, indent, "name %s", e.Value)
+		astLine(sb, prefix, isLast, "name %s", e.Value)
 
 	case *QualifiedName:
-		astLine(sb, indent, "qualified %s.%s", e.Module, e.Value)
+		astLine(sb, prefix, isLast, "qualified %s.%s", e.Module, e.Value)
 
 	case *Operation:
 		if e.Operator == "" {
-			astLine(sb, indent, "apply")
+			astLine(sb, prefix, isLast, "apply")
 		} else {
-			astLine(sb, indent, "operation %q", e.Operator)
+			astLine(sb, prefix, isLast, "operation %q", e.Operator)
 		}
-		for _, operand := range e.Operands {
-			writeASTExpr(sb, operand, indent+1)
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, operand := range e.Operands {
+			writeASTExpr(sb, operand, nextPrefix, i == len(e.Operands)-1)
 		}
 
 	case *Lambda:
-		astLine(sb, indent, "lambda (%d case(s))", len(e.Cases))
+		astLine(sb, prefix, isLast, "lambda (%d case(s))", len(e.Cases))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
 		for i, c := range e.Cases {
-			astLine(sb, indent+1, "case #%d", i)
-			astLine(sb, indent+2, "pattern")
-			writeASTPattern(sb, c.Pattern, indent+3)
-			astLine(sb, indent+2, "body")
-			writeASTExpr(sb, c.Expression, indent+3)
+			caseIsLast := i == len(e.Cases)-1
+			astLine(sb, nextPrefix, caseIsLast, "case #%d", i)
+			casePrefix := nextPrefix
+			if caseIsLast {
+				casePrefix += "    "
+			} else {
+				casePrefix += "│   "
+			}
+			astLine(sb, casePrefix, false, "pattern")
+			writeASTPattern(sb, c.Pattern, casePrefix+"│   ", true)
+			astLine(sb, casePrefix, true, "body")
+			writeASTExpr(sb, c.Expression, casePrefix+"    ", true)
 		}
 
 	case *Let:
-		astLine(sb, indent, "let (%d binding(s))", len(e.Bindings))
-		for _, b := range e.Bindings {
-			astLine(sb, indent+1, "bind %s", b.Name.Value)
-			writeASTExpr(sb, b.Expression, indent+2)
+		astLine(sb, prefix, isLast, "let (%d binding(s))", len(e.Bindings))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
 		}
-		astLine(sb, indent+1, "in")
-		writeASTExpr(sb, e.Expression, indent+2)
+		for _, b := range e.Bindings {
+			astLine(sb, nextPrefix, false, "bind %s", b.Name.Value)
+			writeASTExpr(sb, b.Expression, nextPrefix+"│   ", true)
+		}
+		astLine(sb, nextPrefix, true, "in")
+		writeASTExpr(sb, e.Expression, nextPrefix+"    ", true)
 
 	case *TupleExpr:
-		astLine(sb, indent, "tuple (arity %d)", len(e.SubExpressions))
-		for _, sub := range e.SubExpressions {
-			writeASTExpr(sb, sub, indent+1)
+		astLine(sb, prefix, isLast, "tuple (arity %d)", len(e.SubExpressions))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, sub := range e.SubExpressions {
+			writeASTExpr(sb, sub, nextPrefix, i == len(e.SubExpressions)-1)
 		}
 
 	case *List:
-		astLine(sb, indent, "list (%d element(s))", len(e.SubExpressions))
-		for _, sub := range e.SubExpressions {
-			writeASTExpr(sb, sub, indent+1)
+		astLine(sb, prefix, isLast, "list (%d element(s))", len(e.SubExpressions))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, sub := range e.SubExpressions {
+			writeASTExpr(sb, sub, nextPrefix, i == len(e.SubExpressions)-1)
 		}
 
 	default:
-		astLine(sb, indent, "<unknown expression %T>", expr)
+		astLine(sb, prefix, isLast, "<unknown expression %T>", expr)
 	}
 }
 
-func writeASTPattern(sb *strings.Builder, pattern Pattern, indent int) {
+func writeASTPattern(sb *strings.Builder, pattern Pattern, prefix string, isLast bool) {
 	switch p := pattern.(type) {
 	case *Name:
-		astLine(sb, indent, "var %s", p.Value)
+		astLine(sb, prefix, isLast, "var %s", p.Value)
 
 	case *NumberLiteral:
-		astLine(sb, indent, "num %s", formatNumber(p.Value))
+		astLine(sb, prefix, isLast, "num %s", formatNumber(p.Value))
 
 	case *StringLiteral:
-		astLine(sb, indent, "str %q", p.Value)
+		astLine(sb, prefix, isLast, "str %q", p.Value)
 
 	case *TuplePattern:
-		astLine(sb, indent, "tuple-pattern (arity %d)", len(p.SubPatterns))
-		for _, sub := range p.SubPatterns {
-			writeASTPattern(sb, sub, indent+1)
+		astLine(sb, prefix, isLast, "tuple-pattern (arity %d)", len(p.SubPatterns))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, sub := range p.SubPatterns {
+			writeASTPattern(sb, sub, nextPrefix, i == len(p.SubPatterns)-1)
 		}
 
 	case *ListPattern:
-		astLine(sb, indent, "list-pattern (%d element(s))", len(p.SubPatterns))
-		for _, sub := range p.SubPatterns {
-			writeASTPattern(sb, sub, indent+1)
+		astLine(sb, prefix, isLast, "list-pattern (%d element(s))", len(p.SubPatterns))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, sub := range p.SubPatterns {
+			writeASTPattern(sb, sub, nextPrefix, i == len(p.SubPatterns)-1)
 		}
 
 	default:
-		astLine(sb, indent, "<unknown pattern %T>", pattern)
+		astLine(sb, prefix, isLast, "<unknown pattern %T>", pattern)
 	}
 }

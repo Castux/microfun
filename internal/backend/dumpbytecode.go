@@ -33,7 +33,7 @@ func DumpBytecode(p *Program) string {
 			fmt.Fprintf(&sb, "\n%s\n", label)
 		}
 		in := p.Code[pc]
-		fmt.Fprintf(&sb, "%5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in))
+		fmt.Fprintf(&sb, "│ %5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in))
 	}
 	return sb.String()
 }

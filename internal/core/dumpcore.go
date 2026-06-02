@@ -26,7 +26,7 @@ func DumpCore(mainCore Expr, modCores map[string][]Bind) string {
 
 	main := mainCore.(Thunk)
 	fmt.Fprintf(&sb, "program (frame %d)\n", main.Frame)
-	writeCoreExpr(&sb, main.Body, 1)
+	writeCoreExpr(&sb, main.Body, "", true)
 
 	var names []string
 	for name := range modCores {
@@ -38,10 +38,15 @@ func DumpCore(mainCore Expr, modCores map[string][]Bind) string {
 			continue // every binding of this module was pruned as unreachable
 		}
 		fmt.Fprintf(&sb, "\nmodule %s\n", name)
-		for _, bind := range modCores[name] {
+		for i, bind := range modCores[name] {
+			isLast := i == len(modCores[name])-1
 			thunk := bind.Body.(Thunk)
-			fmt.Fprintf(&sb, "  binding %d %s (frame %d)\n", bind.Slot, bind.Name, thunk.Frame)
-			writeCoreExpr(&sb, thunk.Body, 2)
+			coreLine(&sb, "", isLast, "binding %d %s (frame %d)", bind.Slot, bind.Name, thunk.Frame)
+			nextPrefix := "    "
+			if !isLast {
+				nextPrefix = "│   "
+			}
+			writeCoreExpr(&sb, thunk.Body, nextPrefix, true)
 		}
 	}
 	return sb.String()
@@ -52,109 +57,178 @@ func formatNumber(num float64) string {
 	return strconv.FormatFloat(num, 'g', -1, 64)
 }
 
-func coreIndent(sb *strings.Builder, indent int) {
-	for i := 0; i < indent; i++ {
-		sb.WriteString("  ")
+func coreLine(sb *strings.Builder, prefix string, isLast bool, format string, args ...any) {
+	sb.WriteString(prefix)
+	if isLast {
+		sb.WriteString("└── ")
+	} else {
+		sb.WriteString("├── ")
 	}
-}
-
-func coreLine(sb *strings.Builder, indent int, format string, args ...any) {
-	coreIndent(sb, indent)
 	fmt.Fprintf(sb, format, args...)
 	sb.WriteByte('\n')
 }
 
-func writeCoreExpr(sb *strings.Builder, expr Expr, indent int) {
+func writeCoreExpr(sb *strings.Builder, expr Expr, prefix string, isLast bool) {
 	switch e := expr.(type) {
 	case Num:
-		coreLine(sb, indent, "num %s", formatNumber(e.Val))
+		coreLine(sb, prefix, isLast, "num %s", formatNumber(e.Val))
 
 	case Const:
-		coreLine(sb, indent, "const %s", value.ShowConst(e.Val))
+		coreLine(sb, prefix, isLast, "const %s", value.ShowConst(e.Val))
 
 	case Var:
-		coreLine(sb, indent, "var %s", showAddr(e.Addr))
+		coreLine(sb, prefix, isLast, "var %s", showAddr(e.Addr))
 
 	case App:
-		coreLine(sb, indent, "app")
-		coreLine(sb, indent+1, "head")
-		writeCoreExpr(sb, e.Head, indent+2)
+		coreLine(sb, prefix, isLast, "app")
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		coreLine(sb, nextPrefix, false, "head")
+		writeCoreExpr(sb, e.Head, nextPrefix+"│   ", true)
 		for i, arg := range e.Args {
-			coreLine(sb, indent+1, "arg %d", i)
-			writeCoreExpr(sb, arg, indent+2)
+			argIsLast := i == len(e.Args)-1
+			coreLine(sb, nextPrefix, argIsLast, "arg %d", i)
+			writeCoreExpr(sb, arg, nextPrefix+pick(argIsLast, "    ", "│   "), true)
 		}
 
 	case Prim:
-		coreLine(sb, indent, "prim %s", value.PrimName(e.Op))
+		coreLine(sb, prefix, isLast, "prim %s", value.PrimName(e.Op))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
 		for i, arg := range e.Args {
-			coreLine(sb, indent+1, "arg %d", i)
-			writeCoreExpr(sb, arg, indent+2)
+			argIsLast := i == len(e.Args)-1
+			coreLine(sb, nextPrefix, argIsLast, "arg %d", i)
+			writeCoreExpr(sb, arg, nextPrefix+pick(argIsLast, "    ", "│   "), true)
 		}
 
 	case Compose:
-		coreLine(sb, indent, "compose (forward %t)", e.Forward)
-		for _, fn := range e.Fns {
-			writeCoreExpr(sb, fn, indent+1)
+		coreLine(sb, prefix, isLast, "compose (forward %t)", e.Forward)
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, fn := range e.Fns {
+			writeCoreExpr(sb, fn, nextPrefix, i == len(e.Fns)-1)
 		}
 
 	case Cons:
-		coreLine(sb, indent, "cons")
-		coreLine(sb, indent+1, "head")
-		writeCoreExpr(sb, e.Head, indent+2)
-		coreLine(sb, indent+1, "tail")
-		writeCoreExpr(sb, e.Tail, indent+2)
+		coreLine(sb, prefix, isLast, "cons")
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		coreLine(sb, nextPrefix, false, "head")
+		writeCoreExpr(sb, e.Head, nextPrefix+"│   ", true)
+		coreLine(sb, nextPrefix, true, "tail")
+		writeCoreExpr(sb, e.Tail, nextPrefix+"    ", true)
 
 	case Tuple:
-		coreLine(sb, indent, "tuple (arity %d)", len(e.Fields))
-		for _, field := range e.Fields {
-			writeCoreExpr(sb, field, indent+1)
+		coreLine(sb, prefix, isLast, "tuple (arity %d)", len(e.Fields))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, field := range e.Fields {
+			writeCoreExpr(sb, field, nextPrefix, i == len(e.Fields)-1)
 		}
 
 	case Let:
-		coreLine(sb, indent, "let (%d binding(s))", len(e.Binds))
-		for _, bind := range e.Binds {
-			coreLine(sb, indent+1, "bind slot %d %s", bind.Slot, bind.Name)
-			writeCoreExpr(sb, bind.Body, indent+2)
+		coreLine(sb, prefix, isLast, "let (%d binding(s))", len(e.Binds))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
 		}
-		coreLine(sb, indent+1, "in")
-		writeCoreExpr(sb, e.Body, indent+2)
+		for _, bind := range e.Binds {
+			coreLine(sb, nextPrefix, false, "bind slot %d %s", bind.Slot, bind.Name)
+			writeCoreExpr(sb, bind.Body, nextPrefix+"│   ", true)
+		}
+		coreLine(sb, nextPrefix, true, "in")
+		writeCoreExpr(sb, e.Body, nextPrefix+"    ", true)
 
 	case Lambda:
-		coreLine(sb, indent, "lambda (frame %d, free %s)", e.Frame, showAddrs(e.Free))
+		coreLine(sb, prefix, isLast, "lambda (frame %d, free %s)", e.Frame, showAddrs(e.Free))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
 		for i, c := range e.Cases {
-			coreLine(sb, indent+1, "case #%d (frame %d)", i, c.Frame)
-			coreLine(sb, indent+2, "pattern")
-			writeCorePattern(sb, c.Pattern, indent+3)
-			coreLine(sb, indent+2, "body")
-			writeCoreExpr(sb, c.Body, indent+3)
+			caseIsLast := i == len(e.Cases)-1
+			coreLine(sb, nextPrefix, caseIsLast, "case #%d (frame %d)", i, c.Frame)
+			casePrefix := nextPrefix
+			if caseIsLast {
+				casePrefix += "    "
+			} else {
+				casePrefix += "│   "
+			}
+			coreLine(sb, casePrefix, false, "pattern")
+			writeCorePattern(sb, c.Pattern, casePrefix+"│   ", true)
+			coreLine(sb, casePrefix, true, "body")
+			writeCoreExpr(sb, c.Body, casePrefix+"    ", true)
 		}
 
 	case Thunk:
-		coreLine(sb, indent, "thunk (update %t, frame %d%s)", e.Update, e.Frame, thunkName(e.Name))
-		writeCoreExpr(sb, e.Body, indent+1)
+		coreLine(sb, prefix, isLast, "thunk (update %t, frame %d%s)", e.Update, e.Frame, thunkName(e.Name))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		writeCoreExpr(sb, e.Body, nextPrefix, true)
 
 	default:
-		coreLine(sb, indent, "<unknown core expression %T>", expr)
+		coreLine(sb, prefix, isLast, "<unknown core expression %T>", expr)
 	}
 }
 
-func writeCorePattern(sb *strings.Builder, pattern Pattern, indent int) {
+func writeCorePattern(sb *strings.Builder, pattern Pattern, prefix string, isLast bool) {
 	switch p := pattern.(type) {
 	case PatternVar:
-		coreLine(sb, indent, "var slot %d %s", p.Slot, p.Name)
+		coreLine(sb, prefix, isLast, "var slot %d %s", p.Slot, p.Name)
 
 	case PatternConst:
-		coreLine(sb, indent, "const %s", value.ShowConst(p.Val))
+		coreLine(sb, prefix, isLast, "const %s", value.ShowConst(p.Val))
 
 	case PatternTuple:
-		coreLine(sb, indent, "tuple-pattern (arity %d)", len(p.Fields))
-		for _, field := range p.Fields {
-			writeCorePattern(sb, field, indent+1)
+		coreLine(sb, prefix, isLast, "tuple-pattern (arity %d)", len(p.Fields))
+		nextPrefix := prefix
+		if isLast {
+			nextPrefix += "    "
+		} else {
+			nextPrefix += "│   "
+		}
+		for i, field := range p.Fields {
+			writeCorePattern(sb, field, nextPrefix, i == len(p.Fields)-1)
 		}
 
 	default:
-		coreLine(sb, indent, "<unknown core pattern %T>", pattern)
+		coreLine(sb, prefix, isLast, "<unknown core pattern %T>", pattern)
 	}
+}
+
+func pick(cond bool, t, f string) string {
+	if cond {
+		return t
+	}
+	return f
 }
 
 func thunkName(name string) string {
