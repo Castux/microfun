@@ -1,9 +1,9 @@
 microfun: a toy programming language and its compiler
 
-- Purely functional, dynamic, lazily evaluated. Language definition in README.md
-- Compiler in Go. Architecture and design in IMPLEMENTATION.md
+- Purely functional, dynamic, lazily evaluated. Language definition in docs/LANGUAGE.md (README.md is the short tour).
+- Compiler in Go. Architecture and design in docs/0–6 (Overview, Lexer, Parser, Resolver, Core IR & Lowering, Bytecode & Compiler, G-machine).
 
-These two reference documents MUST be kept up to date. They should be both human-readable and useful as context for an LLM.
+These reference documents MUST be kept up to date. They should be both human-readable and useful as context for an LLM.
 
 I am a 15 years programmer, I worked in network security, games, education.
 
@@ -13,4 +13,4 @@ I am a 15 years programmer, I worked in network security, games, education.
 
 The unit tests in examples/core_tests.mf, written in microfun itself, can be used as a quick regression test. If they all pass, it is likely that the compiler is still working.
 
-There are three execution backends, all producing byte-identical output: `--mode=interp` (tree-walking interpreter, the reference oracle), `--mode=compiled` (builder bytecode VM), and `--mode=stg` (spineless tagless G-machine). tests/run.sh runs every case under all three and diffs each against the interpreter; bench/run.sh times all three. Backend design docs are docs/4–6.
+There is one execution engine: a spineless tagless G-machine. The pipeline is `source → Lex → Parse → Resolve → Lower (Core IR) → Compile (flat bytecode) → Run (G-machine)`. The pre-rewrite tree-walking interpreter is frozen in etc/experiment and built as microfun.oracle.exe, the reference oracle. tests/run.sh checks every case in tests/cases against its golden .expected/.exit (produced by that oracle); bench/run.sh times the engine (and the oracle as a baseline if present). Backend design docs are docs/4–6.

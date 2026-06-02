@@ -7,7 +7,7 @@ package main
 // has a single clear input and output, and the tree can be traversed or printed
 // without wondering which fields some earlier pass has filled in.
 
-type Program struct {
+type ASTProgram struct {
 	Imports []*Name
 	Body    Expression
 
@@ -39,7 +39,7 @@ func (x Name) isExpr()          {}
 func (x QualifiedName) isExpr() {}
 func (x NumberLiteral) isExpr() {}
 func (x StringLiteral) isExpr() {}
-func (x Tuple) isExpr()         {}
+func (x TupleExpr) isExpr()         {}
 func (x List) isExpr()          {}
 
 type Let struct {
@@ -112,7 +112,7 @@ type StringLiteral struct {
 	Pos SourcePos
 }
 
-type Tuple struct {
+type TupleExpr struct {
 	SubExpressions []Expression
 
 	Start, End SourcePos

@@ -28,16 +28,12 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 ## Usage
 
 ```
-microfun [--mode=interp|compiled] [--dump-ir] <path>
+microfun <path>
 ```
 
-Runs the program at `<path>`. Modules are searched first in the current directory
-(`./name.mf`), then in the embedded standard library. Errors are reported with
-source locations; runtime errors include a reduction trace.
-
-- `--mode=interp` (default) — tree-walking interpreter.
-- `--mode=compiled` — bytecode compiler + VM; produces identical output.
-- `--dump-ir` — disassemble the compiled IR to stdout and exit (implies compiled mode).
+Runs the program at `<path>` on the G-machine. Modules are searched first in the
+current directory (`./name.mf`), then in the embedded standard library. Errors are
+reported with source locations; runtime errors include a reduction trace.
 
 ## Example
 
@@ -94,10 +90,11 @@ Key things illustrated:
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/0.Overview.md](docs/0.Overview.md) | Implementation pipeline and source positions |
 | [docs/1.Lexer.md](docs/1.Lexer.md) | Lexer |
-| [docs/2.Parser.md](docs/2.Parser.md) | Parser and AST |
-| [docs/3.Analyzer.md](docs/3.Analyzer.md) | Name resolution, slot assignment, upvalue capture |
-| [docs/4.Interpreter and Runtime.md](docs/4.Interpreter%20and%20Runtime.md) | Runtime values, lazy reduction, pattern matching, builtins |
-| [docs/5.Bytecode compiler.md](docs/5.Bytecode%20compiler.md) | Bytecode backend design: IR, builder VM, matcher VM, compiler |
+| [docs/2.Parser.md](docs/2.Parser.md) | Parser and the (pure) AST |
+| [docs/3.Resolver.md](docs/3.Resolver.md) | Name resolution and compile-time checks |
+| [docs/4.Core IR and Lowering.md](docs/4.Core%20IR%20and%20Lowering.md) | Core IR, explicit laziness, slot/upvalue assignment, desugaring |
+| [docs/5.Bytecode and Compiler.md](docs/5.Bytecode%20and%20Compiler.md) | Flat bytecode and the syntax-directed compiler |
+| [docs/6.The G-machine.md](docs/6.The%20G-machine.md) | Runtime values, the push/enter reducer, builtins, errors |
 | [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Proposals for future optimization |
 
 ## License

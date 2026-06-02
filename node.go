@@ -20,8 +20,8 @@ func NodeType(node Node) string {
 	return reName.FindString(reflect.TypeOf(node).String())
 }
 
-func (x *Program) FirstPos() SourcePos { return x.Start }
-func (x *Program) LastPos() SourcePos  { return x.Body.LastPos() }
+func (x *ASTProgram) FirstPos() SourcePos { return x.Start }
+func (x *ASTProgram) LastPos() SourcePos  { return x.Body.LastPos() }
 
 func (x *Module) FirstPos() SourcePos { return x.Start }
 func (x *Module) LastPos() SourcePos  { return x.PublicBindings[len(x.PublicBindings)-1].LastPos() }
@@ -59,8 +59,8 @@ func (x *NumberLiteral) LastPos() SourcePos  { return x.Pos }
 func (x *StringLiteral) FirstPos() SourcePos { return x.Pos }
 func (x *StringLiteral) LastPos() SourcePos  { return x.Pos }
 
-func (x *Tuple) FirstPos() SourcePos { return x.Start }
-func (x *Tuple) LastPos() SourcePos  { return x.End }
+func (x *TupleExpr) FirstPos() SourcePos { return x.Start }
+func (x *TupleExpr) LastPos() SourcePos  { return x.End }
 
 func (x *List) FirstPos() SourcePos { return x.Start }
 func (x *List) LastPos() SourcePos  { return x.End }
@@ -78,7 +78,7 @@ func Traverse(node Node, pre, post func(n Node)) {
 	}
 
 	switch n := node.(type) {
-	case *Program:
+	case *ASTProgram:
 		TraverseList(n.Imports, pre, post)
 		Traverse(n.Body, pre, post)
 
@@ -110,7 +110,7 @@ func Traverse(node Node, pre, post func(n Node)) {
 	case *Operation:
 		TraverseList(n.Operands, pre, post)
 
-	case *Tuple:
+	case *TupleExpr:
 		TraverseList(n.SubExpressions, pre, post)
 
 	case *List:

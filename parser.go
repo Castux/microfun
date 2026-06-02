@@ -52,7 +52,7 @@ func (p *Parser) Expect(kind string) Token {
 	panic("expect")
 }
 
-func (p *Parser) ParseProgram() *Program {
+func (p *Parser) ParseProgram() *ASTProgram {
 	start := p.Pos()
 
 	imports := []*Name{}
@@ -68,7 +68,7 @@ func (p *Parser) ParseProgram() *Program {
 	expr := p.ParseExpression()
 	p.Expect("eof")
 
-	return &Program{Imports: imports, Body: expr, Start: start}
+	return &ASTProgram{Imports: imports, Body: expr, Start: start}
 }
 
 func (p *Parser) ParseModule() *Module {
@@ -264,13 +264,13 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 		exprs := []Expression{}
 
 		if p.Accept("]") {
-			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
+			return &TupleExpr{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		exprs = append(exprs, p.ParseExpression())
 
 		if p.Accept("]") {
-			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
+			return &TupleExpr{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		if p.Accept(",") {
@@ -281,7 +281,7 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 				}
 			}
 			p.Expect("]")
-			return &Tuple{SubExpressions: exprs, Start: start, End: p.PrevPos()}
+			return &TupleExpr{SubExpressions: exprs, Start: start, End: p.PrevPos()}
 		}
 
 		if p.Accept(";") {
@@ -333,8 +333,8 @@ func ToPattern(expr Expression) Pattern {
 		return str
 	}
 
-	if tup, ok := expr.(*Tuple); ok {
-		var subs []Pattern
+	if tup, ok := expr.(*TupleExpr); ok {
+		subs := []Pattern{}
 		for _, tsub := range tup.SubExpressions {
 			tmp := ToPattern(tsub)
 			if tmp == nil {
@@ -370,7 +370,7 @@ func Recover() {
 	}
 }
 
-func ParseProgram(tokens []Token) *Program {
+func ParseProgram(tokens []Token) *ASTProgram {
 	defer Recover()
 
 	parser := Parser{Tokens: tokens}

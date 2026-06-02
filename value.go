@@ -142,6 +142,18 @@ func applyValue(fn, arg Value, pos SourcePos) Value {
 // instance is reused everywhere one is needed.
 var emptyTuple = Value{Tag: TupleTag, Ref: &Tuple{}}
 
+// foldStringValue decodes a string into the runtime representation of a string: a
+// cons list of code points ending in the empty tuple. The lowerer calls it once
+// per literal, building a shared immutable constant.
+func foldStringValue(s string) Value {
+	current := emptyTuple
+	runes := []rune(s)
+	for i := len(runes) - 1; i >= 0; i-- {
+		current = cons(number(float64(runes[i])), current)
+	}
+	return current
+}
+
 func (v Value) thunk() *Thunk             { return v.Ref.(*Thunk) }
 func (v Value) cons() *Cons               { return v.Ref.(*Cons) }
 func (v Value) tuple() *Tuple             { return v.Ref.(*Tuple) }

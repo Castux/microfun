@@ -1,123 +1,130 @@
 # Future improvements
 
 Proposals for further optimization of the microfun implementation, building on
-the existing bytecode backend (see
-[5.Bytecode compiler](5.Bytecode%20compiler.md)).
+the current single engine: the flat bytecode
+([5.Bytecode and Compiler](5.Bytecode%20and%20Compiler.md)) run by the
+spineless-tagless G-machine ([6.The G-machine](6.The%20G-machine.md)).
+
+Runtime performance is the optimization target; clarity comes first, so each of
+these is a deliberate trade and listed in roughly descending order of expected
+payoff.
 
 ---
 
-## 1. Direct-reduction machine (the big one) — ✅ DONE (`--mode=stg`)
+## 1. Eager strict-argument evaluation (the big one)
 
-**Problem:** The builder VM still materializes a fresh `RuntimeApplication` /
-`RuntimeCons` / `RuntimeTuple` / `NamedValue` graph per activation (each node
-embeds frame-specific thunk pointers, so it cannot be shared across activations),
-so allocation counts are essentially the same as the tree-walking interpreter.  
-**Fix (implemented):** A spineless-tagless-G-machine backend
-([stg.go](../stg.go), [stgcompiler.go](../stgcompiler.go), [stgir.go](../stgir.go),
-`--mode=stg`) that *reduces* bodies directly: an application pushes its argument
-thunks onto the reduction stack and enters the head function, so the application
-spine is never built. Only genuine argument sub-expressions still allocate (as
-thunks); atoms are passed by reference. WHNF results stay ordinary `RuntimeValue`s,
-so the entire runtime (builtins, `show`, `DeepEqual`, stdin, errors) is reused
-unchanged. The full design is in [6.STG machine](6.STG%20machine.md); the build
-log is in [STG_PLAN.md](STG_PLAN.md). Measured: fewer GC cycles than the builder VM
-on allocation-heavy workloads, and a wall-clock speedup over both other backends
-(see `bench/run.sh`).
+**Problem:** The dominant remaining allocation in numeric workloads
+(`fib`, `ackermann`, `collatz`) is the thunk built for each argument of an
+arithmetic builtin. The builtin is strict, so the thunk is forced immediately —
+it is pure overhead.
 
-**Remaining headroom (future work building on the STG):**
+**Fix:** Force a strict prim's arguments on the *explicit* reduction stack instead
+of via a re-entrant `WHNF`, so the compiler can skip building thunks for
+arithmetic operands. This needs a continuation/return frame and an interleaved
+exec/reduce loop (an EVAL-style machine), which is harder to read than the current
+build-then-reduce split — hence deferred. A cheaper down payment:
 
-- *Minimal free-variable capture.* Thunks currently capture the whole activation
-  frame by reference (simple, no slot renumbering) at the cost of retaining the
-  frame. Computing each thunk's exact free variables and capturing only those — as
-  the analyzer already does for lambda upvalues — would cut retention.
-- *Strictness / known-call optimization.* The arithmetic and comparison builtins
-  are strict; arguments to them need not be thunked at all. A simple strictness
-  pass (or special-casing known strict builtins at compile time) would remove a
-  large fraction of the remaining thunk allocations.
-- *Constructor field unboxing* and avoiding the pattern-bind `NamedValue` wrapper
-  when the bound subject is already a thunk.
+- **Saturated direct prim calls.** The Core IR and bytecode already reserve a
+  `CorePrim` / `Prim` form for a syntactically saturated, direct prim call
+  (`add 2 3`) that skips the `Builtin` value entirely. The lowerer currently does
+  not emit it (every builtin goes through the application spine, matching the
+  oracle's structure). Emitting `CorePrim` for the common case would cut the
+  per-call `Builtin` allocation and one spine round-trip. Note the operand-buffer
+  hazard: a `Prim` that forces mid-body would re-enter `runFrom` while its operand
+  buffer is live, so this must either force on a separate path or be restricted to
+  positions where the buffer is empty.
 
 ---
 
-## 2. Module-ref link patching
+## 2. Minimal free-variable capture for thunks
 
-**Problem:** `ModuleRef` constants in `CodeBlock.Consts` are resolved via a map
-lookup in `runBlock` at run time because module environments do not exist at
-compile time. This is the only per-reference map lookup the VM retains.  
-**Fix:** After all module environments are built, walk every `CodeBlock` once and
-replace each `ModuleRef` const with a direct `*NamedValue` pointer (the resolved
-slot), turning `OpConst`-of-`ModuleRef` into a plain push.
+**Problem:** Thunks capture the whole enclosing activation frame by reference
+(simple, no slot renumbering, cheap `letrec`) at the cost of retaining the entire
+frame for as long as any thunk over it is live.
 
----
-
-## 3. Fail-fast matcher without frame allocation
-
-**Problem:** For every failed pattern clause, `runMatcher` allocates a full frame
-(`make(Environment, c.FrameSize)`) and partially fills it before discovering the
-mismatch.  
-**Fix:** Either (a) defer `MOpBind` writes to a small scratch list and only
-allocate and fill the frame on the winning clause, or (b) hoist a constructor-tag
-test (`MOpTuple` arity / number / string) to the front of each case so most
-non-matching cases reject before any frame work.
+**Fix:** Compute each thunk's exact free variables — as the lowerer already does
+for lambda upvalues — and capture only those. This cuts retention but conflicts
+with cheap `letrec` under by-value capture, so it needs care around mutually
+recursive `let` groups.
 
 ---
 
-## 4. Body-skeleton templates
+## 3. Constructor-tag specialisation and field unboxing
 
-**Problem:** For bodies whose graph shape is fixed and whose only variation is
-which frame thunks fill the leaves, every activation re-allocates the same shaped
-graph.  
-**Fix:** Precompute a template for the body's graph shape and patch the leaf thunk
-slots, reducing allocation without a full G-machine. (Subsumed by improvement 1
-if that lands.)
+**Problem:** Every constructor field is a `Value` (tagged union); a list of
+numbers boxes each element's pointer indirection through `*Cons`.
 
----
-
-## 5. Operand stack as a fixed array
-
-**Problem:** `vm.opstack` grows dynamically via `append`, paying slice header and
-bounds checks.  
-**Fix:** Size the operand and subject stacks from a compile-time max-depth per
-block (computable in a single pass over the `Code`) and use a fixed array,
-eliminating slice bounds and `append`.
+**Fix:** Specialise common constructor shapes (e.g. a cons whose head is known to
+be a number) and/or unbox constructor fields, reducing both allocation and
+indirection on list-heavy code.
 
 ---
 
-## 6. Superinstructions / peephole
+## 4. Pattern-bind without the indirection thunk
 
-**Problem:** Common opcode pairs such as `OpLoadLocal; OpBuildApp` and
-`OpConst; OpBuildApp` appear in many bodies and each costs a dispatch iteration.  
+**Problem:** A pattern binding wraps the matched subject in a named, memoising
+indirection thunk so the bound name appears on traces and in `show` exactly as the
+oracle's `NamedValue` does. When the subject is already a thunk, this is a
+redundant wrapper.
+
+**Fix:** Behind an analyzer flag (so trace/show parity stays the default), skip the
+wrapper when the subject is already a named thunk, or when the binding's name is
+never observed.
+
+---
+
+## 5. Fail-fast matcher without frame allocation
+
+**Problem:** A closure application allocates one frame (`make([]Value, Frame)`)
+reused across the cases tried; a case that binds slots before a later sub-pattern
+fails leaves partial writes (harmless, but wasted work).
+
+**Fix:** Hoist a constructor-tag test to the front of each case so most
+non-matching cases reject before any `Bind`, or defer binds to a scratch list and
+commit only on the winning case.
+
+---
+
+## 6. Operand and subject stacks as fixed arrays
+
+**Problem:** The operand buffer grows via `append`, paying a slice header and
+bounds checks.
+
+**Fix:** Compute a per-body maximum operand/subject depth in a single pass over
+the `Code` and size a fixed array from it, eliminating `append` and bounds checks
+on the hot path.
+
+---
+
+## 7. Superinstructions / peephole fusion
+
+**Problem:** Common opcode pairs (`PushLocal; PushArg`, `PushConst; PushArg`,
+`MatchTuple; Bind`) each cost a dispatch iteration.
+
 **Fix:** Fuse frequent pairs into single opcodes to reduce dispatch overhead.
-
----
-
-## 7. Inline caches for module and builtin pushes
-
-**Depends on:** improvement 2 not being sufficient  
-**Problem:** After link patching, module refs become direct pushes, but builtin
-lookups via `OpConst` still resolve through the constant pool on each call.  
-**Fix:** Inline a direct function pointer or value at the call site after the
-first dispatch.
+Measure which pairs dominate first.
 
 ---
 
 ## 8. Threaded dispatch
 
-**Depends on:** profiling showing `switch` dispatch as a bottleneck  
-**Problem:** Go's `switch` statement dispatches via an indexed jump table, which
-may show up in profiles for tight inner loops.  
+**Depends on:** profiling showing the `switch` dispatch as a bottleneck.
+
+**Problem:** Go's `switch` over the opcode compiles to an indexed jump table that
+may show up in profiles for the tight `runFrom` loop.
+
 **Fix:** Computed-goto-style dispatch via a function table if measurements show it
 wins. Measure first.
 
 ---
 
-## 9. Serialized IR
+## 9. Serialized bytecode
 
-**Depends on:** bytecode backend being stable  
-**Problem:** The IR is in-process only — programs re-compile from source on every
-run.  
-**Fix:** Add a versioned binary encoding of `CompiledProgram`, keyed by a source
-digest, so compilation can be cached across runs. The `InstrDebug` structures in
-[5.Bytecode compiler §Debug data](5.Bytecode%20compiler.md#debug-data-and-diagnostics)
-already define the source-mapping shape to serialize.
+**Depends on:** the bytecode being stable.
 
+**Problem:** The bytecode is in-process only — programs re-compile from source on
+every run.
+
+**Fix:** A versioned binary encoding of `Program`, keyed by a source digest, so
+compilation can be cached across runs. The `Posns` / `Names` pools already define
+the source-mapping shape to serialize.

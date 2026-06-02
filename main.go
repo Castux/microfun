@@ -11,7 +11,7 @@ import (
 //go:embed core
 var coreFS embed.FS
 
-func LoadProgram(path string) *Program {
+func LoadProgram(path string) *ASTProgram {
 	tokens := Lex(path)
 	if tokens == nil {
 		os.Exit(1)
@@ -83,16 +83,9 @@ func LoadModules(imports []*Name) map[string]*Module {
 }
 
 func main() {
-	mode := "interp"
-	dumpIR := false
-
 	var path string
 	for _, arg := range os.Args[1:] {
 		switch {
-		case arg == "--mode=interp" || arg == "--mode=compiled" || arg == "--mode=stg":
-			mode = arg[len("--mode="):]
-		case arg == "--dump-ir":
-			dumpIR = true
 		case len(arg) > 0 && arg[0] == '-':
 			fmt.Printf("Unknown flag: %s\n", arg)
 			os.Exit(1)
@@ -102,35 +95,22 @@ func main() {
 	}
 
 	if path == "" {
-		fmt.Println("Usage: microfun [--mode=interp|compiled|stg] [--dump-ir] <path>")
+		fmt.Println("Usage: microfun <path>")
 		os.Exit(1)
 	}
 
 	program := LoadProgram(path)
 	modules := LoadModules(program.Imports)
 
-	analyzer := Analyze(program, modules)
-	if analyzer.Errors > 0 {
-		fmt.Printf("Analyzer found %d errors\n", analyzer.Errors)
+	resolution := Resolve(program, modules)
+	if resolution.Errors > 0 {
+		fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
 		os.Exit(1)
 	}
 
-	// --dump-ir disassembles whichever backend's IR the selected mode would run.
-	if dumpIR {
-		if mode == "stg" {
-			fmt.Print(DisassembleSTGProgram(CompileSTG(analyzer)))
-		} else {
-			fmt.Print(DisassembleProgram(Compile(analyzer)))
-		}
-		return
-	}
+	mainCore, moduleCores := Lower(program, modules, resolution)
+	prog := Compile(mainCore, moduleCores, program, modules)
 
-	switch mode {
-	case "compiled":
-		RunVM(NewVM(Compile(analyzer), analyzer.Modules))
-	case "stg":
-		RunSTG(NewMachine(CompileSTG(analyzer), analyzer.Modules))
-	default:
-		Interpret(analyzer)
-	}
+	machine := NewMachine(prog)
+	RunSafe(machine)
 }

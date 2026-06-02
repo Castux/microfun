@@ -1,11 +1,10 @@
-# Regression harness for the microfun front-end and compiler backend (PowerShell).
+# Regression harness for the microfun front-end and the G-machine backend (PowerShell).
 #
-# For every tests/cases/<category>/<name>.mf this performs two checks:
-#
-#   * DIFFERENTIAL — run under --mode=interp (the oracle) and --mode=compiled;
-#     their combined output and exit code must be byte-identical.
-#   * GOLDEN — the interpreter's output and exit code must match the recorded
-#     <name>.expected (and <name>.exit, when non-zero).
+# microfun now has a single execution engine, so this is a GOLDEN harness: for
+# every tests/cases/<category>/<name>.mf it runs the engine and checks that the
+# combined stdout+stderr and the exit code match the recorded <name>.expected
+# (and <name>.exit, when non-zero). The golden files were produced by the
+# pre-rewrite tree-walking interpreter (the frozen oracle).
 #
 # A sibling <name>.in, if present, is fed as standard input (raw bytes, so the
 # invalid-UTF-8 case works). Output is captured as raw bytes (via the process
@@ -32,13 +31,13 @@ Write-Host "building $bin ..."
 & go build -o $bin .
 if ($LASTEXITCODE -ne 0) { Write-Host 'build failed'; exit 1 }
 
-# Invoke-MF runs the binary in the given mode, feeding inFile as raw stdin, and
-# returns the combined stdout+stderr as a byte array plus the exit code. Reading
-# the raw BaseStream avoids any console-encoding transformation.
-function Invoke-MF([string]$mode, [string]$relPath, [string]$inFile) {
+# Invoke-MF runs the binary, feeding inFile as raw stdin, and returns the combined
+# stdout+stderr as a byte array plus the exit code. Reading the raw BaseStream
+# avoids any console-encoding transformation.
+function Invoke-MF([string]$relPath, [string]$inFile) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $bin
-    $psi.Arguments = "--mode=$mode `"$relPath`""
+    $psi.Arguments = "`"$relPath`""
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
@@ -76,31 +75,26 @@ Get-ChildItem -Path 'tests/cases' -Recurse -Filter '*.mf' | Sort-Object FullName
     $expectedFile = "$base.expected"
     $exitFile = "$base.exit"
 
-    $i = Invoke-MF 'interp' $rel $inFile
+    $r = Invoke-MF $rel $inFile
 
     if ($Bless) {
-        [System.IO.File]::WriteAllBytes($expectedFile, $i.Bytes)
-        if ($i.Code -ne 0) { Set-Content -Path $exitFile -Value $i.Code -NoNewline }
+        [System.IO.File]::WriteAllBytes($expectedFile, $r.Bytes)
+        if ($r.Code -ne 0) { Set-Content -Path $exitFile -Value $r.Code -NoNewline }
         elseif (Test-Path $exitFile) { Remove-Item $exitFile }
-        Write-Host ("  BLESS " + $_.BaseName + " (exit $($i.Code))")
+        Write-Host ("  BLESS " + $_.BaseName + " (exit $($r.Code))")
         return
     }
-
-    $c = Invoke-MF 'compiled' $rel $inFile
 
     $expectedExit = 0
     if (Test-Path $exitFile) { $expectedExit = [int](Get-Content -Raw $exitFile) }
 
     $reasons = @()
-    if (-not (Bytes-Equal $i.Bytes $c.Bytes) -or ($i.Code -ne $c.Code)) {
-        $reasons += "differential(interp exit $($i.Code), compiled exit $($c.Code))"
-    }
     if (-not (Test-Path $expectedFile)) {
         $reasons += "golden(no .expected -- run -Bless)"
     } else {
         $expected = [System.IO.File]::ReadAllBytes($expectedFile)
-        if (-not (Bytes-Equal $i.Bytes $expected) -or ($i.Code -ne $expectedExit)) {
-            $reasons += "golden(exit $($i.Code), expected $expectedExit)"
+        if (-not (Bytes-Equal $r.Bytes $expected) -or ($r.Code -ne $expectedExit)) {
+            $reasons += "golden(exit $($r.Code), expected $expectedExit)"
         }
     }
 

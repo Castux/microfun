@@ -49,28 +49,17 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 ## 2. Running a program
 
 ```
-microfun [--mode=interp|compiled|stg] [--dump-ir] <path>
+microfun <path>
 ```
 
-Loads the file at `<path>`, loads any modules it imports, analyzes everything,
-and evaluates the program body. Anything the program prints via `peek`, `show`,
-`write`, or `bwrite` appears on standard output. A lexical, syntactic, or
-name-resolution error is reported with a located diagnostic and the program does
-not run; a run-time error is reported with a source location and a reduction
-trace.
+Loads the file at `<path>`, loads any modules it imports, resolves and lowers
+everything, and evaluates the program body on the G-machine. Anything the program
+prints via `peek`, `show`, `write`, or `bwrite` appears on standard output. A
+lexical, syntactic, or name-resolution error is reported with a located diagnostic
+and the program does not run; a run-time error is reported with a source location
+and a reduction trace.
 
-- `--mode=interp` (default) — tree-walking interpreter.
-- `--mode=compiled` — builder bytecode compiler + VM; produces identical output.
-- `--mode=stg` — spineless tagless G-machine; reduces bodies directly without
-  building the application spine. Produces identical output and is the fastest
-  backend.
-- `--dump-ir` — disassemble the selected mode's IR to stdout and exit
-  (the STG IR for `--mode=stg`, otherwise the builder bytecode).
-
-All three backends are guaranteed to produce byte-identical output; the choice is
-purely about evaluation strategy and performance.
-
-**Module search order.** For each import `name`, the interpreter first looks for
+**Module search order.** For each import `name`, the runtime first looks for
 `./name.mf` in the current working directory. If that file does not exist, it
 falls back to the standard library embedded in the binary (see
 [§14](#14-standard-library)). A file in the working directory therefore always
@@ -570,10 +559,10 @@ import list in
 ## 14. Standard library
 
 The standard library is a collection of microfun modules **embedded in the
-interpreter binary** — no separate installation is needed. Modules are written in
+microfun binary** — no separate installation is needed. Modules are written in
 microfun itself and are split by concern across five files in `core/`.
 
-**Module search order.** For every `import name`, the interpreter first checks
+**Module search order.** For every `import name`, the runtime first checks
 `./name.mf` in the working directory, then falls back to the embedded library.
 Placing your own `list.mf` (or any other core module name) next to your program
 **shadows** the built-in one for that run.
