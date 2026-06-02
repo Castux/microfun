@@ -35,6 +35,19 @@ Runs the program at `<path>` on the G-machine. Modules are searched first in the
 current directory (`./name.mf`), then in the embedded standard library. Errors are
 reported with source locations; runtime errors include a reduction trace.
 
+To inspect the compiler's intermediate forms instead of running the program, pass
+one or more dump flags:
+
+```
+microfun --dump-ast       <path>   # the parsed AST
+microfun --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
+microfun --dump-bytecode  <path>   # the compiled flat bytecode
+```
+
+Any dump flag emits the requested stage(s) to stdout and skips execution. Add
+`--to-file` to write each one to a sibling file instead (`.ast`, `.ir`, `.bc`).
+See [docs/0.Overview.md](docs/0.Overview.md#inspecting-the-stages) for the format.
+
 ## Example
 
 The program below demonstrates imports, recursive and mutually-visible `let`
