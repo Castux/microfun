@@ -41,11 +41,36 @@ type localDef struct {
 
 // FrameBuilder tracks slot allocation for one activation (the program body, a
 // module binding, or a lambda) and the upvalues a nested lambda captures from it.
+// freeNames and slotNames are debug-only; they are never read by the machine.
 type FrameBuilder struct {
-	parent *FrameBuilder
-	node   syntax.Node
-	size   int
-	free   []Addr // captured free variables, in the parent's addressing
+	parent    *FrameBuilder
+	node      syntax.Node
+	size      int
+	free      []Addr   // captured free variables, in the parent's addressing
+	freeNames []string // name of each entry in free, parallel
+	slotNames []string // name of each local slot, indexed by slot number
+}
+
+func (fb *FrameBuilder) setSlotName(slot int, name string) {
+	for len(fb.slotNames) <= slot {
+		fb.slotNames = append(fb.slotNames, "")
+	}
+	fb.slotNames[slot] = name
+}
+
+// nameForAddr returns the debug name of a variable reached via addr in this frame.
+func (fb *FrameBuilder) nameForAddr(addr Addr) string {
+	switch addr.Kind {
+	case AddrLocal:
+		if addr.Slot < len(fb.slotNames) {
+			return fb.slotNames[addr.Slot]
+		}
+	case AddrUpvalue:
+		if addr.Slot < len(fb.freeNames) {
+			return fb.freeNames[addr.Slot]
+		}
+	}
+	return ""
 }
 
 func (fb *FrameBuilder) allocate() int {
@@ -72,6 +97,7 @@ func (fb *FrameBuilder) resolveUpvalue(defFrame *FrameBuilder, defSlot int) Addr
 
 	slot := len(fb.free)
 	fb.free = append(fb.free, parentAddr)
+	fb.freeNames = append(fb.freeNames, fb.parent.nameForAddr(parentAddr))
 	return Addr{Kind: AddrUpvalue, Slot: slot}
 }
 
@@ -116,7 +142,7 @@ func Lower(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			binds = append(binds, Bind{
 				Slot: l.modSlots[pb],
 				Name: pb.Name.Value,
-				Body: Thunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true},
+				Body: Thunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true, Pos: syntax.NodePos(pb.Expression)},
 			})
 		}
 		modBinds[modName] = binds
@@ -194,12 +220,12 @@ func (l *Lowerer) lowerArg(expr syntax.Expression) Expr {
 	case *syntax.Operation:
 		switch e.Operator {
 		case "", ">", "<": // an application/pipe may force when entered → defer it
-			return Thunk{Body: l.lowerTail(e), Update: false}
+			return Thunk{Body: l.lowerTail(e), Update: false, Pos: syntax.NodePos(e)}
 		default: // a composition only builds a value → build it directly
 			return l.lowerValue(e)
 		}
 	case *syntax.Let:
-		return Thunk{Body: l.lowerTail(e), Update: false}
+		return Thunk{Body: l.lowerTail(e), Update: false, Pos: syntax.NodePos(e)}
 	default:
 		return l.lowerValue(expr)
 	}
@@ -328,6 +354,7 @@ func (l *Lowerer) lowerLet(let *syntax.Let) Expr {
 	for i, b := range let.Bindings {
 		slots[i] = l.current.allocate()
 		l.locals[b] = localDef{frame: l.current, slot: slots[i]}
+		l.current.setSlotName(slots[i], b.Name.Value)
 	}
 
 	binds := make([]Bind, len(let.Bindings))
@@ -336,7 +363,7 @@ func (l *Lowerer) lowerLet(let *syntax.Let) Expr {
 		binds[i] = Bind{
 			Slot: slots[i],
 			Name: b.Name.Value,
-			Body: Thunk{Body: body, Name: b.Name.Value, Update: true},
+			Body: Thunk{Body: body, Name: b.Name.Value, Update: true, Pos: syntax.NodePos(b.Expression)},
 		}
 	}
 	return Let{Binds: binds, Body: l.lowerTail(let.Expression)}
@@ -363,8 +390,9 @@ func (l *Lowerer) lowerLambda(lam *syntax.Lambda) Expr {
 	}
 
 	free := fb.free
+	freeNames := fb.freeNames
 	l.current = fb.parent
-	return Lambda{Cases: cases, Free: free, Frame: maxSize, NoMatch: noMatchPos(lam)}
+	return Lambda{Cases: cases, Free: free, FreeNames: freeNames, Frame: maxSize, NoMatch: noMatchPos(lam)}
 }
 
 // noMatchPos is the source span covering a lambda's whole pattern set, used to
@@ -408,6 +436,7 @@ func (l *Lowerer) lowerPattern(p syntax.Pattern) Pattern {
 	case *syntax.Name:
 		slot := l.current.allocate()
 		l.locals[pat] = localDef{frame: l.current, slot: slot}
+		l.current.setSlotName(slot, pat.Value)
 		return PatternVar{Slot: slot, Name: pat.Value}
 
 	case *syntax.NumberLiteral:

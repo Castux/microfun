@@ -50,10 +50,11 @@ type Let struct {
 }
 
 type Lambda struct {
-	Cases   []Case
-	Free    []Addr
-	Frame   int
-	NoMatch source.SourcePos // span of the whole pattern set, for the "no pattern matched" error
+	Cases     []Case
+	Free      []Addr
+	FreeNames []string        // debug: name of each captured variable, parallel to Free
+	Frame     int
+	NoMatch   source.SourcePos // span of the whole pattern set, for the "no pattern matched" error
 }
 
 type Thunk struct {
@@ -62,6 +63,7 @@ type Thunk struct {
 	Frame  int
 	Name   string
 	Update bool
+	Pos    source.SourcePos // debug: definition site, for the bytecode dump
 }
 
 type AddrKind uint8

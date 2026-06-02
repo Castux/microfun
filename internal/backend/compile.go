@@ -264,7 +264,7 @@ func (c *compiler) compileValue(expr core.Expr) {
 
 	case core.Thunk:
 		// A thunk in value position is a lazy argument or field (call-by-name).
-		c.emit(MakeThunk, c.declareThunk(e.Body, e.Name))
+		c.emit(MakeThunk, c.declareThunk(e))
 
 	case core.Let:
 		// A let in value position: store its bindings, then build the body value.
@@ -278,8 +278,7 @@ func (c *compiler) compileValue(expr core.Expr) {
 
 func (c *compiler) compileLetBindings(binds []core.Bind) {
 	for _, b := range binds {
-		thunk := b.Body.(core.Thunk)
-		tmpl := c.declareThunk(thunk.Body, b.Name)
+		tmpl := c.declareThunk(b.Body.(core.Thunk))
 		c.emitAB(StoreLet, int32(b.Slot), tmpl)
 	}
 }
@@ -300,12 +299,12 @@ func (c *compiler) compileAddr(addr core.Addr) {
 // declareThunk registers a thunk template and queues its body for compilation,
 // returning the template index. The body runs over the enclosing activation's
 // frames (whole-frame capture), so no capture list is needed.
-func (c *compiler) declareThunk(body core.Expr, name string) int32 {
+func (c *compiler) declareThunk(t core.Thunk) int32 {
 	idx := int32(len(c.prog.Thunks))
-	c.prog.Thunks = append(c.prog.Thunks, ThunkTemplate{Code: -1, Name: int(c.nameOrNone(name))})
+	c.prog.Thunks = append(c.prog.Thunks, ThunkTemplate{Code: -1, Name: int(c.nameOrNone(t.Name)), Pos: t.Pos})
 	c.pending = append(c.pending, func() {
 		c.prog.Thunks[idx].Code = c.pc()
-		c.compileBody(body)
+		c.compileBody(t.Body)
 		c.emit(Enter, 0)
 	})
 	return idx
@@ -317,8 +316,12 @@ func (c *compiler) declareLambda(lam core.Lambda) int32 {
 	idx := int32(len(c.prog.Closures))
 
 	var captures []Capture
-	for _, addr := range lam.Free {
-		captures = append(captures, Capture{FromUpvalue: addr.Kind == core.AddrUpvalue, Slot: addr.Slot})
+	for i, addr := range lam.Free {
+		name := ""
+		if i < len(lam.FreeNames) {
+			name = lam.FreeNames[i]
+		}
+		captures = append(captures, Capture{FromUpvalue: addr.Kind == core.AddrUpvalue, Slot: addr.Slot, Name: name})
 	}
 	c.prog.Closures = append(c.prog.Closures, ClosureTemplate{Frame: lam.Frame, Capture: captures, NoMatch: lam.NoMatch})
 

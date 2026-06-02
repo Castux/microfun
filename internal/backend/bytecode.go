@@ -85,7 +85,8 @@ type ClosureTemplate struct {
 // capture list is needed; it addresses them with the enclosing slot numbers.
 type ThunkTemplate struct {
 	Code PC
-	Name int // index into Names; the binding name for let/module thunks, -1 (→ "") for anonymous
+	Name int              // index into Names; the binding name for let/module thunks, -1 (→ "") for anonymous
+	Pos  source.SourcePos // debug: definition site; never read by the machine
 }
 
 // A Capture says where MakeClosure reads one captured free variable: from the
@@ -93,6 +94,7 @@ type ThunkTemplate struct {
 type Capture struct {
 	FromUpvalue bool
 	Slot        int
+	Name        string // debug: source name of the captured variable; never read by the machine
 }
 
 // A ModuleBinding is one public binding of a module, compiled as its own

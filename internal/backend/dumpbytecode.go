@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"microfun/internal/source"
 	"microfun/internal/value"
 )
 
@@ -15,10 +16,18 @@ import (
 //
 // The disassembly walks the array in PC order and prints a span header whenever a
 // known entry point (the program entry, a module binding, a closure template, a
-// thunk template) begins, so the reader sees where each body starts and how the
-// out-of-line lambda/thunk bodies are laid out after the top-level code. Operands
-// are decoded against the pools (constants, names, modules) the instructions index,
-// so no separate pool listing is needed to read the program.
+// thunk template) begins. Operands are decoded against the pools (constants, names,
+// modules, positions) the instructions index, so no separate pool listing is needed
+// to read the program.
+//
+// Names are surfaced for locals and upvalues:
+//   - PushLocal/PushUpvalue: annotated with the variable name as a semicolon comment.
+//     PushLocal names are inferred by scanning each case block for the Bind/StoreLet
+//     instructions that write to each slot. PushUpvalue names come from the closure's
+//     Capture list (populated with the source name at compile time).
+//   - PushArg and Prim show the source position rather than an opaque pool index.
+//   - MakeThunk, StoreLet, thunk span headers, and closure span headers all show
+//     the binding name and (where available) the definition site position.
 
 // DumpBytecode renders the whole Program.
 func DumpBytecode(p *Program) string {
@@ -28,18 +37,60 @@ func DumpBytecode(p *Program) string {
 		len(p.Code), len(p.Consts), len(p.Closures), len(p.Thunks))
 
 	labels := spanLabels(p)
+	closureByPC := closureIdxByPC(p)
+
+	// State updated as we walk the instructions linearly.
+	slotNames := make(map[int]string) // current case/body: slot → bound name
+	closureIdx := -1                  // index of the closure span we're in, or -1
+
 	for pc := 0; pc < len(p.Code); pc++ {
 		if label, ok := labels[PC(pc)]; ok {
 			fmt.Fprintf(&sb, "\n%s\n", label)
+			slotNames = make(map[int]string)
+			closureIdx = closureByPC[PC(pc)]
 		}
+
 		in := p.Code[pc]
-		fmt.Fprintf(&sb, "│ %5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in))
+
+		// Update slot→name table before printing so StoreLet's own line shows the name.
+		switch in.Op {
+		case Case:
+			slotNames = make(map[int]string)
+		case Bind:
+			if in.B >= 0 {
+				slotNames[int(in.A)] = p.Names[in.B]
+			}
+		case StoreLet:
+			if tmpl := p.Thunks[in.B]; tmpl.Name >= 0 {
+				slotNames[int(in.A)] = p.Names[tmpl.Name]
+			}
+		}
+
+		fmt.Fprintf(&sb, "│ %5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in, slotNames, closureIdx))
 	}
 	return sb.String()
 }
 
-// spanLabels maps each span-entry PC to its header line. A span is reached only by
-// entering its PC, so every entry point is a label here.
+// closureIdxByPC maps each span-entry PC to its closure index, or -1 for
+// non-closure spans (program body, module bindings, thunk bodies).
+func closureIdxByPC(p *Program) map[PC]int {
+	m := make(map[PC]int)
+	m[p.Entry] = -1
+	for _, mbs := range p.Modules {
+		for _, mb := range mbs {
+			m[mb.Code] = -1
+		}
+	}
+	for i, tmpl := range p.Closures {
+		m[tmpl.Code] = i
+	}
+	for _, tmpl := range p.Thunks {
+		m[tmpl.Code] = -1
+	}
+	return m
+}
+
+// spanLabels maps each span-entry PC to its header line.
 func spanLabels(p *Program) map[PC]string {
 	labels := make(map[PC]string)
 	labels[p.Entry] = fmt.Sprintf("[program body]  frame=%d", p.EntryFrame)
@@ -50,10 +101,18 @@ func spanLabels(p *Program) map[PC]string {
 		}
 	}
 	for i, tmpl := range p.Closures {
-		labels[tmpl.Code] = fmt.Sprintf("[closure #%d]  frame=%d capture=%s", i, tmpl.Frame, showCaptures(tmpl.Capture))
+		hdr := fmt.Sprintf("[closure #%d]  frame=%d capture=%s", i, tmpl.Frame, showCaptures(tmpl.Capture))
+		if pos := posText(tmpl.NoMatch); pos != "" {
+			hdr += "  ; " + pos
+		}
+		labels[tmpl.Code] = hdr
 	}
 	for i, tmpl := range p.Thunks {
-		labels[tmpl.Code] = fmt.Sprintf("[thunk #%d %s]", i, quotedName(p, int32(tmpl.Name)))
+		hdr := fmt.Sprintf("[thunk #%d %s]", i, quotedName(p, int32(tmpl.Name)))
+		if pos := posText(tmpl.Pos); pos != "" {
+			hdr += "  ; " + pos
+		}
+		labels[tmpl.Code] = hdr
 	}
 	return labels
 }
@@ -64,45 +123,104 @@ func showCaptures(captures []Capture) string {
 	}
 	parts := make([]string, len(captures))
 	for i, c := range captures {
+		addr := fmt.Sprintf("local[%d]", c.Slot)
 		if c.FromUpvalue {
-			parts[i] = fmt.Sprintf("upvalue[%d]", c.Slot)
+			addr = fmt.Sprintf("upvalue[%d]", c.Slot)
+		}
+		if c.Name != "" {
+			parts[i] = fmt.Sprintf("%q=%s", c.Name, addr)
 		} else {
-			parts[i] = fmt.Sprintf("local[%d]", c.Slot)
+			parts[i] = addr
 		}
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 // operandText decodes an instruction's operands against the program's pools.
-func operandText(p *Program, in Instr) string {
+// slotNames is the current case/body's slot→name table; closureIdx is the index
+// of the enclosing closure (for PushUpvalue names), or -1.
+func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int) string {
 	switch in.Op {
 	case PushConst:
 		return value.ShowConst(p.Consts[in.A])
-	case PushLocal, PushUpvalue:
+
+	case PushLocal:
+		if name := slotNames[int(in.A)]; name != "" {
+			return fmt.Sprintf("slot=%d  ; %q", in.A, name)
+		}
 		return fmt.Sprintf("slot=%d", in.A)
+
+	case PushUpvalue:
+		name := ""
+		if closureIdx >= 0 && int(in.A) < len(p.Closures[closureIdx].Capture) {
+			name = p.Closures[closureIdx].Capture[in.A].Name
+		}
+		if name != "" {
+			return fmt.Sprintf("slot=%d  ; %q", in.A, name)
+		}
+		return fmt.Sprintf("slot=%d", in.A)
+
 	case PushModule:
 		return fmt.Sprintf("%s[%d]", p.ModuleNames[in.A], in.B)
+
 	case MakeTuple:
 		return fmt.Sprintf("arity=%d", in.A)
+
 	case MakeClosure:
 		return fmt.Sprintf("closure #%d", in.A)
+
 	case MakeThunk:
-		return fmt.Sprintf("thunk #%d", in.A)
+		tmpl := p.Thunks[in.A]
+		name := quotedName(p, int32(tmpl.Name))
+		if pos := posText(tmpl.Pos); pos != "" {
+			return fmt.Sprintf("%s thunk #%d  ; %s", name, in.A, pos)
+		}
+		return fmt.Sprintf("%s thunk #%d", name, in.A)
+
 	case StoreLet:
-		return fmt.Sprintf("slot=%d thunk #%d", in.A, in.B)
+		tmpl := p.Thunks[in.B]
+		name := quotedName(p, int32(tmpl.Name))
+		if pos := posText(tmpl.Pos); pos != "" {
+			return fmt.Sprintf("slot=%d %s thunk #%d  ; %s", in.A, name, in.B, pos)
+		}
+		return fmt.Sprintf("slot=%d %s thunk #%d", in.A, name, in.B)
+
 	case PushArg:
+		if pos := posText(p.Posns[in.A]); pos != "" {
+			return pos
+		}
 		return fmt.Sprintf("pos #%d", in.A)
+
 	case MatchNumber, MatchString:
 		return fmt.Sprintf("%s -> %d", value.ShowConst(p.Consts[in.A]), in.B)
+
 	case MatchTuple:
 		return fmt.Sprintf("arity=%d -> %d", in.A, in.B)
+
 	case Bind:
 		return fmt.Sprintf("slot=%d name=%s", in.A, quotedName(p, in.B))
+
 	case Prim:
-		return fmt.Sprintf("%s pos #%d", value.PrimName(value.PrimOp(in.A)), in.B)
+		name := value.PrimName(value.PrimOp(in.A))
+		if pos := posText(p.Posns[in.B]); pos != "" {
+			return fmt.Sprintf("%s  ; %s", name, pos)
+		}
+		return name
+
 	default:
 		return ""
 	}
+}
+
+// posText formats a source position as "file:line:col", or "" for a zero pos.
+func posText(pos source.SourcePos) string {
+	if pos.File == nil {
+		return ""
+	}
+	text := pos.File.Text[:pos.Start]
+	line := 1 + strings.Count(text, "\n")
+	col := pos.Start - strings.LastIndex(text, "\n")
+	return fmt.Sprintf("%s:%d:%d", pos.File.Path, line, col)
 }
 
 // quotedName renders a Names-pool index, with -1 meaning the anonymous name.
