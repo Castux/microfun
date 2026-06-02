@@ -1,7 +1,7 @@
 microfun: a toy programming language and its compiler
 
 - Purely functional, dynamic, lazily evaluated. Language definition in docs/LANGUAGE.md (README.md is the short tour).
-- Compiler in Go. Architecture and design in docs/0–6 (Overview, Lexer, Parser, Resolver, Core IR & Lowering, Bytecode & Compiler, G-machine).
+- Compiler in Go. Architecture: `internal/{source,syntax,value,core,backend}`. Demos/tests: `examples/`, `tests/`.
 
 These reference documents MUST be kept up to date. They should be both human-readable and useful as context for an LLM.
 
