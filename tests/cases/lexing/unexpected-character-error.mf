@@ -1,0 +1,3 @@
+-- '@' is not a token in any position: a lexing error.
+import core in
+show (add 1 @ 2)

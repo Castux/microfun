@@ -1,0 +1,3 @@
+-- write of an out-of-range code point is a runtime error.
+import core in
+write [65; 55296]

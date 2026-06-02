@@ -1,0 +1,3 @@
+-- write of a list with a non-code-point element is a runtime error.
+import core in
+write [104; 105; 'z']

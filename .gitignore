@@ -2,3 +2,5 @@ test.mf
 out.lua
 .DS_Store
 microfun.exe
+microfun.test.exe
+microfun.bench.exe

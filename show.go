@@ -28,23 +28,23 @@ const (
 // only as far as it needs to, guesses which tuples are lists, labels functions
 // and cycles with the name of the binding they came from, and caps width and
 // depth so that even an infinite or self-referential value still prints.
-func (i *Interpreter) ShowValue(value RuntimeValue) string {
+func (rt *Runtime) ShowValue(value RuntimeValue) string {
 	var builder strings.Builder
-	i.WriteValue(&builder, value, 0, ShowDefaultDepth, ShowDefaultWidth, make(map[*NamedValue]bool))
+	rt.WriteValue(&builder, value, 0, ShowDefaultDepth, ShowDefaultWidth, make(map[*NamedValue]bool))
 	return builder.String()
 }
 
 // ShowValueFull is like ShowValue but without width or depth limits.
-func (i *Interpreter) ShowValueFull(value RuntimeValue) string {
+func (rt *Runtime) ShowValueFull(value RuntimeValue) string {
 	var builder strings.Builder
-	i.WriteValue(&builder, value, 0, math.MaxInt, math.MaxInt, make(map[*NamedValue]bool))
+	rt.WriteValue(&builder, value, 0, math.MaxInt, math.MaxInt, make(map[*NamedValue]bool))
 	return builder.String()
 }
 
 // WriteValue renders one value. expanding holds the named values currently being
 // rendered on the path above this point, so a value that refers back to itself
 // prints its name instead of looping forever.
-func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
+func (rt *Runtime) WriteValue(builder *strings.Builder, value RuntimeValue, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
 	if depth > maxDepth {
 		builder.WriteString("…")
@@ -64,15 +64,15 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 		defer delete(expanding, named)
 	}
 
-	switch forced := i.EvaluateToWeakHeadNormalForm(value).(type) {
+	switch forced := rt.EvaluateToWeakHeadNormalForm(value).(type) {
 	case RuntimeNumber:
 		builder.WriteString(FormatNumber(forced))
 
 	case RuntimeCons:
-		i.WriteConsOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
+		rt.WriteConsOrList(builder, forced, depth, maxDepth, maxWidth, expanding)
 
 	case RuntimeTuple:
-		i.WriteTuple(builder, forced, depth, maxDepth, maxWidth, expanding)
+		rt.WriteTuple(builder, forced, depth, maxDepth, maxWidth, expanding)
 
 	case RuntimeClosure, RuntimeBuiltin, RuntimeComposition, RuntimePartial:
 		if name != "" {
@@ -88,16 +88,16 @@ func (i *Interpreter) WriteValue(builder *strings.Builder, value RuntimeValue, d
 
 // WriteConsOrList renders a cons cell as a list [a; b; c] when its tail chain
 // ends in the empty list, and as a plain 2-tuple [a, b] otherwise.
-func (i *Interpreter) WriteConsOrList(builder *strings.Builder, cons RuntimeCons, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
+func (rt *Runtime) WriteConsOrList(builder *strings.Builder, cons RuntimeCons, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
-	heads, ending, tailName := i.CollectListSpine(cons, expanding, maxWidth)
+	heads, ending, tailName := rt.CollectListSpine(cons, expanding, maxWidth)
 	if ending != NotAList {
 		builder.WriteByte('[')
 		for index, head := range heads {
 			if index > 0 {
 				builder.WriteString("; ")
 			}
-			i.WriteValue(builder, head, depth+1, maxDepth, maxWidth, expanding)
+			rt.WriteValue(builder, head, depth+1, maxDepth, maxWidth, expanding)
 		}
 		if ending == Truncated {
 			builder.WriteString("; …")
@@ -113,22 +113,22 @@ func (i *Interpreter) WriteConsOrList(builder *strings.Builder, cons RuntimeCons
 
 	// The tail is not a list, so this cons is really a 2-tuple pair.
 	builder.WriteByte('[')
-	i.WriteValue(builder, cons.Head, depth+1, maxDepth, maxWidth, expanding)
+	rt.WriteValue(builder, cons.Head, depth+1, maxDepth, maxWidth, expanding)
 	builder.WriteString(", ")
-	i.WriteValue(builder, cons.Tail, depth+1, maxDepth, maxWidth, expanding)
+	rt.WriteValue(builder, cons.Tail, depth+1, maxDepth, maxWidth, expanding)
 	builder.WriteByte(']')
 }
 
 // WriteTuple renders a non-cons tuple (arity 0, 1, 3, 4, …) as [a, b, c]. The
 // empty tuple, which is also the empty list, prints as [].
-func (i *Interpreter) WriteTuple(builder *strings.Builder, tuple RuntimeTuple, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
+func (rt *Runtime) WriteTuple(builder *strings.Builder, tuple RuntimeTuple, depth int, maxDepth int, maxWidth int, expanding map[*NamedValue]bool) {
 
 	builder.WriteByte('[')
 	for index, element := range tuple {
 		if index > 0 {
 			builder.WriteString(", ")
 		}
-		i.WriteValue(builder, element, depth+1, maxDepth, maxWidth, expanding)
+		rt.WriteValue(builder, element, depth+1, maxDepth, maxWidth, expanding)
 	}
 	builder.WriteByte(']')
 }
@@ -137,7 +137,7 @@ func (i *Interpreter) WriteTuple(builder *strings.Builder, tuple RuntimeTuple, d
 // head of each cell and reporting how the chain ended. It forces only the spine,
 // so the heads stay lazy until they are rendered. A repeated named value, or one
 // already being expanded above, is reported as a cycle rather than followed.
-func (i *Interpreter) CollectListSpine(start RuntimeCons, expanding map[*NamedValue]bool, maxWidth int) ([]RuntimeValue, ListEnding, string) {
+func (rt *Runtime) CollectListSpine(start RuntimeCons, expanding map[*NamedValue]bool, maxWidth int) ([]RuntimeValue, ListEnding, string) {
 
 	var heads []RuntimeValue
 	seen := make(map[*NamedValue]bool)
@@ -151,7 +151,7 @@ func (i *Interpreter) CollectListSpine(start RuntimeCons, expanding map[*NamedVa
 			seen[named] = true
 		}
 
-		switch forced := i.EvaluateToWeakHeadNormalForm(current).(type) {
+		switch forced := rt.EvaluateToWeakHeadNormalForm(current).(type) {
 		case RuntimeCons:
 			heads = append(heads, forced.Head)
 			current = forced.Tail

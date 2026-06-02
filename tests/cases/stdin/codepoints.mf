@@ -1,0 +1,3 @@
+-- stdin as a lazy list of Unicode code points, echoed back.
+import core, list in
+stdin > write

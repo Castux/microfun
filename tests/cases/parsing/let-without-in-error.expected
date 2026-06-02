@@ -1,0 +1,3 @@
+tests/cases/parsing/let-without-in-error.mf:4:1: expected in, found eof instead
+
+

@@ -61,22 +61,38 @@ type RuntimeComposition struct {
 
 func (RuntimeComposition) isRuntimeValue() {}
 
+// RuntimeClosure carries both backend representations so a single value type
+// serves the interpreter and the VM; exactly one of Cases / Compiled is set per
+// run (a run is uniformly one mode). The interpreter's ApplyClosure reads Cases;
+// the VM's apply reads Compiled.
 type RuntimeClosure struct {
 	Upvalues Environment
-	Cases    []*LambdaCase
+	Cases    []*LambdaCase   // interpreter mode
+	Compiled *CompiledLambda // bytecode mode (nil in interpreter mode)
 }
 
 func (RuntimeClosure) isRuntimeValue() {}
 
-type RuntimeBuiltin func(*Interpreter, RuntimeValue) RuntimeValue
+// noMatchPos is the source span of the whole pattern set of this closure, used
+// to report a non-exhaustive match. Both backends can reach the AST cases: the
+// interpreter through Cases, the VM through Compiled.Source.Cases.
+func (c RuntimeClosure) noMatchPos() SourcePos {
+	cases := c.Cases
+	if c.Compiled != nil {
+		cases = c.Compiled.Source.Cases
+	}
+	return cases[0].Pattern.FirstPos().To(cases[len(cases)-1].Pattern.LastPos())
+}
+
+type RuntimeBuiltin func(*Runtime, RuntimeValue) RuntimeValue
 
 func (RuntimeBuiltin) isRuntimeValue() {}
 
 // RuntimePartial holds the first argument of a two-argument builtin. Applying
-// it to a second argument calls Apply(interp, First, second) directly, avoiding
+// it to a second argument calls Apply(rt, First, second) directly, avoiding
 // the Go closure allocation that WrapBinop would otherwise create per call.
 type RuntimePartial struct {
-	Apply func(*Interpreter, RuntimeValue, RuntimeValue) RuntimeValue
+	Apply func(*Runtime, RuntimeValue, RuntimeValue) RuntimeValue
 	First RuntimeValue
 }
 

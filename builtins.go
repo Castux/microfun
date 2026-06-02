@@ -1,31 +1,35 @@
 package main
 
-import "math"
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"os"
+	"unicode/utf8"
+)
 
 // inputStreamPlaceholder stands in the Builtins map for stdin and bstdin so the
 // analyzer accepts those names. They are not callable functions but lazy input
 // lists, resolved directly in RunExpression, so this is never actually invoked.
-func inputStreamPlaceholder(*Interpreter, RuntimeValue) RuntimeValue {
+func inputStreamPlaceholder(*Runtime, RuntimeValue) RuntimeValue {
 	panic("internal error: stdin / bstdin must be resolved as a stream, not called")
 }
 
 type Monop func(float64) float64
 type Binop func(float64, float64) float64
 
-func equalApply(interp *Interpreter, a, b RuntimeValue) RuntimeValue {
-	if interp.DeepEqual(a, b, make(map[ComparisonPair]bool)) {
+func equalApply(rt *Runtime, a, b RuntimeValue) RuntimeValue {
+	if rt.DeepEqual(a, b, make(map[ComparisonPair]bool)) {
 		return RuntimeNumber(1)
 	}
 	return RuntimeNumber(0)
 }
 
 func WrapMonop(operation Monop, name string) RuntimeBuiltin {
-	function := func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-		number, ok := interpreter.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
+	function := func(rt *Runtime, a RuntimeValue) RuntimeValue {
+		number, ok := rt.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
 
 		if !ok {
-			interpreter.builtinError("argument to " + name + " is not a number")
+			rt.builtinError("argument to " + name + " is not a number")
 		}
 
 		return RuntimeNumber(operation(float64(number)))
@@ -35,16 +39,41 @@ func WrapMonop(operation Monop, name string) RuntimeBuiltin {
 }
 
 func WrapBinop(operation Binop, name string) RuntimeBuiltin {
-	apply := func(interp *Interpreter, a, b RuntimeValue) RuntimeValue {
-		numberA, okA := interp.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
-		numberB, okB := interp.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
+	apply := func(rt *Runtime, a, b RuntimeValue) RuntimeValue {
+		numberA, okA := rt.EvaluateToWeakHeadNormalForm(a).(RuntimeNumber)
+		numberB, okB := rt.EvaluateToWeakHeadNormalForm(b).(RuntimeNumber)
 		if !okA || !okB {
-			interp.builtinError("argument to " + name + " is not a number")
+			rt.builtinError("argument to " + name + " is not a number")
 		}
 		return RuntimeNumber(operation(float64(numberA), float64(numberB)))
 	}
-	return func(interp *Interpreter, a RuntimeValue) RuntimeValue {
+	return func(rt *Runtime, a RuntimeValue) RuntimeValue {
 		return RuntimePartial{apply, a}
+	}
+}
+
+func walkList(rt *Runtime, a RuntimeValue, name string, expected string, action func(RuntimeNumber)) {
+	for {
+		switch cell := rt.EvaluateToWeakHeadNormalForm(a).(type) {
+		case RuntimeCons:
+			number, ok := rt.EvaluateToWeakHeadNormalForm(cell.Head).(RuntimeNumber)
+			if !ok {
+				rt.builtinError(name + " expects a " + expected + ", found a non-number element")
+			}
+			action(number)
+			a = cell.Tail
+
+		case RuntimeTuple:
+			// The only valid non-cons value is the empty list, which ends
+			// the walk; any other tuple arity is an error.
+			if len(cell) != 0 {
+				rt.builtinError(name + " expects a " + expected)
+			}
+			return
+
+		default:
+			rt.builtinError(name + " expects a " + expected)
+		}
 	}
 }
 
@@ -69,19 +98,15 @@ func init() {
 		"eq": WrapBinop(func(a, b float64) float64 {
 			if a == b {
 				return 1
-			} else {
-				return 0
 			}
+			return 0
 		}, "eq"),
 		"lt": WrapBinop(func(a, b float64) float64 {
 			if b < a {
 				return 1
-			} else {
-				return 0
 			}
+			return 0
 		}, "lt"),
-		// Derived comparisons follow the same threshold-first, value-second convention
-		// as eq and lt: (lte 10 x) = "x ≤ 10", (gte 0 x) = "x ≥ 0", etc.
 		"neq": WrapBinop(func(a, b float64) float64 {
 			if a != b {
 				return 1
@@ -107,46 +132,39 @@ func init() {
 			return 0
 		}, "gt"),
 		"sqrt": WrapMonop(func(a float64) float64 { return math.Sqrt(a) }, "sqrt"),
-		"eval": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			return interpreter.EvaluateToFullNormalForm(a, make(map[*NamedValue]bool))
+		"eval": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			return rt.EvaluateToFullNormalForm(a, make(map[*NamedValue]bool))
 		},
-		"peek": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			fmt.Println(interpreter.ShowValue(a))
+		"peek": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			fmt.Println(rt.ShowValue(a))
 			return a
 		},
-		"show": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			fmt.Println(interpreter.ShowValueFull(a))
+		"show": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			fmt.Println(rt.ShowValueFull(a))
 			return a
 		},
-		"write": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
-			original := a
-		walk:
-			for {
-				switch cell := interpreter.EvaluateToWeakHeadNormalForm(a).(type) {
-				case RuntimeCons:
-					number, ok := interpreter.EvaluateToWeakHeadNormalForm(cell.Head).(RuntimeNumber)
-					if !ok {
-						interpreter.builtinError("write expects a list of code points, found a non-number element")
-					}
-					fmt.Printf("%c", rune(int(number)))
-					a = cell.Tail
-
-				case RuntimeTuple:
-					// The only valid non-cons value is the empty list, which ends
-					// the walk; any other tuple arity is an error.
-					if len(cell) != 0 {
-						interpreter.builtinError("write expects a list of code points")
-					}
-					break walk
-
-				default:
-					interpreter.builtinError("write expects a list of code points")
+		"write": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			walkList(rt, a, "write", "list of code points", func(r RuntimeNumber) {
+				v := float64(r)
+				if v != math.Trunc(v) || !utf8.ValidRune(rune(v)) {
+					rt.builtinError(fmt.Sprintf("write expects a list of code points, found invalid code point %g", v))
 				}
-			}
+				fmt.Printf("%c", rune(r))
+			})
 			fmt.Println()
-			return original
+			return a
 		},
-		"equal": func(interpreter *Interpreter, a RuntimeValue) RuntimeValue {
+		"bwrite": func(rt *Runtime, a RuntimeValue) RuntimeValue {
+			walkList(rt, a, "bwrite", "list of numbers", func(r RuntimeNumber) {
+				v := float64(r)
+				if v != math.Trunc(v) || v < 0 || v > 255 {
+					rt.builtinError(fmt.Sprintf("bwrite expects a list of numbers, found invalid byte value %g", v))
+				}
+				os.Stdout.Write([]byte{byte(r)})
+			})
+			return a
+		},
+		"equal": func(rt *Runtime, a RuntimeValue) RuntimeValue {
 			return RuntimePartial{equalApply, a}
 		},
 		"stdin":  inputStreamPlaceholder,
