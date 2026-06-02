@@ -58,7 +58,9 @@ func (p *Parser) ParseProgram() *Program {
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
-			imports = append(imports, p.ParseName())
+			name := p.ParseName()
+			name.InImport = true
+			imports = append(imports, name)
 			if !p.Accept(",") {
 				break
 			}
@@ -77,7 +79,9 @@ func (p *Parser) ParseModule() *Module {
 	imports := []*Name{}
 	if p.Accept("import") {
 		for {
-			imports = append(imports, p.ParseName())
+			name := p.ParseName()
+			name.InImport = true
+			imports = append(imports, name)
 			if !p.Accept(",") {
 				break
 			}
@@ -185,6 +189,7 @@ func (p *Parser) ParseLambdaCase() *LambdaCase {
 func (p *Parser) ParseBinding() *Binding {
 
 	name := p.ParseName()
+	name.InBinding = true
 	p.Expect("=")
 	expr := p.ParseExpression()
 
@@ -324,12 +329,15 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 func ToPattern(expr Expression) Pattern {
 
 	if name, ok := expr.(*Name); ok {
+		name.InPattern = true
 		return name
 	}
 	if number, ok := expr.(*NumberLiteral); ok {
+		number.InPattern = true
 		return number
 	}
 	if str, ok := expr.(*StringLiteral); ok {
+		str.InPattern = true
 		return str
 	}
 

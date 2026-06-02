@@ -1,10 +1,15 @@
 package main
 
+// The AST is the parser's output and nothing more: it is a faithful, immutable
+// picture of the source. No pass writes resolution, slot, or capture information
+// back onto it — all of that lives in the Core IR (see core.go), which the
+// resolver/lowerer produces from this tree. Keeping the AST pure means each pass
+// has a single clear input and output, and the tree can be traversed or printed
+// without wondering which fields some earlier pass has filled in.
+
 type Program struct {
 	Imports []*Name
 	Body    Expression
-
-	FrameSize int // added by analyzer: slots the body's activation frame needs
 
 	Start SourcePos
 }
@@ -20,8 +25,6 @@ type Module struct {
 type Binding struct {
 	Name       *Name
 	Expression Expression
-
-	FrameSize int // added by analyzer: slots the RHS's activation frame needs (module bindings only)
 }
 
 type Expression interface {
@@ -49,25 +52,12 @@ type Let struct {
 type Lambda struct {
 	Cases []*LambdaCase
 
-	Upvalues        []string         // added by analyzer for display/traces
-	UpvalueCaptures []UpvalueCapture // added by analyzer for MakeClosure
-
 	Start, End SourcePos
 }
 
 type LambdaCase struct {
 	Pattern    Pattern
 	Expression Expression
-
-	FrameSize int // added by analyzer: slots this case's activation frame needs
-}
-
-// UpvalueCapture tells MakeClosure where to find one upvalue in the enclosing
-// activation when a closure is built: either in that activation's own captured
-// upvalues (FromUpvalue) or in its local frame, at the given slot.
-type UpvalueCapture struct {
-	FromUpvalue bool
-	Slot        int
 }
 
 type Pattern interface {
@@ -98,47 +88,26 @@ type Operation struct {
 	Operands []Expression
 }
 
-// NameResolution records where a resolved Name lives, telling the interpreter
-// which environment to index with ResolvedSlot. It is filled by the analyzer.
-type NameResolution byte
-
-const (
-	ResolveLocal   NameResolution = iota // a slot in the current activation's frame
-	ResolveUpvalue                       // a slot in the enclosing closure's captured upvalues
-	ResolveModule                        // a slot in ResolvedModule's environment
-	ResolveBuiltin                       // a builtin function (or the stdin/bstdin streams)
-)
-
 type Name struct {
-	Value          string
-	InPattern      bool
-	InImport       bool
-	InBinding      bool
-	Resolution     NameResolution // added by analyzer
-	ResolvedModule *Module        // added by analyzer: set when Resolution == ResolveModule
-	ResolvedSlot   int            // added by analyzer: index in the resolved environment
-	Pos            SourcePos
+	Value string
+	Pos   SourcePos
 }
 
 type QualifiedName struct {
 	Module string
 	Value  string
 
-	ResolvedSlot int // added by analyzer
-
 	Start, End SourcePos
 }
 
 type NumberLiteral struct {
-	Value     float64
-	InPattern bool
+	Value float64
 
 	Pos SourcePos
 }
 
 type StringLiteral struct {
-	Value     string
-	InPattern bool
+	Value string
 
 	Pos SourcePos
 }

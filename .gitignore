@@ -4,4 +4,6 @@ out.lua
 microfun.exe
 microfun.test.exe
 microfun.bench.exe
+microfun.oracle.exe
 microfun
+etc/experiment/*.exe
