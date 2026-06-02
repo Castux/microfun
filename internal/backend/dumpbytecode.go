@@ -1,8 +1,10 @@
-package main
+package backend
 
 import (
 	"fmt"
 	"strings"
+
+	"microfun/internal/value"
 )
 
 // dumpbytecode.go disassembles the flat bytecode (bytecode.go) to text, reached by
@@ -75,7 +77,7 @@ func showCaptures(captures []Capture) string {
 func operandText(p *Program, in Instr) string {
 	switch in.Op {
 	case PushConst:
-		return showConstValue(p.Consts[in.A])
+		return value.ShowConst(p.Consts[in.A])
 	case PushLocal, PushUpvalue:
 		return fmt.Sprintf("slot=%d", in.A)
 	case PushModule:
@@ -91,13 +93,13 @@ func operandText(p *Program, in Instr) string {
 	case PushArg:
 		return fmt.Sprintf("pos #%d", in.A)
 	case MatchNumber, MatchString:
-		return fmt.Sprintf("%s -> %d", showConstValue(p.Consts[in.A]), in.B)
+		return fmt.Sprintf("%s -> %d", value.ShowConst(p.Consts[in.A]), in.B)
 	case MatchTuple:
 		return fmt.Sprintf("arity=%d -> %d", in.A, in.B)
 	case Bind:
 		return fmt.Sprintf("slot=%d name=%s", in.A, quotedName(p, in.B))
 	case Prim:
-		return fmt.Sprintf("%s pos #%d", primName(PrimOp(in.A)), in.B)
+		return fmt.Sprintf("%s pos #%d", value.PrimName(value.PrimOp(in.A)), in.B)
 	default:
 		return ""
 	}

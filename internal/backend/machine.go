@@ -1,8 +1,11 @@
-package main
+package backend
 
 import (
 	"fmt"
 	"os"
+
+	"microfun/internal/source"
+	"microfun/internal/value"
 )
 
 // Machine is the STG-style push/enter reducer. It executes the flat bytecode
@@ -11,16 +14,16 @@ import (
 // reducing a graph.
 type Machine struct {
 	Prog    *Program
-	ModEnvs map[string][]Value // module name → binding thunks
+	ModEnvs map[string][]value.Value // module name → binding thunks
 
 	// The operand buffer runFrom builds values on. It is reused across calls
 	// because runFrom never forces, so two runFrom calls never overlap.
-	opstack []Value
+	opstack []value.Value
 
 	// The application span and reduction stack of the builtin currently running,
 	// so a structural builtin (write, bwrite, …) can locate and trace its error
 	// without threading them through every helper.
-	builtinPos   SourcePos
+	builtinPos   source.SourcePos
 	builtinStack []StackFrame
 }
 
@@ -28,40 +31,46 @@ type Machine struct {
 type StackFrameKind uint8
 
 const (
-	argFrame    StackFrameKind = iota
+	argFrame StackFrameKind = iota
 	updateFrame
 )
 
 // StackFrame is one entry of the reduction stack.
 type StackFrame struct {
 	Kind  StackFrameKind
-	Arg   Value      // valid when Kind == argFrame
-	Pos   SourcePos  // valid when Kind == argFrame
-	Thunk *Thunk     // valid when Kind == updateFrame
+	Arg   value.Value      // valid when Kind == argFrame
+	Pos   source.SourcePos // valid when Kind == argFrame
+	Thunk *value.Thunk     // valid when Kind == updateFrame
 }
 
 func NewMachine(prog *Program) *Machine {
 	m := &Machine{
 		Prog:    prog,
-		ModEnvs: make(map[string][]Value),
+		ModEnvs: make(map[string][]value.Value),
 	}
 	// WHNF re-enters the machine through this package-level handle (show, equal,
 	// the prim kernels, and the stdin streams all force values without a Machine
 	// receiver). A program runs one Machine, so a single handle suffices.
 	globalMachine = m
+	// Install the runtime hooks the value package calls but cannot implement: forcing
+	// requires running compiled code, and structural-builtin errors are located and
+	// traced against the live reduction stack. The value package declares these as
+	// nil function variables; nothing forces before a Machine exists.
+	value.Force = WHNF
+	value.RaiseBuiltinError = m.raiseBuiltinError
 	return m
 }
 
 // Run initialises module environments and reduces the main body to WHNF.
-func (m *Machine) Run() Value {
+func (m *Machine) Run() value.Value {
 	// Create module environments so modules can refer to each other.
 	for _, modName := range m.Prog.ModuleOrder {
 		mbs := m.Prog.Modules[modName]
-		env := make([]Value, len(mbs))
+		env := make([]value.Value, len(mbs))
 		for j, mb := range mbs {
-			env[j] = thunkValue(&Thunk{
+			env[j] = value.ThunkValue(&value.Thunk{
 				Code:   mb.Code,
-				Locals: make([]Value, mb.Frame),
+				Locals: make([]value.Value, mb.Frame),
 				Name:   mb.Name,
 				Update: true,
 			})
@@ -70,17 +79,17 @@ func (m *Machine) Run() Value {
 	}
 
 	// Reduce the main body.
-	mainLocals := make([]Value, m.Prog.EntryFrame)
+	mainLocals := make([]value.Value, m.Prog.EntryFrame)
 	control, stack := m.runFrom(m.Prog.Entry, mainLocals, nil, nil)
 	return m.reduce(control, stack)
 }
 
 // RunSafe wraps Run with RuntimeError recovery.
-func RunSafe(m *Machine) (result Value) {
+func RunSafe(m *Machine) (result value.Value) {
 	defer func() {
 		if r := recover(); r != nil {
-			if rerr, ok := r.(*RuntimeError); ok {
-				ReportRuntimeError(rerr)
+			if rerr, ok := r.(*source.RuntimeError); ok {
+				source.ReportRuntimeError(rerr)
 				os.Exit(1)
 			}
 			panic(r)
@@ -96,18 +105,19 @@ func RunSafe(m *Machine) (result Value) {
 // thunk, stdin cell, or pattern-binding indirection) or a pending application
 // from a composition — is handed to the full reducer, which pushes the right
 // update frames and memoises. It is the re-entrant entry point used by show,
-// DeepEqual, FullNormalForm, and the primitive kernels; routing every force
-// through the same reducer keeps update-frame handling and memoisation in one place.
-func WHNF(v Value) Value {
+// DeepEqual, FullNormalForm, and the primitive kernels (installed as value.Force);
+// routing every force through the same reducer keeps update-frame handling and
+// memoisation in one place.
+func WHNF(v value.Value) value.Value {
 	for {
 		switch v.Tag {
-		case ThunkTag:
-			thunk := v.thunk()
+		case value.ThunkTag:
+			thunk := v.Thunk()
 			if !thunk.Forced {
 				return globalMachine.reduce(v, nil)
 			}
 			v = thunk.Value // forced thunks always hold a WHNF value
-		case ApplyTag:
+		case value.ApplyTag:
 			return globalMachine.reduce(v, nil)
 		default:
 			return v
@@ -122,11 +132,11 @@ var globalMachine *Machine
 
 // reduce is the main reduction loop. control is the current value in hand;
 // stack is the reduction stack of argument and update frames.
-func (m *Machine) reduce(control Value, stack []StackFrame) Value {
+func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 	for {
 		// Force thunks.
-		for control.Tag == ThunkTag {
-			thunk := control.thunk()
+		for control.Tag == value.ThunkTag {
+			thunk := control.Thunk()
 			if thunk.Forced {
 				control = thunk.Value
 				continue
@@ -154,8 +164,8 @@ func (m *Machine) reduce(control Value, stack []StackFrame) Value {
 		}
 
 		// Unwind Apply nodes (only created by composition reduction).
-		if control.Tag == ApplyTag {
-			ap := control.apply()
+		if control.Tag == value.ApplyTag {
+			ap := control.Apply()
 			stack = append(stack, StackFrame{Kind: argFrame, Arg: ap.Arg, Pos: ap.Pos})
 			control = ap.Fn
 			continue
@@ -178,19 +188,19 @@ func (m *Machine) reduce(control Value, stack []StackFrame) Value {
 		case argFrame:
 			// Apply control to the argument.
 			switch control.Tag {
-			case ClosureTag:
-				closure := control.closure()
+			case value.ClosureTag:
+				closure := control.Closure()
 				stack = stack[:len(stack)-1] // consume the argument
 				// Try each case: run the match+body code from the closure's entry
 				// point. The Case instruction resets the subject, and on match
 				// failure the match instructions jump to the next Case (or NoMatch).
-				locals := make([]Value, closure.Frame)
-				control, stack = m.runMatch(closure.Code, locals, closure.Env, frame.Arg, closure.Source, stack)
+				locals := make([]value.Value, closure.Frame)
+				control, stack = m.runMatch(closure.Code, locals, closure.Env, frame.Arg, closure.NoMatch, stack)
 
-			case BuiltinTag:
-				b := control.builtin()
+			case value.BuiltinTag:
+				b := control.Builtin()
 				stack = stack[:len(stack)-1]
-				newArgs := make([]Value, len(b.Args)+1)
+				newArgs := make([]value.Value, len(b.Args)+1)
 				copy(newArgs, b.Args)
 				newArgs[len(b.Args)] = frame.Arg
 				if len(newArgs) == b.Arity {
@@ -198,7 +208,7 @@ func (m *Machine) reduce(control Value, stack []StackFrame) Value {
 					control = m.runBuiltin(b.Prim, newArgs, frame.Pos, stack)
 				} else {
 					// Partial application: return a new Builtin with one more arg.
-					control = builtinValue(&Builtin{
+					control = value.BuiltinValue(&value.Builtin{
 						Prim:  b.Prim,
 						Arity: b.Arity,
 						Args:  newArgs,
@@ -206,19 +216,19 @@ func (m *Machine) reduce(control Value, stack []StackFrame) Value {
 					})
 				}
 
-			case CompositionTag:
+			case value.CompositionTag:
 				// (first *> second) arg → first (second arg)
-				comp := control.composition()
+				comp := control.Composition()
 				stack[len(stack)-1] = StackFrame{
 					Kind: argFrame,
-					Arg:  applyValue(comp.Second, frame.Arg, frame.Pos),
+					Arg:  value.ApplyValue(comp.Second, frame.Arg, frame.Pos),
 					Pos:  frame.Pos,
 				}
 				control = comp.First
 
 			default:
 				m.raiseRuntimeError(
-					"cannot apply "+ShowValue(control)+", it is not a function",
+					"cannot apply "+value.ShowValue(control)+", it is not a function",
 					frame.Pos, stack)
 			}
 		}
@@ -227,12 +237,12 @@ func (m *Machine) reduce(control Value, stack []StackFrame) Value {
 
 // runBuiltin dispatches a saturated builtin. Math prims force their arguments
 // and run the kernel; structural builtins are dispatched separately.
-func (m *Machine) runBuiltin(op PrimOp, args []Value, pos SourcePos, stack []StackFrame) Value {
+func (m *Machine) runBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
 	switch op {
-	case PrimEqual, PrimEval, PrimPeek, PrimShow, PrimWrite, PrimBwrite:
+	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite:
 		m.builtinPos = pos
 		m.builtinStack = stack
-		return evalStructuralBuiltin(op, args)
+		return value.EvalStructuralBuiltin(op, args)
 	default:
 		// Numeric/comparison prims force every operand left-to-right, then check
 		// that all are numbers — every operand is forced before any non-number is
@@ -240,14 +250,14 @@ func (m *Machine) runBuiltin(op PrimOp, args []Value, pos SourcePos, stack []Sta
 		allNumbers := true
 		for i := range args {
 			args[i] = WHNF(args[i])
-			if args[i].Tag != NumberTag {
+			if args[i].Tag != value.NumberTag {
 				allNumbers = false
 			}
 		}
 		if !allNumbers {
-			m.raiseRuntimeError("argument to "+PrimNames[op]+" is not a number", pos, stack)
+			m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
 		}
-		return evalPrim(op, args)
+		return value.EvalPrim(op, args)
 	}
 }
 
@@ -256,7 +266,7 @@ func (m *Machine) runBuiltin(op PrimOp, args []Value, pos SourcePos, stack []Sta
 // runFrom executes instructions from pc, building values on the operand buffer,
 // pushing argument frames onto the reduction stack, and returning the head value
 // when Enter is reached. It never forces — it is the build phase.
-func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (Value, []StackFrame) {
+func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFrame) (value.Value, []StackFrame) {
 	operands := m.opstack[:0]
 
 	for {
@@ -278,26 +288,26 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 			operands = append(operands, m.ModEnvs[modName][in.B])
 
 		case PushStdin:
-			operands = append(operands, StdinCodePoints())
+			operands = append(operands, value.StdinCodePoints())
 
 		case PushBstdin:
-			operands = append(operands, StdinBytes())
+			operands = append(operands, value.StdinBytes())
 
 		case MakeCons:
 			n := len(operands)
-			operands[n-2] = cons(operands[n-2], operands[n-1])
+			operands[n-2] = value.ConsValue(operands[n-2], operands[n-1])
 			operands = operands[:n-1]
 
 		case MakeTuple:
 			n := len(operands)
 			k := int(in.A)
-			fields := make([]Value, k)
+			fields := make([]value.Value, k)
 			copy(fields, operands[n-k:])
-			operands = append(operands[:n-k], tupleValue(&Tuple{Fields: fields}))
+			operands = append(operands[:n-k], value.TupleValue(&value.Tuple{Fields: fields}))
 
 		case MakeCompose:
 			n := len(operands)
-			operands[n-2] = Value{Tag: CompositionTag, Ref: &Composition{
+			operands[n-2] = value.Value{Tag: value.CompositionTag, Ref: &value.Composition{
 				First: operands[n-2], Second: operands[n-1],
 			}}
 			operands = operands[:n-1]
@@ -305,11 +315,11 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 		case MakeClosure:
 			tmpl := &m.Prog.Closures[in.A]
 			env := m.captureEnv(tmpl.Capture, locals, upvalues)
-			operands = append(operands, closureValue(&Closure{
-				Code:   tmpl.Code,
-				Env:    env,
-				Frame:  tmpl.Frame,
-				Source: tmpl.Source,
+			operands = append(operands, value.ClosureValue(&value.Closure{
+				Code:    tmpl.Code,
+				Env:     env,
+				Frame:   tmpl.Frame,
+				NoMatch: tmpl.NoMatch,
 			}))
 
 		case MakeThunk:
@@ -318,7 +328,7 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 			if tmpl.Name >= 0 {
 				name = m.Prog.Names[tmpl.Name]
 			}
-			operands = append(operands, thunkValue(&Thunk{
+			operands = append(operands, value.ThunkValue(&value.Thunk{
 				Code:     tmpl.Code,
 				Locals:   locals,
 				Upvalues: upvalues,
@@ -332,7 +342,7 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 			if tmpl.Name >= 0 {
 				name = m.Prog.Names[tmpl.Name]
 			}
-			locals[in.A] = thunkValue(&Thunk{
+			locals[in.A] = value.ThunkValue(&value.Thunk{
 				Code:     tmpl.Code,
 				Locals:   locals,
 				Upvalues: upvalues,
@@ -350,10 +360,10 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 			operands = operands[:n-1]
 
 		case Prim:
-			op := PrimOp(in.A)
-			arity := PrimArity[op]
+			op := value.PrimOp(in.A)
+			arity := value.PrimArity[op]
 			n := len(operands)
-			args := make([]Value, arity)
+			args := make([]value.Value, arity)
 			copy(args, operands[n-arity:])
 			operands = operands[:n-arity]
 			// Force and evaluate the prim.
@@ -377,9 +387,9 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []Value, stack []StackFrame) (
 // instruction must be Case. On match success, the case body is executed and its
 // head + stack are returned. On failure, the match instructions jump to the next
 // Case instruction. If all cases fail, NoMatch raises an error.
-func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, source *Lambda, stack []StackFrame) (Value, []StackFrame) {
+func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value.Value, noMatch source.SourcePos, stack []StackFrame) (value.Value, []StackFrame) {
 	operands := m.opstack[:0]
-	var subjects []Value
+	var subjects []value.Value
 	pc := entryPC
 
 	for {
@@ -398,7 +408,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			subject := subjects[n-1]
 			subjects = subjects[:n-1]
 			forced := WHNF(subject)
-			if forced.Tag != NumberTag || forced.Num != m.Prog.Consts[in.A].Num {
+			if forced.Tag != value.NumberTag || forced.Num != m.Prog.Consts[in.A].Num {
 				pc = PC(in.B) // jump to fail target
 			}
 
@@ -409,14 +419,14 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			forced := WHNF(subject)
 			arity := int(in.A)
 			if arity == 2 {
-				if forced.Tag == ConsTag {
-					c := forced.cons()
+				if forced.Tag == value.ConsTag {
+					c := forced.Cons()
 					subjects = append(subjects, c.Tail, c.Head) // Head on top → matched first
 				} else {
 					pc = PC(in.B)
 				}
-			} else if forced.Tag == TupleTag {
-				t := forced.tuple()
+			} else if forced.Tag == value.TupleTag {
+				t := forced.Tuple()
 				if len(t.Fields) == arity {
 					for j := len(t.Fields) - 1; j >= 0; j-- {
 						subjects = append(subjects, t.Fields[j])
@@ -448,8 +458,8 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			if in.B >= 0 {
 				name = m.Prog.Names[in.B]
 			}
-			locals[in.A] = thunkValue(&Thunk{
-				Code:   NoCode,
+			locals[in.A] = value.ThunkValue(&value.Thunk{
+				Code:   value.NoCode,
 				Value:  subject,
 				Name:   name,
 				Update: true,
@@ -457,8 +467,8 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 
 		case NoMatch:
 			m.raiseRuntimeError(
-				"no pattern matched value "+ShowValue(arg),
-				noMatchPos(source), stack)
+				"no pattern matched value "+value.ShowValue(arg),
+				noMatch, stack)
 
 		// --- Build instructions (body of the matched case) ---
 		case PushConst:
@@ -475,26 +485,26 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			operands = append(operands, m.ModEnvs[modName][in.B])
 
 		case PushStdin:
-			operands = append(operands, StdinCodePoints())
+			operands = append(operands, value.StdinCodePoints())
 
 		case PushBstdin:
-			operands = append(operands, StdinBytes())
+			operands = append(operands, value.StdinBytes())
 
 		case MakeCons:
 			n := len(operands)
-			operands[n-2] = cons(operands[n-2], operands[n-1])
+			operands[n-2] = value.ConsValue(operands[n-2], operands[n-1])
 			operands = operands[:n-1]
 
 		case MakeTuple:
 			n := len(operands)
 			k := int(in.A)
-			fields := make([]Value, k)
+			fields := make([]value.Value, k)
 			copy(fields, operands[n-k:])
-			operands = append(operands[:n-k], tupleValue(&Tuple{Fields: fields}))
+			operands = append(operands[:n-k], value.TupleValue(&value.Tuple{Fields: fields}))
 
 		case MakeCompose:
 			n := len(operands)
-			operands[n-2] = Value{Tag: CompositionTag, Ref: &Composition{
+			operands[n-2] = value.Value{Tag: value.CompositionTag, Ref: &value.Composition{
 				First: operands[n-2], Second: operands[n-1],
 			}}
 			operands = operands[:n-1]
@@ -502,11 +512,11 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 		case MakeClosure:
 			tmpl := &m.Prog.Closures[in.A]
 			env := m.captureEnv(tmpl.Capture, locals, upvalues)
-			operands = append(operands, closureValue(&Closure{
-				Code:   tmpl.Code,
-				Env:    env,
-				Frame:  tmpl.Frame,
-				Source: tmpl.Source,
+			operands = append(operands, value.ClosureValue(&value.Closure{
+				Code:    tmpl.Code,
+				Env:     env,
+				Frame:   tmpl.Frame,
+				NoMatch: tmpl.NoMatch,
 			}))
 
 		case MakeThunk:
@@ -515,7 +525,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			if tmpl.Name >= 0 {
 				name = m.Prog.Names[tmpl.Name]
 			}
-			operands = append(operands, thunkValue(&Thunk{
+			operands = append(operands, value.ThunkValue(&value.Thunk{
 				Code:     tmpl.Code,
 				Locals:   locals,
 				Upvalues: upvalues,
@@ -529,7 +539,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			if tmpl.Name >= 0 {
 				name = m.Prog.Names[tmpl.Name]
 			}
-			locals[in.A] = thunkValue(&Thunk{
+			locals[in.A] = value.ThunkValue(&value.Thunk{
 				Code:     tmpl.Code,
 				Locals:   locals,
 				Upvalues: upvalues,
@@ -547,10 +557,10 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			operands = operands[:n-1]
 
 		case Prim:
-			op := PrimOp(in.A)
-			arity := PrimArity[op]
+			op := value.PrimOp(in.A)
+			arity := value.PrimArity[op]
 			n := len(operands)
-			args := make([]Value, arity)
+			args := make([]value.Value, arity)
 			copy(args, operands[n-arity:])
 			operands = operands[:n-arity]
 			result := m.runBuiltin(op, args, m.Prog.Posns[in.B], stack)
@@ -569,11 +579,11 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 
 // --- helpers ---
 
-func (m *Machine) captureEnv(captures []Capture, locals, upvalues []Value) []Value {
+func (m *Machine) captureEnv(captures []Capture, locals, upvalues []value.Value) []value.Value {
 	if len(captures) == 0 {
 		return nil
 	}
-	env := make([]Value, len(captures))
+	env := make([]value.Value, len(captures))
 	for i, cap := range captures {
 		if cap.FromUpvalue {
 			env[i] = upvalues[cap.Slot]
@@ -585,7 +595,7 @@ func (m *Machine) captureEnv(captures []Capture, locals, upvalues []Value) []Val
 }
 
 // raiseRuntimeError panics with a RuntimeError carrying the reduction trace.
-func (m *Machine) raiseRuntimeError(message string, pos SourcePos, stack []StackFrame) {
+func (m *Machine) raiseRuntimeError(message string, pos source.SourcePos, stack []StackFrame) {
 	// Walk the stack from the outermost frame inward, collecting the names of the
 	// bindings being forced — this is the reduction-trace skeleton.
 	var trace []string
@@ -594,7 +604,7 @@ func (m *Machine) raiseRuntimeError(message string, pos SourcePos, stack []Stack
 			trace = append(trace, stack[i].Thunk.Name)
 		}
 	}
-	panic(&RuntimeError{
+	panic(&source.RuntimeError{
 		Message: message,
 		Pos:     pos,
 		HasPos:  pos.File != nil,
@@ -604,40 +614,30 @@ func (m *Machine) raiseRuntimeError(message string, pos SourcePos, stack []Stack
 
 // raiseBuiltinError reports an error from inside a structural builtin, locating it
 // at the builtin's application span and tracing it through the reduction stack
-// active when the builtin was entered.
+// active when the builtin was entered. It is installed as value.RaiseBuiltinError.
 func (m *Machine) raiseBuiltinError(message string) {
 	m.raiseRuntimeError(message, m.builtinPos, m.builtinStack)
 }
 
-// noMatchPos is the source span covering a lambda's whole pattern set, used to
-// locate a non-exhaustive match.
-func noMatchPos(source *Lambda) SourcePos {
-	if source == nil || len(source.Cases) == 0 {
-		return SourcePos{}
-	}
-	cases := source.Cases
-	return cases[0].Pattern.FirstPos().To(cases[len(cases)-1].Pattern.LastPos())
-}
-
 // matchStringSpine compares a value against a pre-built string constant (a cons
 // list of code points). Both sides are forced spine-only.
-func matchStringSpine(subject Value, target Value) bool {
+func matchStringSpine(subject value.Value, target value.Value) bool {
 	a := subject
 	b := target
 	for {
 		fa := WHNF(a)
 		fb := WHNF(b)
 
-		if fa.Tag == TupleTag && fb.Tag == TupleTag {
+		if fa.Tag == value.TupleTag && fb.Tag == value.TupleTag {
 			// Both empty → match.
-			return len(fa.tuple().Fields) == 0 && len(fb.tuple().Fields) == 0
+			return len(fa.Tuple().Fields) == 0 && len(fb.Tuple().Fields) == 0
 		}
-		if fa.Tag == ConsTag && fb.Tag == ConsTag {
-			ca := fa.cons()
-			cb := fb.cons()
+		if fa.Tag == value.ConsTag && fb.Tag == value.ConsTag {
+			ca := fa.Cons()
+			cb := fb.Cons()
 			ha := WHNF(ca.Head)
 			hb := WHNF(cb.Head)
-			if ha.Tag != NumberTag || hb.Tag != NumberTag || ha.Num != hb.Num {
+			if ha.Tag != value.NumberTag || hb.Tag != value.NumberTag || ha.Num != hb.Num {
 				return false
 			}
 			a = ca.Tail

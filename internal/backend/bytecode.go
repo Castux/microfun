@@ -1,4 +1,9 @@
-package main
+package backend
+
+import (
+	"microfun/internal/source"
+	"microfun/internal/value"
+)
 
 // The bytecode is flat: one Instr slice for the whole program (see Program.Code),
 // not a tree of nested blocks. Every body — the program, each module binding,
@@ -15,7 +20,9 @@ package main
 // match and Prim instructions are the only ones that force, and they do so through
 // the machine's re-entrant WHNF.
 
-type PC = int32
+// PC is re-exported from the value package, where Thunk and Closure store entry
+// points; the two definitions are the same int32 alias.
+type PC = value.PC
 
 // Instr is one instruction. The two operands are small integers (pool indices,
 // slots, arities, jump targets), never pointers, so Code stays dense. Each
@@ -31,10 +38,10 @@ type Op uint8
 const (
 	// Build (push a value; never force). The head of a body is whatever these
 	// leave on the operand stack when Enter is reached.
-	PushConst    Op = iota // push Consts[A]
-	PushLocal              // push Locals[A]
-	PushUpvalue            // push Upvalues[A]
-	PushModule             // push ModuleEnvironments[ModuleNames[A]][B]
+	PushConst   Op = iota // push Consts[A]
+	PushLocal             // push Locals[A]
+	PushUpvalue           // push Upvalues[A]
+	PushModule            // push ModuleEnvironments[ModuleNames[A]][B]
 	PushStdin             // push the lazy stdin code-point stream
 	PushBstdin            // push the lazy stdin byte stream
 	MakeCons              // pop tail, head; push Cons{head, tail}
@@ -67,10 +74,10 @@ const (
 // variables from the enclosing activation's frames. Frame is the largest case
 // frame, allocated once per application and reused across the cases tried.
 type ClosureTemplate struct {
-	Code    PC         // entry point: the first case's Case instruction
-	Capture []Capture  // minimal free-variable capture (closures escape, so this is worth computing)
-	Frame   int        // slots to allocate for the matched case's bindings and lets
-	Source  *Lambda    // pattern spans for "no pattern matched"; display
+	Code    PC               // entry point: the first case's Case instruction
+	Capture []Capture        // minimal free-variable capture (closures escape, so this is worth computing)
+	Frame   int              // slots to allocate for the matched case's bindings and lets
+	NoMatch source.SourcePos // span of the whole pattern set, for "no pattern matched"
 }
 
 // A ThunkTemplate is the compile-time description of a thunk body. The thunk
@@ -103,8 +110,8 @@ type ModuleBinding struct {
 // and the per-module binding entries.
 type Program struct {
 	Code        []Instr
-	Consts      []Value
-	Posns       []SourcePos
+	Consts      []value.Value
+	Posns       []source.SourcePos
 	Names       []string
 	ModuleNames []string
 	Closures    []ClosureTemplate

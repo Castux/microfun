@@ -1,10 +1,16 @@
-package main
+package syntax
 
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+// formatNumber renders a float literal the same way the value printer does.
+func formatNumber(num float64) string {
+	return strconv.FormatFloat(num, 'g', -1, 64)
+}
 
 // dumpast.go renders the AST (ast.go) as an indented tree. It is one of three
 // inspection dumps (the others are the Core IR and the bytecode), reached by the
@@ -16,7 +22,7 @@ import (
 
 // DumpAST renders the program body followed by every imported module's bindings,
 // modules in sorted order for a stable result.
-func DumpAST(program *ASTProgram, modules map[string]*Module) string {
+func DumpAST(program *Program, modules map[string]*Module) string {
 	var sb strings.Builder
 	sb.WriteString("; microfun AST\n\n")
 

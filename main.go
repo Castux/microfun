@@ -8,18 +8,23 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"microfun/internal/backend"
+	"microfun/internal/core"
+	"microfun/internal/source"
+	"microfun/internal/syntax"
 )
 
 //go:embed core
 var coreFS embed.FS
 
-func LoadProgram(path string) *ASTProgram {
-	tokens := Lex(path)
+func LoadProgram(path string) *syntax.Program {
+	tokens := syntax.Lex(path)
 	if tokens == nil {
 		os.Exit(1)
 	}
 
-	prog := ParseProgram(tokens)
+	prog := syntax.ParseProgram(tokens)
 	if prog == nil {
 		os.Exit(1)
 	}
@@ -29,11 +34,11 @@ func LoadProgram(path string) *ASTProgram {
 
 // LexModule tries to load a module by name: first from the working directory,
 // then from the embedded core/ library. Returns nil if not found in either place.
-func LexModule(name string) []Token {
+func LexModule(name string) []syntax.Token {
 	path := name + ".mf"
 	text, err := os.ReadFile(path)
 	if err == nil {
-		return LexContent(path, string(text))
+		return syntax.LexContent(path, string(text))
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
 		fmt.Printf("Could not read %s: %v\n", path, err)
@@ -43,31 +48,31 @@ func LexModule(name string) []Token {
 	corePath := "core/" + name + ".mf"
 	text, err = coreFS.ReadFile(corePath)
 	if err == nil {
-		return LexContent(corePath, string(text))
+		return syntax.LexContent(corePath, string(text))
 	}
 
 	fmt.Printf("Module not found: %s (looked for %s and %s)\n", name, path, corePath)
 	return nil
 }
 
-func LoadModules(imports []*Name) map[string]*Module {
-	loaded := make(map[string]*Module)
+func LoadModules(imports []*syntax.Name) map[string]*syntax.Module {
+	loaded := make(map[string]*syntax.Module)
 
-	var load func(*Name)
-	load = func(name *Name) {
+	var load func(*syntax.Name)
+	load = func(name *syntax.Name) {
 		if loaded[name.Value] != nil {
 			return
 		}
 
 		tokens := LexModule(name.Value)
 		if tokens == nil {
-			Log("imported here", name.Pos, SeverityInfo)
+			source.Log("imported here", name.Pos, source.SeverityInfo)
 			os.Exit(1)
 		}
 
-		module := ParseModule(tokens)
+		module := syntax.ParseModule(tokens)
 		if module == nil {
-			Log("imported here", name.Pos, SeverityInfo)
+			source.Log("imported here", name.Pos, source.SeverityInfo)
 			os.Exit(1)
 		}
 		module.Name = name.Value
@@ -128,29 +133,29 @@ func main() {
 	// The AST is available right after parsing, so it can be dumped even for a
 	// program that would fail to resolve.
 	if dump.ast {
-		emitDump(path, "ast", DumpAST(program, modules), dump.toFile)
+		emitDump(path, "ast", syntax.DumpAST(program, modules), dump.toFile)
 	}
 
 	if dump.core || dump.bytecode || !dump.any() {
-		resolution := Resolve(program, modules)
+		resolution := syntax.Resolve(program, modules)
 		if resolution.Errors > 0 {
 			fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
 			os.Exit(1)
 		}
 
-		mainCore, moduleCores := Lower(program, modules, resolution)
+		mainCore, moduleCores := core.Lower(program, modules, resolution)
 		if dump.core {
-			emitDump(path, "ir", DumpCore(mainCore, moduleCores), dump.toFile)
+			emitDump(path, "ir", core.DumpCore(mainCore, moduleCores), dump.toFile)
 		}
 
-		prog := Compile(mainCore, moduleCores, program, modules)
+		prog := backend.Compile(mainCore, moduleCores, program, modules)
 		if dump.bytecode {
-			emitDump(path, "bc", DumpBytecode(prog), dump.toFile)
+			emitDump(path, "bc", backend.DumpBytecode(prog), dump.toFile)
 		}
 
 		if !dump.any() {
-			machine := NewMachine(prog)
-			RunSafe(machine)
+			machine := backend.NewMachine(prog)
+			backend.RunSafe(machine)
 		}
 	}
 }

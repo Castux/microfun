@@ -1,9 +1,12 @@
-package main
+package core
 
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+
+	"microfun/internal/value"
 )
 
 // dumpcore.go renders the Core IR (core.go) as an indented tree, reached by the
@@ -17,11 +20,11 @@ import (
 
 // DumpCore renders the program body thunk followed by every module's bindings,
 // modules in sorted order for a stable result.
-func DumpCore(mainCore CoreExpr, modCores map[string][]CoreBind) string {
+func DumpCore(mainCore Expr, modCores map[string][]Bind) string {
 	var sb strings.Builder
 	sb.WriteString("; microfun Core IR\n\n")
 
-	main := mainCore.(CoreThunk)
+	main := mainCore.(Thunk)
 	fmt.Fprintf(&sb, "program (frame %d)\n", main.Frame)
 	writeCoreExpr(&sb, main.Body, 1)
 
@@ -36,12 +39,17 @@ func DumpCore(mainCore CoreExpr, modCores map[string][]CoreBind) string {
 		}
 		fmt.Fprintf(&sb, "\nmodule %s\n", name)
 		for _, bind := range modCores[name] {
-			thunk := bind.Body.(CoreThunk)
+			thunk := bind.Body.(Thunk)
 			fmt.Fprintf(&sb, "  binding %d %s (frame %d)\n", bind.Slot, bind.Name, thunk.Frame)
 			writeCoreExpr(&sb, thunk.Body, 2)
 		}
 	}
 	return sb.String()
+}
+
+// formatNumber renders a float literal the same way the value printer does.
+func formatNumber(num float64) string {
+	return strconv.FormatFloat(num, 'g', -1, 64)
 }
 
 func coreIndent(sb *strings.Builder, indent int) {
@@ -56,18 +64,18 @@ func coreLine(sb *strings.Builder, indent int, format string, args ...any) {
 	sb.WriteByte('\n')
 }
 
-func writeCoreExpr(sb *strings.Builder, expr CoreExpr, indent int) {
+func writeCoreExpr(sb *strings.Builder, expr Expr, indent int) {
 	switch e := expr.(type) {
-	case CoreNum:
+	case Num:
 		coreLine(sb, indent, "num %s", formatNumber(e.Val))
 
-	case CoreConst:
-		coreLine(sb, indent, "const %s", showConstValue(e.Val))
+	case Const:
+		coreLine(sb, indent, "const %s", value.ShowConst(e.Val))
 
-	case CoreVar:
+	case Var:
 		coreLine(sb, indent, "var %s", showAddr(e.Addr))
 
-	case CoreApp:
+	case App:
 		coreLine(sb, indent, "app")
 		coreLine(sb, indent+1, "head")
 		writeCoreExpr(sb, e.Head, indent+2)
@@ -76,33 +84,33 @@ func writeCoreExpr(sb *strings.Builder, expr CoreExpr, indent int) {
 			writeCoreExpr(sb, arg, indent+2)
 		}
 
-	case CorePrim:
-		coreLine(sb, indent, "prim %s", primName(e.Op))
+	case Prim:
+		coreLine(sb, indent, "prim %s", value.PrimName(e.Op))
 		for i, arg := range e.Args {
 			coreLine(sb, indent+1, "arg %d", i)
 			writeCoreExpr(sb, arg, indent+2)
 		}
 
-	case CoreCompose:
+	case Compose:
 		coreLine(sb, indent, "compose (forward %t)", e.Forward)
 		for _, fn := range e.Fns {
 			writeCoreExpr(sb, fn, indent+1)
 		}
 
-	case CoreCons:
+	case Cons:
 		coreLine(sb, indent, "cons")
 		coreLine(sb, indent+1, "head")
 		writeCoreExpr(sb, e.Head, indent+2)
 		coreLine(sb, indent+1, "tail")
 		writeCoreExpr(sb, e.Tail, indent+2)
 
-	case CoreTuple:
+	case Tuple:
 		coreLine(sb, indent, "tuple (arity %d)", len(e.Fields))
 		for _, field := range e.Fields {
 			writeCoreExpr(sb, field, indent+1)
 		}
 
-	case CoreLet:
+	case Let:
 		coreLine(sb, indent, "let (%d binding(s))", len(e.Binds))
 		for _, bind := range e.Binds {
 			coreLine(sb, indent+1, "bind slot %d %s", bind.Slot, bind.Name)
@@ -111,7 +119,7 @@ func writeCoreExpr(sb *strings.Builder, expr CoreExpr, indent int) {
 		coreLine(sb, indent+1, "in")
 		writeCoreExpr(sb, e.Body, indent+2)
 
-	case CoreLambda:
+	case Lambda:
 		coreLine(sb, indent, "lambda (frame %d, free %s)", e.Frame, showAddrs(e.Free))
 		for i, c := range e.Cases {
 			coreLine(sb, indent+1, "case #%d (frame %d)", i, c.Frame)
@@ -121,7 +129,7 @@ func writeCoreExpr(sb *strings.Builder, expr CoreExpr, indent int) {
 			writeCoreExpr(sb, c.Body, indent+3)
 		}
 
-	case CoreThunk:
+	case Thunk:
 		coreLine(sb, indent, "thunk (update %t, frame %d%s)", e.Update, e.Frame, thunkName(e.Name))
 		writeCoreExpr(sb, e.Body, indent+1)
 
@@ -130,15 +138,15 @@ func writeCoreExpr(sb *strings.Builder, expr CoreExpr, indent int) {
 	}
 }
 
-func writeCorePattern(sb *strings.Builder, pattern CorePattern, indent int) {
+func writeCorePattern(sb *strings.Builder, pattern Pattern, indent int) {
 	switch p := pattern.(type) {
-	case CorePatternVar:
+	case PatternVar:
 		coreLine(sb, indent, "var slot %d %s", p.Slot, p.Name)
 
-	case CorePatternConst:
-		coreLine(sb, indent, "const %s", showConstValue(p.Val))
+	case PatternConst:
+		coreLine(sb, indent, "const %s", value.ShowConst(p.Val))
 
-	case CorePatternTuple:
+	case PatternTuple:
 		coreLine(sb, indent, "tuple-pattern (arity %d)", len(p.Fields))
 		for _, field := range p.Fields {
 			writeCorePattern(sb, field, indent+1)
@@ -179,98 +187,4 @@ func showAddrs(addrs []Addr) string {
 		parts[i] = showAddr(addr)
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
-}
-
-// showConstValue renders a compile-time constant Value without forcing anything.
-// Core/bytecode constants are already fully built (numbers, prebuilt code-point
-// lists for string literals, the empty tuple, builtins), so this walks them
-// directly rather than routing through WHNF, keeping the dump independent of the
-// machine.
-func showConstValue(v Value) string {
-	switch v.Tag {
-	case NumberTag:
-		return formatNumber(v.Num)
-
-	case BuiltinTag:
-		return "<builtin " + v.builtin().Name + ">"
-
-	case ConsTag:
-		// A string literal lowers to a cons list of code points; render it as a
-		// quoted string when every element is one, else as a literal list.
-		if s, ok := codePointString(v); ok {
-			return fmt.Sprintf("%q", s)
-		}
-		return showConstList(v)
-
-	case TupleTag:
-		t := v.tuple()
-		if len(t.Fields) == 0 {
-			return "[]"
-		}
-		parts := make([]string, len(t.Fields))
-		for i, f := range t.Fields {
-			parts[i] = showConstValue(f)
-		}
-		return "(" + strings.Join(parts, ", ") + ")"
-
-	default:
-		return fmt.Sprintf("<tag %d>", v.Tag)
-	}
-}
-
-// codePointString reports whether v is a proper cons list of integral code points
-// and, if so, returns the decoded string.
-func codePointString(v Value) (string, bool) {
-	var runes []rune
-	for {
-		switch v.Tag {
-		case TupleTag:
-			if len(v.tuple().Fields) == 0 {
-				return string(runes), true
-			}
-			return "", false
-		case ConsTag:
-			head := v.cons().Head
-			if head.Tag != NumberTag || head.Num != float64(int32(head.Num)) {
-				return "", false
-			}
-			runes = append(runes, rune(int32(head.Num)))
-			v = v.cons().Tail
-		default:
-			return "", false
-		}
-	}
-}
-
-func showConstList(v Value) string {
-	var parts []string
-	for v.Tag == ConsTag {
-		parts = append(parts, showConstValue(v.cons().Head))
-		v = v.cons().Tail
-	}
-	return "[" + strings.Join(parts, "; ") + "]"
-}
-
-// primName returns the source-level name of a primitive operation, covering both
-// the numeric/comparison kernels and the structural builtins.
-func primName(op PrimOp) string {
-	if name, ok := PrimNames[op]; ok {
-		return name
-	}
-	switch op {
-	case PrimEqual:
-		return "equal"
-	case PrimEval:
-		return "eval"
-	case PrimPeek:
-		return "peek"
-	case PrimShow:
-		return "show"
-	case PrimWrite:
-		return "write"
-	case PrimBwrite:
-		return "bwrite"
-	default:
-		return fmt.Sprintf("prim(%d)", op)
-	}
 }

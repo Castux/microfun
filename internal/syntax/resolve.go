@@ -1,4 +1,6 @@
-package main
+package syntax
+
+import "microfun/internal/source"
 
 type ResolveKind uint8
 
@@ -26,16 +28,16 @@ type scope struct {
 }
 
 type Resolver struct {
-	program *ASTProgram
+	program *Program
 	modules map[string]*Module
-	
+
 	res      *Resolution
 	imported map[string]bool
 	stack    []*scope
 	defining map[*Name]bool
 }
 
-func Resolve(program *ASTProgram, modules map[string]*Module) *Resolution {
+func Resolve(program *Program, modules map[string]*Module) *Resolution {
 	r := &Resolver{
 		program:  program,
 		modules:  modules,
@@ -65,15 +67,15 @@ func (r *Resolver) currentScope() *scope {
 	return r.stack[len(r.stack)-1]
 }
 
-func (r *Resolver) define(name string, def Node, pos SourcePos) {
+func (r *Resolver) define(name string, def Node, pos source.SourcePos) {
 	s := r.currentScope()
 	if existing, ok := s.binds[name]; ok {
-		Log(name+" was already defined", pos, SeverityInfo)
-		var existPos SourcePos
+		source.Log(name+" was already defined", pos, source.SeverityInfo)
+		var existPos source.SourcePos
 		if existing != nil {
 			existPos = existing.FirstPos()
 		}
-		Log("here", existPos, SeverityError)
+		source.Log("here", existPos, source.SeverityError)
 		r.res.Errors++
 		return
 	}
@@ -109,13 +111,13 @@ func (r *Resolver) resolveName(name *Name) {
 			return
 		}
 	}
-	Log("no definition for "+name.Value, name.Pos, SeverityError)
+	source.Log("no definition for "+name.Value, name.Pos, source.SeverityError)
 	r.res.Errors++
 }
 
 func (r *Resolver) resolveQualified(name *QualifiedName) {
 	if !r.imported[name.Module] {
-		Log("module "+name.Module+" was not imported", name.Start, SeverityError)
+		source.Log("module "+name.Module+" was not imported", name.Start, source.SeverityError)
 		r.res.Errors++
 		return
 	}
@@ -126,7 +128,7 @@ func (r *Resolver) resolveQualified(name *QualifiedName) {
 			return
 		}
 	}
-	Log("no definition for "+name.Value+" in module "+name.Module, name.Start, SeverityError)
+	source.Log("no definition for "+name.Value+" in module "+name.Module, name.Start, source.SeverityError)
 	r.res.Errors++
 }
 
@@ -154,14 +156,14 @@ func (r *Resolver) resetToBuiltins() {
 	r.imported = make(map[string]bool)
 	r.pushScope(nil) // builtin scope
 	for _, b := range knownBuiltins {
-		r.define(b, nil, SourcePos{})
+		r.define(b, nil, source.SourcePos{})
 	}
 }
 
 func (r *Resolver) analyze(root Node) {
 	Traverse(root, func(n Node) {
 		switch node := n.(type) {
-		case *ASTProgram:
+		case *Program:
 			r.handleImports(node.Imports)
 		case *Module:
 			r.handleImports(node.Imports)

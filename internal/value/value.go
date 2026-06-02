@@ -1,4 +1,10 @@
-package main
+package value
+
+import "microfun/internal/source"
+
+// PC is a program counter: an index into the compiled instruction array. It lives
+// here because Thunk and Closure store entry points; the backend re-exports it.
+type PC = int32
 
 // A Value is one runtime value, passed around by value (not by pointer). It is a
 // small tagged union: a Number lives inline in Num, while every compound or
@@ -86,13 +92,13 @@ type Tuple struct {
 
 // A Closure is a lambda (one or more pattern cases) paired with the minimal set of
 // free variables it captured. Frame is the largest of its cases' frame sizes,
-// allocated once per application. Source is the original AST lambda, used for the
-// pattern span in a "no pattern matched" error and for display.
+// allocated once per application. NoMatch is the source span of the whole pattern
+// set, used to locate a "no pattern matched" error.
 type Closure struct {
-	Code   PC
-	Env    []Value
-	Frame  int
-	Source *Lambda
+	Code    PC
+	Env     []Value
+	Frame   int
+	NoMatch source.SourcePos
 }
 
 // A Builtin is a primitive operation as a first-class value. It carries the
@@ -122,47 +128,47 @@ type Composition struct {
 type Apply struct {
 	Fn  Value
 	Arg Value
-	Pos SourcePos
+	Pos source.SourcePos
 }
 
 // Constructors for the common values, keeping the Tag / Ref pairing in one place.
 
-func number(n float64) Value        { return Value{Tag: NumberTag, Num: n} }
-func cons(h, t Value) Value         { return Value{Tag: ConsTag, Ref: &Cons{Head: h, Tail: t}} }
-func tupleValue(t *Tuple) Value     { return Value{Tag: TupleTag, Ref: t} }
-func thunkValue(t *Thunk) Value     { return Value{Tag: ThunkTag, Ref: t} }
-func closureValue(c *Closure) Value { return Value{Tag: ClosureTag, Ref: c} }
-func builtinValue(b *Builtin) Value { return Value{Tag: BuiltinTag, Ref: b} }
-func applyValue(fn, arg Value, pos SourcePos) Value {
+func NumberValue(n float64) Value   { return Value{Tag: NumberTag, Num: n} }
+func ConsValue(h, t Value) Value    { return Value{Tag: ConsTag, Ref: &Cons{Head: h, Tail: t}} }
+func TupleValue(t *Tuple) Value     { return Value{Tag: TupleTag, Ref: t} }
+func ThunkValue(t *Thunk) Value     { return Value{Tag: ThunkTag, Ref: t} }
+func ClosureValue(c *Closure) Value { return Value{Tag: ClosureTag, Ref: c} }
+func BuiltinValue(b *Builtin) Value { return Value{Tag: BuiltinTag, Ref: b} }
+func ApplyValue(fn, arg Value, pos source.SourcePos) Value {
 	return Value{Tag: ApplyTag, Ref: &Apply{Fn: fn, Arg: arg, Pos: pos}}
 }
 
-// emptyTuple is the shared empty tuple / empty list. It is immutable, so a single
+// EmptyTuple is the shared empty tuple / empty list. It is immutable, so a single
 // instance is reused everywhere one is needed.
-var emptyTuple = Value{Tag: TupleTag, Ref: &Tuple{}}
+var EmptyTuple = Value{Tag: TupleTag, Ref: &Tuple{}}
 
-// foldStringValue decodes a string into the runtime representation of a string: a
+// FoldStringValue decodes a string into the runtime representation of a string: a
 // cons list of code points ending in the empty tuple. The lowerer calls it once
 // per literal, building a shared immutable constant.
-func foldStringValue(s string) Value {
-	current := emptyTuple
+func FoldStringValue(s string) Value {
+	current := EmptyTuple
 	runes := []rune(s)
 	for i := len(runes) - 1; i >= 0; i-- {
-		current = cons(number(float64(runes[i])), current)
+		current = ConsValue(NumberValue(float64(runes[i])), current)
 	}
 	return current
 }
 
-func (v Value) thunk() *Thunk             { return v.Ref.(*Thunk) }
-func (v Value) cons() *Cons               { return v.Ref.(*Cons) }
-func (v Value) tuple() *Tuple             { return v.Ref.(*Tuple) }
-func (v Value) closure() *Closure         { return v.Ref.(*Closure) }
-func (v Value) builtin() *Builtin         { return v.Ref.(*Builtin) }
-func (v Value) composition() *Composition { return v.Ref.(*Composition) }
-func (v Value) apply() *Apply             { return v.Ref.(*Apply) }
+func (v Value) Thunk() *Thunk             { return v.Ref.(*Thunk) }
+func (v Value) Cons() *Cons               { return v.Ref.(*Cons) }
+func (v Value) Tuple() *Tuple             { return v.Ref.(*Tuple) }
+func (v Value) Closure() *Closure         { return v.Ref.(*Closure) }
+func (v Value) Builtin() *Builtin         { return v.Ref.(*Builtin) }
+func (v Value) Composition() *Composition { return v.Ref.(*Composition) }
+func (v Value) Apply() *Apply             { return v.Ref.(*Apply) }
 
-// isFunction reports whether v can be applied to an argument. Used only for
+// IsFunction reports whether v can be applied to an argument. Used only for
 // display and error wording.
-func (v Value) isFunction() bool {
+func (v Value) IsFunction() bool {
 	return v.Tag == ClosureTag || v.Tag == BuiltinTag || v.Tag == CompositionTag
 }

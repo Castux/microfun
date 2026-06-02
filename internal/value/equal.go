@@ -1,4 +1,4 @@
-package main
+package value
 
 type comparisonPair struct {
 	a, b Value
@@ -13,8 +13,8 @@ func DeepEqual(a, b Value, seen map[comparisonPair]bool) bool {
 	}
 	seen[pair] = true
 
-	forcedA := WHNF(a)
-	forcedB := WHNF(b)
+	forcedA := Force(a)
+	forcedB := Force(b)
 
 	if forcedA.Tag != forcedB.Tag {
 		return false
@@ -25,8 +25,8 @@ func DeepEqual(a, b Value, seen map[comparisonPair]bool) bool {
 		return forcedA.Num == forcedB.Num
 
 	case TupleTag:
-		tA := forcedA.tuple()
-		tB := forcedB.tuple()
+		tA := forcedA.Tuple()
+		tB := forcedB.Tuple()
 		if len(tA.Fields) != len(tB.Fields) {
 			return false
 		}
@@ -38,8 +38,8 @@ func DeepEqual(a, b Value, seen map[comparisonPair]bool) bool {
 		return true
 
 	case ConsTag:
-		cA := forcedA.cons()
-		cB := forcedB.cons()
+		cA := forcedA.Cons()
+		cB := forcedB.Cons()
 		return DeepEqual(cA.Head, cB.Head, seen) && DeepEqual(cA.Tail, cB.Tail, seen)
 
 	case ClosureTag, BuiltinTag, CompositionTag, ApplyTag:
@@ -55,25 +55,25 @@ func DeepEqual(a, b Value, seen map[comparisonPair]bool) bool {
 // tracking Thunks it has already visited.
 func FullNormalForm(value Value, seen map[*Thunk]bool) Value {
 	if value.Tag == ThunkTag {
-		thunk := value.thunk()
+		thunk := value.Thunk()
 		if seen[thunk] {
 			return value
 		}
 		seen[thunk] = true
 	}
 
-	forced := WHNF(value)
+	forced := Force(value)
 
 	switch forced.Tag {
 	case TupleTag:
-		t := forced.tuple()
+		t := forced.Tuple()
 		for i, element := range t.Fields {
 			t.Fields[i] = FullNormalForm(element, seen)
 		}
 		return forced
 
 	case ConsTag:
-		c := forced.cons()
+		c := forced.Cons()
 		FullNormalForm(c.Head, seen)
 		FullNormalForm(c.Tail, seen)
 		return forced

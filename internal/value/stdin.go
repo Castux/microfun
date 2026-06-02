@@ -1,10 +1,12 @@
-package main
+package value
 
 import (
 	"bufio"
 	"io"
 	"os"
 	"unicode"
+
+	"microfun/internal/source"
 )
 
 var (
@@ -32,13 +34,13 @@ func makeInputStream(readCell func() (float64, bool)) Value {
 		Read: func() Value {
 			num, ok := readCell()
 			if !ok {
-				return emptyTuple
+				return EmptyTuple
 			}
 			tail := makeInputStream(readCell)
-			return cons(number(num), tail)
+			return ConsValue(NumberValue(num), tail)
 		},
 	}
-	return thunkValue(thunk)
+	return ThunkValue(thunk)
 }
 
 // StdinCodePoints returns stdin: the standard input decoded as a lazy list of
@@ -51,11 +53,11 @@ func StdinCodePoints() Value {
 				return 0, false
 			}
 			if err != nil {
-				panic(&RuntimeError{Message: "error reading standard input: " + err.Error()})
+				panic(&source.RuntimeError{Message: "error reading standard input: " + err.Error()})
 			}
 			// ReadRune yields U+FFFD with size 1 for invalid UTF-8 bytes.
 			if r == unicode.ReplacementChar && size == 1 {
-				panic(&RuntimeError{Message: "invalid UTF-8 byte on standard input"})
+				panic(&source.RuntimeError{Message: "invalid UTF-8 byte on standard input"})
 			}
 			return float64(r), true
 		})
@@ -72,7 +74,7 @@ func StdinBytes() Value {
 				return 0, false
 			}
 			if err != nil {
-				panic(&RuntimeError{Message: "error reading standard input: " + err.Error()})
+				panic(&source.RuntimeError{Message: "error reading standard input: " + err.Error()})
 			}
 			return float64(b), true
 		})

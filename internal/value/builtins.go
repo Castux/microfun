@@ -1,4 +1,4 @@
-package main
+package value
 
 import (
 	"fmt"
@@ -23,15 +23,15 @@ func init() {
 	}
 }
 
-// evalStructuralBuiltin executes structural primitives when saturated.
-func evalStructuralBuiltin(op PrimOp, args []Value) Value {
+// EvalStructuralBuiltin executes structural primitives when saturated.
+func EvalStructuralBuiltin(op PrimOp, args []Value) Value {
 	switch op {
 	case PrimEqual:
 		// DeepEqual takes a seen map for cycle detection.
 		if DeepEqual(args[1], args[0], make(map[comparisonPair]bool)) {
-			return number(1)
+			return NumberValue(1)
 		}
-		return number(0)
+		return NumberValue(0)
 
 	case PrimEval:
 		return FullNormalForm(args[0], make(map[*Thunk]bool))
@@ -47,7 +47,7 @@ func evalStructuralBuiltin(op PrimOp, args []Value) Value {
 	case PrimWrite:
 		walkList(args[0], "write", "list of code points", func(num float64) {
 			if num != math.Trunc(num) || !utf8.ValidRune(rune(num)) {
-				globalMachine.raiseBuiltinError(fmt.Sprintf("write expects a list of code points, found invalid code point %g", num))
+				RaiseBuiltinError(fmt.Sprintf("write expects a list of code points, found invalid code point %g", num))
 			}
 			fmt.Printf("%c", rune(num))
 		})
@@ -57,7 +57,7 @@ func evalStructuralBuiltin(op PrimOp, args []Value) Value {
 	case PrimBwrite:
 		walkList(args[0], "bwrite", "list of numbers", func(num float64) {
 			if num != math.Trunc(num) || num < 0 || num > 255 {
-				globalMachine.raiseBuiltinError(fmt.Sprintf("bwrite expects a list of numbers, found invalid byte value %g", num))
+				RaiseBuiltinError(fmt.Sprintf("bwrite expects a list of numbers, found invalid byte value %g", num))
 			}
 			os.Stdout.Write([]byte{byte(num)})
 		})
@@ -71,25 +71,25 @@ func evalStructuralBuiltin(op PrimOp, args []Value) Value {
 func walkList(a Value, name string, expected string, action func(float64)) {
 	current := a
 	for {
-		forced := WHNF(current)
+		forced := Force(current)
 		switch forced.Tag {
 		case ConsTag:
-			c := forced.cons()
-			headForced := WHNF(c.Head)
+			c := forced.Cons()
+			headForced := Force(c.Head)
 			if headForced.Tag != NumberTag {
-				globalMachine.raiseBuiltinError(name + " expects a " + expected + ", found a non-number element")
+				RaiseBuiltinError(name + " expects a " + expected + ", found a non-number element")
 			}
 			action(headForced.Num)
 			current = c.Tail
 
 		case TupleTag:
-			if len(forced.tuple().Fields) != 0 {
-				globalMachine.raiseBuiltinError(name + " expects a " + expected)
+			if len(forced.Tuple().Fields) != 0 {
+				RaiseBuiltinError(name + " expects a " + expected)
 			}
 			return
 
 		default:
-			globalMachine.raiseBuiltinError(name + " expects a " + expected)
+			RaiseBuiltinError(name + " expects a " + expected)
 		}
 	}
 }

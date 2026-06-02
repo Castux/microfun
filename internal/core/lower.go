@@ -1,11 +1,17 @@
-package main
+package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"microfun/internal/source"
+	"microfun/internal/syntax"
+	"microfun/internal/value"
+)
 
 // lower.go translates the resolved AST into the Core IR (core.go). It is where
 // laziness becomes explicit: every position that must stay unevaluated until
 // demanded — a function argument, a data field, a let/module binding — becomes a
-// CoreThunk, and every other position is built directly. Three lowering modes
+// Thunk, and every other position is built directly. Three lowering modes
 // split demanded from lazy positions:
 //
 //   - lowerTail(e): e's value is demanded now. An application flattens its spine
@@ -22,9 +28,9 @@ import "fmt"
 // slots for pattern bindings and lets.
 
 type Lowerer struct {
-	res      *Resolution
-	locals   map[Node]localDef // defining Node → its frame and slot
-	modSlots map[*Binding]int  // module public binding → its environment slot
+	res      *syntax.Resolution
+	locals   map[syntax.Node]localDef // defining Node → its frame and slot
+	modSlots map[*syntax.Binding]int  // module public binding → its environment slot
 	current  *FrameBuilder
 }
 
@@ -37,7 +43,7 @@ type localDef struct {
 // module binding, or a lambda) and the upvalues a nested lambda captures from it.
 type FrameBuilder struct {
 	parent *FrameBuilder
-	node   Node
+	node   syntax.Node
 	size   int
 	free   []Addr // captured free variables, in the parent's addressing
 }
@@ -71,11 +77,11 @@ func (fb *FrameBuilder) resolveUpvalue(defFrame *FrameBuilder, defSlot int) Addr
 
 // Lower produces the Core for the program body (wrapped in a memoising thunk that
 // carries the body's frame size) and for every module's public bindings.
-func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (CoreExpr, map[string][]CoreBind) {
+func Lower(program *syntax.Program, modules map[string]*syntax.Module, res *syntax.Resolution) (Expr, map[string][]Bind) {
 	l := &Lowerer{
 		res:      res,
-		locals:   make(map[Node]localDef),
-		modSlots: make(map[*Binding]int),
+		locals:   make(map[syntax.Node]localDef),
+		modSlots: make(map[*syntax.Binding]int),
 	}
 
 	// Only module bindings reachable from the program body are compiled. The rest
@@ -97,9 +103,9 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 		}
 	}
 
-	modBinds := make(map[string][]CoreBind)
+	modBinds := make(map[string][]Bind)
 	for modName, mod := range modules {
-		var binds []CoreBind
+		var binds []Bind
 		for _, pb := range mod.PublicBindings {
 			if !reachable[pb] {
 				continue
@@ -107,10 +113,10 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 			fb := &FrameBuilder{node: mod}
 			l.current = fb
 			body := l.lowerTail(pb.Expression)
-			binds = append(binds, CoreBind{
+			binds = append(binds, Bind{
 				Slot: l.modSlots[pb],
 				Name: pb.Name.Value,
-				Body: CoreThunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true},
+				Body: Thunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true},
 			})
 		}
 		modBinds[modName] = binds
@@ -121,7 +127,7 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 	mainBody := l.lowerTail(program.Body)
 	// The program body has no binding name, so it never appears in a trace and its
 	// thunk is left anonymous.
-	mainThunk := CoreThunk{Body: mainBody, Frame: fb.size, Name: "", Update: true}
+	mainThunk := Thunk{Body: mainBody, Frame: fb.size, Name: "", Update: true}
 
 	return mainThunk, modBinds
 }
@@ -131,18 +137,18 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 // live binding's right-hand side uses it. It reads the resolver's facts — a plain
 // name resolving to a module binding, or any qualified name — so it needs no extra
 // analysis, just a worklist closure over the "references" relation.
-func reachableModuleBindings(program *ASTProgram, res *Resolution) map[*Binding]bool {
-	reachable := make(map[*Binding]bool)
-	var worklist []*Binding
+func reachableModuleBindings(program *syntax.Program, res *syntax.Resolution) map[*syntax.Binding]bool {
+	reachable := make(map[*syntax.Binding]bool)
+	var worklist []*syntax.Binding
 
-	collectRefs := func(expr Expression) {
-		Traverse(expr, func(n Node) {
+	collectRefs := func(expr syntax.Expression) {
+		syntax.Traverse(expr, func(n syntax.Node) {
 			switch x := n.(type) {
-			case *Name:
-				if fact, ok := res.Uses[x]; ok && fact.Kind == ResolveModule {
-					worklist = append(worklist, fact.Def.(*Binding))
+			case *syntax.Name:
+				if fact, ok := res.Uses[x]; ok && fact.Kind == syntax.ResolveModule {
+					worklist = append(worklist, fact.Def.(*syntax.Binding))
 				}
-			case *QualifiedName:
+			case *syntax.QualifiedName:
 				if b, ok := res.Quals[x]; ok {
 					worklist = append(worklist, b)
 				}
@@ -164,18 +170,18 @@ func reachableModuleBindings(program *ASTProgram, res *Resolution) map[*Binding]
 }
 
 // lowerTail lowers an expression in demanded position.
-func (l *Lowerer) lowerTail(expr Expression) CoreExpr {
+func (l *Lowerer) lowerTail(expr syntax.Expression) Expr {
 	switch e := expr.(type) {
-	case *Operation:
+	case *syntax.Operation:
 		switch e.Operator {
 		case "":
 			return l.lowerApp(e)
 		case ">", "<":
-			return l.lowerPipe(e.Operator, e.Operands, NodePos(e))
+			return l.lowerPipe(e.Operator, e.Operands, syntax.NodePos(e))
 		default: // "*>", "<*": a composition is a value
 			return l.lowerValue(e)
 		}
-	case *Let:
+	case *syntax.Let:
 		return l.lowerLet(e)
 	default:
 		return l.lowerValue(expr)
@@ -183,17 +189,17 @@ func (l *Lowerer) lowerTail(expr Expression) CoreExpr {
 }
 
 // lowerArg lowers an expression in a lazy position (argument or data field).
-func (l *Lowerer) lowerArg(expr Expression) CoreExpr {
+func (l *Lowerer) lowerArg(expr syntax.Expression) Expr {
 	switch e := expr.(type) {
-	case *Operation:
+	case *syntax.Operation:
 		switch e.Operator {
 		case "", ">", "<": // an application/pipe may force when entered → defer it
-			return CoreThunk{Body: l.lowerTail(e), Update: false}
+			return Thunk{Body: l.lowerTail(e), Update: false}
 		default: // a composition only builds a value → build it directly
 			return l.lowerValue(e)
 		}
-	case *Let:
-		return CoreThunk{Body: l.lowerTail(e), Update: false}
+	case *syntax.Let:
+		return Thunk{Body: l.lowerTail(e), Update: false}
 	default:
 		return l.lowerValue(expr)
 	}
@@ -201,47 +207,47 @@ func (l *Lowerer) lowerArg(expr Expression) CoreExpr {
 
 // lowerValue builds a value: a literal, a constructor, a name, a closure, or a
 // composition. Compound parts are lowered with lowerArg so they stay lazy.
-func (l *Lowerer) lowerValue(expr Expression) CoreExpr {
+func (l *Lowerer) lowerValue(expr syntax.Expression) Expr {
 	switch e := expr.(type) {
-	case *NumberLiteral:
-		return CoreNum{Val: e.Value}
+	case *syntax.NumberLiteral:
+		return Num{Val: e.Value}
 
-	case *StringLiteral:
+	case *syntax.StringLiteral:
 		// Decode the literal once into a shared immutable cons list of code points.
-		return CoreConst{Val: foldStringValue(e.Value)}
+		return Const{Val: value.FoldStringValue(e.Value)}
 
-	case *TupleExpr:
+	case *syntax.TupleExpr:
 		switch len(e.SubExpressions) {
 		case 0:
-			return CoreConst{Val: emptyTuple}
+			return Const{Val: value.EmptyTuple}
 		case 2:
-			return CoreCons{Head: l.lowerArg(e.SubExpressions[0]), Tail: l.lowerArg(e.SubExpressions[1])}
+			return Cons{Head: l.lowerArg(e.SubExpressions[0]), Tail: l.lowerArg(e.SubExpressions[1])}
 		default:
-			var fields []CoreExpr
+			var fields []Expr
 			for _, sub := range e.SubExpressions {
 				fields = append(fields, l.lowerArg(sub))
 			}
-			return CoreTuple{Fields: fields}
+			return Tuple{Fields: fields}
 		}
 
-	case *List:
-		var current CoreExpr = CoreConst{Val: emptyTuple}
+	case *syntax.List:
+		var current Expr = Const{Val: value.EmptyTuple}
 		for i := len(e.SubExpressions) - 1; i >= 0; i-- {
-			current = CoreCons{Head: l.lowerArg(e.SubExpressions[i]), Tail: current}
+			current = Cons{Head: l.lowerArg(e.SubExpressions[i]), Tail: current}
 		}
 		return current
 
-	case *Name:
+	case *syntax.Name:
 		return l.lowerName(e)
 
-	case *QualifiedName:
+	case *syntax.QualifiedName:
 		binding := l.res.Quals[e]
-		return CoreVar{Addr: Addr{Kind: AddrModule, Module: e.Module, Slot: l.modSlots[binding]}}
+		return Var{Addr: Addr{Kind: AddrModule, Module: e.Module, Slot: l.modSlots[binding]}}
 
-	case *Lambda:
+	case *syntax.Lambda:
 		return l.lowerLambda(e)
 
-	case *Operation:
+	case *syntax.Operation:
 		// Only compositions reach here; application and pipe are handled by callers.
 		return l.lowerCompose(e)
 	}
@@ -250,83 +256,83 @@ func (l *Lowerer) lowerValue(expr Expression) CoreExpr {
 }
 
 // lowerApp flattens an application spine `f a1 … an` in tail position.
-func (l *Lowerer) lowerApp(op *Operation) CoreExpr {
-	pos := NodePos(op)
+func (l *Lowerer) lowerApp(op *syntax.Operation) Expr {
+	pos := syntax.NodePos(op)
 	head := l.lowerTail(op.Operands[0])
-	var args []CoreExpr
+	var args []Expr
 	for k := 1; k < len(op.Operands); k++ {
 		args = append(args, l.lowerArg(op.Operands[k]))
 	}
-	return CoreApp{Head: head, Args: args, Pos: pos}
+	return App{Head: head, Args: args, Pos: pos}
 }
 
 // lowerPipe lowers `>` / `<` chains to nested single-argument applications:
 // `a > b > c` is `c (b a)` and `a < b < c` is `a (b c)`. The folded remainder is
 // carried in a lazy thunk; the same whole-chain position is threaded through every
 // level so error locations line up.
-func (l *Lowerer) lowerPipe(operator string, operands []Expression, pos SourcePos) CoreExpr {
+func (l *Lowerer) lowerPipe(operator string, operands []syntax.Expression, pos source.SourcePos) Expr {
 	if len(operands) == 1 {
 		return l.lowerTail(operands[0])
 	}
 
-	var head Expression
-	var rest []Expression
+	var head syntax.Expression
+	var rest []syntax.Expression
 	if operator == ">" {
 		head, rest = operands[len(operands)-1], operands[:len(operands)-1]
 	} else { // "<"
 		head, rest = operands[0], operands[1:]
 	}
 
-	var arg CoreExpr
+	var arg Expr
 	if len(rest) == 1 {
 		arg = l.lowerArg(rest[0])
 	} else {
-		arg = CoreThunk{Body: l.lowerPipe(operator, rest, pos), Update: false}
+		arg = Thunk{Body: l.lowerPipe(operator, rest, pos), Update: false}
 	}
-	return CoreApp{Head: l.lowerTail(head), Args: []CoreExpr{arg}, Pos: pos}
+	return App{Head: l.lowerTail(head), Args: []Expr{arg}, Pos: pos}
 }
 
-// lowerCompose builds a CoreCompose. Operands are functions applied lazily when
+// lowerCompose builds a Compose. Operands are functions applied lazily when
 // the composition is, so each is lowered with lowerArg. Fns stays in source order;
 // codegen reverses it for forward composition (see compile.go).
-func (l *Lowerer) lowerCompose(op *Operation) CoreExpr {
-	var fns []CoreExpr
+func (l *Lowerer) lowerCompose(op *syntax.Operation) Expr {
+	var fns []Expr
 	for _, operand := range op.Operands {
 		fns = append(fns, l.lowerArg(operand))
 	}
-	return CoreCompose{Forward: op.Operator == "*>", Fns: fns}
+	return Compose{Forward: op.Operator == "*>", Fns: fns}
 }
 
 // lowerLet lowers a let in tail position. Slots for all bindings are allocated
 // first so a right-hand side may refer to a later binding (or itself); the binding
 // thunks share the frame by reference, which is what makes recursion work.
-func (l *Lowerer) lowerLet(let *Let) CoreExpr {
+func (l *Lowerer) lowerLet(let *syntax.Let) Expr {
 	slots := make([]int, len(let.Bindings))
 	for i, b := range let.Bindings {
 		slots[i] = l.current.allocate()
 		l.locals[b] = localDef{frame: l.current, slot: slots[i]}
 	}
 
-	binds := make([]CoreBind, len(let.Bindings))
+	binds := make([]Bind, len(let.Bindings))
 	for i, b := range let.Bindings {
 		body := l.lowerTail(b.Expression)
-		binds[i] = CoreBind{
+		binds[i] = Bind{
 			Slot: slots[i],
 			Name: b.Name.Value,
-			Body: CoreThunk{Body: body, Name: b.Name.Value, Update: true},
+			Body: Thunk{Body: body, Name: b.Name.Value, Update: true},
 		}
 	}
-	return CoreLet{Binds: binds, Body: l.lowerTail(let.Expression)}
+	return Let{Binds: binds, Body: l.lowerTail(let.Expression)}
 }
 
-// lowerLambda lowers a lambda into a CoreLambda. Each case shares the closure
+// lowerLambda lowers a lambda into a Lambda node. Each case shares the closure
 // frame (the cases reset the slot counter so they overlap, and Frame is the
 // largest); the upvalue capture list accumulates across all cases.
-func (l *Lowerer) lowerLambda(lam *Lambda) CoreExpr {
+func (l *Lowerer) lowerLambda(lam *syntax.Lambda) Expr {
 	fb := &FrameBuilder{parent: l.current, node: lam}
 	l.current = fb
 
-	var cases []CoreCase
+	var cases []Case
 	maxSize := 0
 	for _, c := range lam.Cases {
 		saved := fb.size
@@ -335,33 +341,43 @@ func (l *Lowerer) lowerLambda(lam *Lambda) CoreExpr {
 		if fb.size > maxSize {
 			maxSize = fb.size
 		}
-		cases = append(cases, CoreCase{Pattern: pat, Body: body, Frame: fb.size - saved})
+		cases = append(cases, Case{Pattern: pat, Body: body, Frame: fb.size - saved})
 		fb.size = saved // the next case reuses the same slots
 	}
 
 	free := fb.free
 	l.current = fb.parent
-	return CoreLambda{Cases: cases, Free: free, Frame: maxSize, Source: lam}
+	return Lambda{Cases: cases, Free: free, Frame: maxSize, NoMatch: noMatchPos(lam)}
 }
 
-func (l *Lowerer) lowerName(e *Name) CoreExpr {
+// noMatchPos is the source span covering a lambda's whole pattern set, used to
+// locate a non-exhaustive match.
+func noMatchPos(lam *syntax.Lambda) source.SourcePos {
+	if lam == nil || len(lam.Cases) == 0 {
+		return source.SourcePos{}
+	}
+	cases := lam.Cases
+	return cases[0].Pattern.FirstPos().To(cases[len(cases)-1].Pattern.LastPos())
+}
+
+func (l *Lowerer) lowerName(e *syntax.Name) Expr {
 	fact := l.res.Uses[e]
 	switch fact.Kind {
-	case ResolveBuiltin:
+	case syntax.ResolveBuiltin:
 		switch e.Value {
 		case "stdin":
-			return CoreConst{Val: StdinCodePoints()}
+			return Const{Val: value.StdinCodePoints()}
 		case "bstdin":
-			return CoreConst{Val: StdinBytes()}
+			return Const{Val: value.StdinBytes()}
 		}
-		return CoreConst{Val: builtinValue(InitialBuiltins[e.Value])}
+		return Const{Val: value.BuiltinValue(value.InitialBuiltins[e.Value])}
 
-	case ResolveModule:
-		return CoreVar{Addr: Addr{Kind: AddrModule, Module: fact.Module.Name, Slot: l.modSlots[fact.Def.(*Binding)]}}
+	case syntax.ResolveModule:
+		return Var{Addr: Addr{Kind: AddrModule, Module: fact.Module.Name, Slot: l.modSlots[fact.Def.(*syntax.Binding)]}}
 
-	case ResolveLocal:
+	case syntax.ResolveLocal:
 		ld := l.locals[fact.Def]
-		return CoreVar{Addr: l.current.resolveUpvalue(ld.frame, ld.slot)}
+		return Var{Addr: l.current.resolveUpvalue(ld.frame, ld.slot)}
 	}
 	panic("lowerName: unknown resolution kind")
 }
@@ -370,37 +386,37 @@ func (l *Lowerer) lowerName(e *Name) CoreExpr {
 // nested arity-2 tuple (cons) patterns, so codegen only ever sees tuple/var/const
 // patterns. Pattern variables allocate a frame slot here and keep their name for
 // traces and show.
-func (l *Lowerer) lowerPattern(p Pattern) CorePattern {
+func (l *Lowerer) lowerPattern(p syntax.Pattern) Pattern {
 	switch pat := p.(type) {
-	case *Name:
+	case *syntax.Name:
 		slot := l.current.allocate()
 		l.locals[pat] = localDef{frame: l.current, slot: slot}
-		return CorePatternVar{Slot: slot, Name: pat.Value}
+		return PatternVar{Slot: slot, Name: pat.Value}
 
-	case *NumberLiteral:
-		return CorePatternConst{Val: number(pat.Value)}
+	case *syntax.NumberLiteral:
+		return PatternConst{Val: value.NumberValue(pat.Value)}
 
-	case *StringLiteral:
-		var current CorePattern = CorePatternTuple{Fields: nil}
+	case *syntax.StringLiteral:
+		var current Pattern = PatternTuple{Fields: nil}
 		runes := []rune(pat.Value)
 		for i := len(runes) - 1; i >= 0; i-- {
-			current = CorePatternTuple{Fields: []CorePattern{
-				CorePatternConst{Val: number(float64(runes[i]))}, current,
+			current = PatternTuple{Fields: []Pattern{
+				PatternConst{Val: value.NumberValue(float64(runes[i]))}, current,
 			}}
 		}
 		return current
 
-	case *TuplePattern:
-		var fields []CorePattern
+	case *syntax.TuplePattern:
+		var fields []Pattern
 		for _, sub := range pat.SubPatterns {
 			fields = append(fields, l.lowerPattern(sub))
 		}
-		return CorePatternTuple{Fields: fields}
+		return PatternTuple{Fields: fields}
 
-	case *ListPattern:
-		var current CorePattern = CorePatternTuple{Fields: nil}
+	case *syntax.ListPattern:
+		var current Pattern = PatternTuple{Fields: nil}
 		for i := len(pat.SubPatterns) - 1; i >= 0; i-- {
-			current = CorePatternTuple{Fields: []CorePattern{l.lowerPattern(pat.SubPatterns[i]), current}}
+			current = PatternTuple{Fields: []Pattern{l.lowerPattern(pat.SubPatterns[i]), current}}
 		}
 		return current
 	}

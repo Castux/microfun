@@ -1,8 +1,13 @@
-package main
+package backend
 
 import (
 	"fmt"
 	"sort"
+
+	"microfun/internal/core"
+	"microfun/internal/source"
+	"microfun/internal/syntax"
+	"microfun/internal/value"
 )
 
 // compile.go translates the Core IR (core.go) into the flat bytecode of
@@ -36,7 +41,7 @@ type compiler struct {
 	prog *Program
 
 	numIdx  map[float64]int32
-	posIdx  map[SourcePos]int32
+	posIdx  map[source.SourcePos]int32
 	nameIdx map[string]int32
 	modIdx  map[string]int32
 
@@ -47,7 +52,7 @@ func newCompiler() *compiler {
 	return &compiler{
 		prog:    &Program{Modules: make(map[string][]ModuleBinding)},
 		numIdx:  make(map[float64]int32),
-		posIdx:  make(map[SourcePos]int32),
+		posIdx:  make(map[source.SourcePos]int32),
 		nameIdx: make(map[string]int32),
 		modIdx:  make(map[string]int32),
 	}
@@ -55,10 +60,10 @@ func newCompiler() *compiler {
 
 // --- pool interning ---
 
-func (c *compiler) internConst(v Value) int32 {
+func (c *compiler) internConst(v value.Value) int32 {
 	// Numbers are deduplicated; other constants (builtins, prebuilt string lists)
 	// are rare and not safely hashable, so they are appended without dedup.
-	if v.Tag == NumberTag {
+	if v.Tag == value.NumberTag {
 		if idx, ok := c.numIdx[v.Num]; ok {
 			return idx
 		}
@@ -72,7 +77,7 @@ func (c *compiler) internConst(v Value) int32 {
 	return idx
 }
 
-func (c *compiler) internPos(pos SourcePos) int32 {
+func (c *compiler) internPos(pos source.SourcePos) int32 {
 	if idx, ok := c.posIdx[pos]; ok {
 		return idx
 	}
@@ -138,11 +143,11 @@ func (c *compiler) patchB(idx int, b int32) {
 // Compile translates the Core IR (program body + module bindings) into a flat
 // Program. Bodies referenced out of line (lambdas, thunks) are queued and drained
 // after the top-level bodies, so the layout never lets one span fall into another.
-func Compile(mainCore CoreExpr, modCores map[string][]CoreBind, sourceProgram *ASTProgram, modules map[string]*Module) *Program {
+func Compile(mainCore core.Expr, modCores map[string][]core.Bind, sourceProgram *syntax.Program, modules map[string]*syntax.Module) *Program {
 	c := newCompiler()
 
 	// Program body.
-	mainThunk := mainCore.(CoreThunk)
+	mainThunk := mainCore.(core.Thunk)
 	c.prog.Entry = c.pc()
 	c.prog.EntryFrame = mainThunk.Frame
 	c.compileBody(mainThunk.Body)
@@ -158,7 +163,7 @@ func Compile(mainCore CoreExpr, modCores map[string][]CoreBind, sourceProgram *A
 	for _, modName := range modNames {
 		var bindings []ModuleBinding
 		for _, cb := range modCores[modName] {
-			thunk := cb.Body.(CoreThunk)
+			thunk := cb.Body.(core.Thunk)
 			entry := c.pc()
 			c.compileBody(thunk.Body)
 			c.emit(Enter, 0)
@@ -180,9 +185,9 @@ func Compile(mainCore CoreExpr, modCores map[string][]CoreBind, sourceProgram *A
 
 // --- body compilation (demanded / tail position) ---
 
-func (c *compiler) compileBody(expr CoreExpr) {
+func (c *compiler) compileBody(expr core.Expr) {
 	switch e := expr.(type) {
-	case CoreApp:
+	case core.App:
 		posIdx := c.internPos(e.Pos)
 		// Push rightmost first so the leftmost argument ends up on top of the
 		// reduction stack and is applied first.
@@ -192,7 +197,7 @@ func (c *compiler) compileBody(expr CoreExpr) {
 		}
 		c.compileBody(e.Head) // the head extends the same spine
 
-	case CoreLet:
+	case core.Let:
 		c.compileLetBindings(e.Binds)
 		c.compileBody(e.Body)
 
@@ -203,25 +208,25 @@ func (c *compiler) compileBody(expr CoreExpr) {
 
 // --- value compilation (leaves one operand, never forces) ---
 
-func (c *compiler) compileValue(expr CoreExpr) {
+func (c *compiler) compileValue(expr core.Expr) {
 	switch e := expr.(type) {
-	case CoreNum:
-		c.emit(PushConst, c.internConst(number(e.Val)))
+	case core.Num:
+		c.emit(PushConst, c.internConst(value.NumberValue(e.Val)))
 
-	case CoreConst:
+	case core.Const:
 		c.emit(PushConst, c.internConst(e.Val))
 
-	case CoreVar:
+	case core.Var:
 		c.compileAddr(e.Addr)
 
-	case CoreCons:
+	case core.Cons:
 		c.compileValue(e.Head)
 		c.compileValue(e.Tail)
 		c.emit(MakeCons, 0)
 
-	case CoreTuple:
+	case core.Tuple:
 		if len(e.Fields) == 0 {
-			c.emit(PushConst, c.internConst(emptyTuple))
+			c.emit(PushConst, c.internConst(value.EmptyTuple))
 			return
 		}
 		for _, f := range e.Fields {
@@ -229,7 +234,7 @@ func (c *compiler) compileValue(expr CoreExpr) {
 		}
 		c.emit(MakeTuple, int32(len(e.Fields)))
 
-	case CoreCompose:
+	case core.Compose:
 		// MakeCompose pops second, first → Composition{first, second}, applied as
 		// first(second(x)). Push so the pairwise folds compose in the right order.
 		if e.Forward {
@@ -245,14 +250,14 @@ func (c *compiler) compileValue(expr CoreExpr) {
 			c.emit(MakeCompose, 0)
 		}
 
-	case CoreLambda:
+	case core.Lambda:
 		c.emit(MakeClosure, c.declareLambda(e))
 
-	case CoreThunk:
+	case core.Thunk:
 		// A thunk in value position is a lazy argument or field (call-by-name).
 		c.emit(MakeThunk, c.declareThunk(e.Body, e.Name))
 
-	case CoreLet:
+	case core.Let:
 		// A let in value position: store its bindings, then build the body value.
 		c.compileLetBindings(e.Binds)
 		c.compileValue(e.Body)
@@ -262,21 +267,21 @@ func (c *compiler) compileValue(expr CoreExpr) {
 	}
 }
 
-func (c *compiler) compileLetBindings(binds []CoreBind) {
+func (c *compiler) compileLetBindings(binds []core.Bind) {
 	for _, b := range binds {
-		thunk := b.Body.(CoreThunk)
+		thunk := b.Body.(core.Thunk)
 		tmpl := c.declareThunk(thunk.Body, b.Name)
 		c.emitAB(StoreLet, int32(b.Slot), tmpl)
 	}
 }
 
-func (c *compiler) compileAddr(addr Addr) {
+func (c *compiler) compileAddr(addr core.Addr) {
 	switch addr.Kind {
-	case AddrLocal:
+	case core.AddrLocal:
 		c.emit(PushLocal, int32(addr.Slot))
-	case AddrUpvalue:
+	case core.AddrUpvalue:
 		c.emit(PushUpvalue, int32(addr.Slot))
-	case AddrModule:
+	case core.AddrModule:
 		c.emitAB(PushModule, c.internModule(addr.Module), int32(addr.Slot))
 	}
 }
@@ -286,7 +291,7 @@ func (c *compiler) compileAddr(addr Addr) {
 // declareThunk registers a thunk template and queues its body for compilation,
 // returning the template index. The body runs over the enclosing activation's
 // frames (whole-frame capture), so no capture list is needed.
-func (c *compiler) declareThunk(body CoreExpr, name string) int32 {
+func (c *compiler) declareThunk(body core.Expr, name string) int32 {
 	idx := int32(len(c.prog.Thunks))
 	c.prog.Thunks = append(c.prog.Thunks, ThunkTemplate{Code: -1, Name: int(c.nameOrNone(name))})
 	c.pending = append(c.pending, func() {
@@ -299,14 +304,14 @@ func (c *compiler) declareThunk(body CoreExpr, name string) int32 {
 
 // declareLambda registers a closure template (with its minimal capture list) and
 // queues its cases for compilation, returning the template index.
-func (c *compiler) declareLambda(lam CoreLambda) int32 {
+func (c *compiler) declareLambda(lam core.Lambda) int32 {
 	idx := int32(len(c.prog.Closures))
 
 	var captures []Capture
 	for _, addr := range lam.Free {
-		captures = append(captures, Capture{FromUpvalue: addr.Kind == AddrUpvalue, Slot: addr.Slot})
+		captures = append(captures, Capture{FromUpvalue: addr.Kind == core.AddrUpvalue, Slot: addr.Slot})
 	}
-	c.prog.Closures = append(c.prog.Closures, ClosureTemplate{Frame: lam.Frame, Capture: captures, Source: lam.Source})
+	c.prog.Closures = append(c.prog.Closures, ClosureTemplate{Frame: lam.Frame, Capture: captures, NoMatch: lam.NoMatch})
 
 	c.pending = append(c.pending, func() {
 		c.prog.Closures[idx].Code = c.pc()
@@ -337,18 +342,18 @@ func (c *compiler) declareLambda(lam CoreLambda) int32 {
 
 // compilePattern emits a pattern's match instructions and returns the indices of
 // the instructions whose jump target must be patched to the case's failure PC.
-func (c *compiler) compilePattern(pat CorePattern) []int {
+func (c *compiler) compilePattern(pat core.Pattern) []int {
 	switch p := pat.(type) {
-	case CorePatternVar:
+	case core.PatternVar:
 		c.emitAB(Bind, int32(p.Slot), c.nameOrNone(p.Name))
 		return nil // Bind never fails.
 
-	case CorePatternConst:
+	case core.PatternConst:
 		// Lowering reduces every constant pattern to a number (strings become nested
 		// cons patterns), so MatchNumber covers them all.
 		return []int{c.placeholder(MatchNumber, c.internConst(p.Val))}
 
-	case CorePatternTuple:
+	case core.PatternTuple:
 		arity := len(p.Fields)
 		fails := []int{c.placeholder(MatchTuple, int32(arity))}
 		// On success MatchTuple pushes the fields; sub-patterns consume them

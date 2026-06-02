@@ -1,4 +1,4 @@
-package main
+package value
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 type ListEnding int
 
 const (
-	NotAList   ListEnding = iota
+	NotAList ListEnding = iota
 	ProperList
 	Truncated
 	Cyclic
@@ -41,7 +41,7 @@ func writeValue(builder *strings.Builder, value Value, depth int, maxDepth int, 
 
 	name := ""
 	if value.Tag == ThunkTag {
-		thunk := value.thunk()
+		thunk := value.Thunk()
 		if expanding[thunk] {
 			builder.WriteString(nameOrEllipsis(thunk))
 			return
@@ -51,17 +51,17 @@ func writeValue(builder *strings.Builder, value Value, depth int, maxDepth int, 
 		defer delete(expanding, thunk)
 	}
 
-	forced := WHNF(value)
+	forced := Force(value)
 
 	switch forced.Tag {
 	case NumberTag:
 		builder.WriteString(formatNumber(forced.Num))
 
 	case ConsTag:
-		writeConsOrList(builder, forced.cons(), depth, maxDepth, maxWidth, expanding)
+		writeConsOrList(builder, forced.Cons(), depth, maxDepth, maxWidth, expanding)
 
 	case TupleTag:
-		writeTuple(builder, forced.tuple(), depth, maxDepth, maxWidth, expanding)
+		writeTuple(builder, forced.Tuple(), depth, maxDepth, maxWidth, expanding)
 
 	case ClosureTag, BuiltinTag, CompositionTag, ApplyTag:
 		if name != "" {
@@ -118,28 +118,28 @@ func writeTuple(builder *strings.Builder, tuple *Tuple, depth int, maxDepth int,
 func collectListSpine(start *Cons, expanding map[*Thunk]bool, maxWidth int) ([]Value, ListEnding, string) {
 	var heads []Value
 	seen := make(map[*Thunk]bool)
-	var current Value = cons(start.Head, start.Tail)
+	var current Value = ConsValue(start.Head, start.Tail)
 
 	for {
 		if current.Tag == ThunkTag {
-			thunk := current.thunk()
+			thunk := current.Thunk()
 			if expanding[thunk] || seen[thunk] {
 				return heads, Cyclic, nameOrEllipsis(thunk)
 			}
 			seen[thunk] = true
 		}
 
-		forced := WHNF(current)
+		forced := Force(current)
 		switch forced.Tag {
 		case ConsTag:
-			c := forced.cons()
+			c := forced.Cons()
 			heads = append(heads, c.Head)
 			current = c.Tail
 			if len(heads) >= maxWidth {
 				return heads, Truncated, ""
 			}
 		case TupleTag:
-			if len(forced.tuple().Fields) == 0 {
+			if len(forced.Tuple().Fields) == 0 {
 				return heads, ProperList, ""
 			}
 			return nil, NotAList, ""

@@ -1,11 +1,15 @@
-package main
+package syntax
 
-import "fmt"
+import (
+	"fmt"
+
+	"microfun/internal/source"
+)
 
 type Parser struct {
 	Tokens   []Token
 	Head     int
-	PosStack []SourcePos
+	PosStack []source.SourcePos
 }
 
 func (p *Parser) Is(kind string) bool {
@@ -19,11 +23,11 @@ func (p *Parser) Peek(offset int) Token {
 	return p.Tokens[p.Head+offset]
 }
 
-func (p *Parser) Pos() SourcePos {
+func (p *Parser) Pos() source.SourcePos {
 	return p.Peek(0).Pos
 }
 
-func (p *Parser) PrevPos() SourcePos {
+func (p *Parser) PrevPos() source.SourcePos {
 	return p.Peek(-1).Pos
 }
 
@@ -48,11 +52,11 @@ func (p *Parser) Expect(kind string) Token {
 		p.Head++
 		return tok
 	}
-	Log(fmt.Sprintf("expected %s, found %s instead", kind, tok.Kind), tok.Pos, SeverityError)
+	source.Log(fmt.Sprintf("expected %s, found %s instead", kind, tok.Kind), tok.Pos, source.SeverityError)
 	panic("expect")
 }
 
-func (p *Parser) ParseProgram() *ASTProgram {
+func (p *Parser) ParseProgram() *Program {
 	start := p.Pos()
 
 	imports := []*Name{}
@@ -68,7 +72,7 @@ func (p *Parser) ParseProgram() *ASTProgram {
 	expr := p.ParseExpression()
 	p.Expect("eof")
 
-	return &ASTProgram{Imports: imports, Body: expr, Start: start}
+	return &Program{Imports: imports, Body: expr, Start: start}
 }
 
 func (p *Parser) ParseModule() *Module {
@@ -135,7 +139,7 @@ func (p *Parser) ParseExpression() Expression {
 	if p.Accept("->") {
 		patt := ToPattern(expr)
 		if patt == nil {
-			Log("invalid pattern for lambda", expr.FirstPos().To(expr.LastPos()), SeverityError)
+			source.Log("invalid pattern for lambda", expr.FirstPos().To(expr.LastPos()), source.SeverityError)
 			panic("expect")
 		}
 		body := p.ParseExpression()
@@ -172,7 +176,7 @@ func (p *Parser) ParseLambdaCase() *LambdaCase {
 	patt := ToPattern(expr)
 
 	if patt == nil {
-		Log("invalid pattern for lambda", expr.FirstPos().To(p.Peek(-1).Pos), SeverityError)
+		source.Log("invalid pattern for lambda", expr.FirstPos().To(p.Peek(-1).Pos), source.SeverityError)
 		panic("expect")
 	}
 
@@ -314,7 +318,7 @@ func (p *Parser) ParseAtomic(mandatory bool) Expression {
 	}
 
 	if mandatory {
-		Log("expected expression", p.Peek(0).Pos, SeverityError)
+		source.Log("expected expression", p.Peek(0).Pos, source.SeverityError)
 		panic("expect")
 	}
 
@@ -370,7 +374,7 @@ func Recover() {
 	}
 }
 
-func ParseProgram(tokens []Token) *ASTProgram {
+func ParseProgram(tokens []Token) *Program {
 	defer Recover()
 
 	parser := Parser{Tokens: tokens}
