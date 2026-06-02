@@ -28,12 +28,16 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 ## Usage
 
 ```
-microfun <path>
+microfun [--mode=interp|compiled] [--dump-ir] <path>
 ```
 
 Runs the program at `<path>`. Modules are searched first in the current directory
 (`./name.mf`), then in the embedded standard library. Errors are reported with
 source locations; runtime errors include a reduction trace.
+
+- `--mode=interp` (default) — tree-walking interpreter.
+- `--mode=compiled` — bytecode compiler + VM; produces identical output.
+- `--dump-ir` — disassemble the compiled IR to stdout and exit (implies compiled mode).
 
 ## Example
 

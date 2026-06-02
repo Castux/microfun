@@ -49,15 +49,19 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 ## 2. Running a program
 
 ```
-microfun <path>
+microfun [--mode=interp|compiled] [--dump-ir] <path>
 ```
 
-The interpreter loads the file at `<path>` as a program, loads any modules it
-imports, analyzes everything, and evaluates the program body. Anything the
-program prints via `peek`, `show`, or `write` appears on standard output. A
-lexical, syntactic, or name-resolution error is reported with a located
-diagnostic and the program does not run; a run-time error is reported with a
-source location and a reduction trace.
+Loads the file at `<path>`, loads any modules it imports, analyzes everything,
+and evaluates the program body. Anything the program prints via `peek`, `show`,
+`write`, or `bwrite` appears on standard output. A lexical, syntactic, or
+name-resolution error is reported with a located diagnostic and the program does
+not run; a run-time error is reported with a source location and a reduction
+trace.
+
+- `--mode=interp` (default) — tree-walking interpreter.
+- `--mode=compiled` — bytecode compiler + VM; produces identical output.
+- `--dump-ir` — disassemble the compiled IR to stdout and exit.
 
 **Module search order.** For each import `name`, the interpreter first looks for
 `./name.mf` in the current working directory. If that file does not exist, it
@@ -519,12 +523,15 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
 | `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
 | `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
+| `bwrite a` | 1 | `a` | prints `a` as raw bytes (list of integers 0–255), then returns it |
 | `stdin` | — (a value) | standard input as a lazy list of Unicode code points | see below |
 | `bstdin` | — (a value) | standard input as a lazy list of raw byte values | see below |
 
-`peek`, `show`, and `write` are the only ways a program produces output; each
-returns its argument so it can be inserted into an expression. `add`, `mul`, and
-`eq` are commutative, so their argument order is immaterial.
+`peek`, `show`, `write`, and `bwrite` are the only ways a program produces
+output; each returns its argument so it can be inserted into an expression.
+`bwrite` is the binary counterpart to `write`: it treats each element as a raw
+byte value (`0`–`255`) with no Unicode encoding. `add`, `mul`, and `eq` are
+commutative, so their argument order is immaterial.
 
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
 a code-point list, is a run-time error.
