@@ -5,9 +5,8 @@ import "fmt"
 // lower.go translates the resolved AST into the Core IR (core.go). It is where
 // laziness becomes explicit: every position that must stay unevaluated until
 // demanded — a function argument, a data field, a let/module binding — becomes a
-// CoreThunk, and every other position is built directly. This mirrors the split
-// the old STG compiler made between demanded and lazy positions (see
-// docs/REWRITE_PLAN.md §5):
+// CoreThunk, and every other position is built directly. Three lowering modes
+// split demanded from lazy positions:
 //
 //   - lowerTail(e): e's value is demanded now. An application flattens its spine
 //     (no intermediate node); a let stores its bindings then continues in tail
@@ -106,8 +105,8 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 	fb := &FrameBuilder{node: program}
 	l.current = fb
 	mainBody := l.lowerTail(program.Body)
-	// The program body has no binding name (it never appears in a trace), matching
-	// the oracle's anonymous main activation.
+	// The program body has no binding name, so it never appears in a trace and its
+	// thunk is left anonymous.
 	mainThunk := CoreThunk{Body: mainBody, Frame: fb.size, Name: "", Update: true}
 
 	return mainThunk, modBinds
@@ -210,10 +209,10 @@ func (l *Lowerer) lowerApp(op *Operation) CoreExpr {
 	return CoreApp{Head: head, Args: args, Pos: pos}
 }
 
-// lowerPipe lowers `>` / `<` chains to nested single-argument applications,
-// matching the oracle's FoldOperation: `a > b > c` is `c (b a)` and `a < b < c`
-// is `a (b c)`. The folded remainder is carried in a lazy thunk; the same whole-
-// chain position is threaded through every level so error locations line up.
+// lowerPipe lowers `>` / `<` chains to nested single-argument applications:
+// `a > b > c` is `c (b a)` and `a < b < c` is `a (b c)`. The folded remainder is
+// carried in a lazy thunk; the same whole-chain position is threaded through every
+// level so error locations line up.
 func (l *Lowerer) lowerPipe(operator string, operands []Expression, pos SourcePos) CoreExpr {
 	if len(operands) == 1 {
 		return l.lowerTail(operands[0])

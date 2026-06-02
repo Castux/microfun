@@ -4,12 +4,12 @@ package main
 // not a tree of nested blocks. Every body — the program, each module binding,
 // each lambda case, each thunk — is a contiguous span of that one array, reached
 // by its start PC. A thunk or closure value therefore holds an integer PC, not a
-// pointer to a sub-block. This is the "assembly, not a tree" choice from
-// docs/REWRITE_PLAN.md Q4: one dense array is friendlier to the instruction cache
-// and gives a single uniform notion of "run instructions from PC P".
+// pointer to a sub-block. This "assembly, not a tree" layout — one dense array —
+// is friendlier to the instruction cache and gives a single uniform notion of
+// "run instructions from PC P".
 //
-// One instruction set covers both building values and matching patterns
-// (docs/REWRITE_PLAN.md Q5). A lambda case compiles to its match instructions —
+// One instruction set covers both building values and matching patterns. A lambda
+// case compiles to its match instructions —
 // each tag test jumping to the next case on failure — followed immediately by its
 // body instructions; there is no separate matcher IR. Building never forces; the
 // match and Prim instructions are the only ones that force, and they do so through

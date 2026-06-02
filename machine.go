@@ -8,19 +8,18 @@ import (
 // Machine is the STG-style push/enter reducer. It executes the flat bytecode
 // produced by compile.go, keeps an explicit reduction stack of argument and
 // update frames, and forces thunks by running their compiled bodies rather than
-// reducing a graph. See docs/REWRITE_PLAN.md §8.
+// reducing a graph.
 type Machine struct {
 	Prog    *Program
 	ModEnvs map[string][]Value // module name → binding thunks
 
-	// The operand buffer runFrom builds values on. It is reused across calls for
-	// the same non-reentrancy reason as the old STG machine: runFrom never
-	// forces, so two runFrom calls never overlap.
+	// The operand buffer runFrom builds values on. It is reused across calls
+	// because runFrom never forces, so two runFrom calls never overlap.
 	opstack []Value
 
 	// The application span and reduction stack of the builtin currently running,
 	// so a structural builtin (write, bwrite, …) can locate and trace its error
-	// without threading them through every helper — exactly as the oracle does.
+	// without threading them through every helper.
 	builtinPos   SourcePos
 	builtinStack []StackFrame
 }
@@ -97,8 +96,8 @@ func RunSafe(m *Machine) (result Value) {
 // thunk, stdin cell, or pattern-binding indirection) or a pending application
 // from a composition — is handed to the full reducer, which pushes the right
 // update frames and memoises. It is the re-entrant entry point used by show,
-// DeepEqual, FullNormalForm, and the primitive kernels; forcing through the same
-// reducer keeps the Go-stack behaviour identical to the oracle.
+// DeepEqual, FullNormalForm, and the primitive kernels; routing every force
+// through the same reducer keeps update-frame handling and memoisation in one place.
 func WHNF(v Value) Value {
 	for {
 		switch v.Tag {
@@ -236,8 +235,8 @@ func (m *Machine) runBuiltin(op PrimOp, args []Value, pos SourcePos, stack []Sta
 		return evalStructuralBuiltin(op, args)
 	default:
 		// Numeric/comparison prims force every operand left-to-right, then check
-		// that all are numbers — matching the oracle's WrapBinop ("force both, then
-		// check") so the same input fails with the same message, span, and trace.
+		// that all are numbers — every operand is forced before any non-number is
+		// reported, so the error names the operation rather than the first bad arg.
 		allNumbers := true
 		for i := range args {
 			args[i] = WHNF(args[i])
@@ -444,8 +443,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []Value, arg Value, sour
 			subject := subjects[n-1]
 			subjects = subjects[:n-1]
 			// Bind the subject behind a named, memoising indirection thunk, so the
-			// bound name appears on traces and in show exactly as the oracle's
-			// pattern-binding NamedValue does.
+			// bound name appears on traces and in show.
 			name := ""
 			if in.B >= 0 {
 				name = m.Prog.Names[in.B]
@@ -589,7 +587,7 @@ func (m *Machine) captureEnv(captures []Capture, locals, upvalues []Value) []Val
 // raiseRuntimeError panics with a RuntimeError carrying the reduction trace.
 func (m *Machine) raiseRuntimeError(message string, pos SourcePos, stack []StackFrame) {
 	// Walk the stack from the outermost frame inward, collecting the names of the
-	// bindings being forced — the same skeleton the oracle's collectTrace builds.
+	// bindings being forced — this is the reduction-trace skeleton.
 	var trace []string
 	for i := 0; i < len(stack); i++ {
 		if stack[i].Kind == updateFrame && stack[i].Thunk.Name != "" {
@@ -612,7 +610,7 @@ func (m *Machine) raiseBuiltinError(message string) {
 }
 
 // noMatchPos is the source span covering a lambda's whole pattern set, used to
-// locate a non-exhaustive match — identical to the oracle's RuntimeClosure.noMatchPos.
+// locate a non-exhaustive match.
 func noMatchPos(source *Lambda) SourcePos {
 	if source == nil || len(source.Cases) == 0 {
 		return SourcePos{}

@@ -27,12 +27,17 @@ build-then-reduce split — hence deferred. A cheaper down payment:
 - **Saturated direct prim calls.** The Core IR and bytecode already reserve a
   `CorePrim` / `Prim` form for a syntactically saturated, direct prim call
   (`add 2 3`) that skips the `Builtin` value entirely. The lowerer currently does
-  not emit it (every builtin goes through the application spine, matching the
-  oracle's structure). Emitting `CorePrim` for the common case would cut the
+  not emit it (every builtin goes through the application spine). Emitting
+  `CorePrim` for the common case would cut the
   per-call `Builtin` allocation and one spine round-trip. Note the operand-buffer
   hazard: a `Prim` that forces mid-body would re-enter `runFrom` while its operand
   buffer is live, so this must either force on a separate path or be restricted to
   positions where the buffer is empty.
+
+  The `Prim` opcode is already fully wired in `runFrom` / `runMatch`; only the
+  compiler does not emit it. When it goes live, `PrimArity` / `PrimNames`
+  (currently `map[PrimOp]…`) should become arrays indexed by the dense `PrimOp`
+  enum, since the arity lookup then sits on the hot path.
 
 ---
 
@@ -63,9 +68,8 @@ indirection on list-heavy code.
 ## 4. Pattern-bind without the indirection thunk
 
 **Problem:** A pattern binding wraps the matched subject in a named, memoising
-indirection thunk so the bound name appears on traces and in `show` exactly as the
-oracle's `NamedValue` does. When the subject is already a thunk, this is a
-redundant wrapper.
+indirection thunk so the bound name appears on traces and in `show`. When the
+subject is already a thunk, this is a redundant wrapper.
 
 **Fix:** Behind an analyzer flag (so trace/show parity stays the default), skip the
 wrapper when the subject is already a named thunk, or when the binding's name is
@@ -128,3 +132,31 @@ every run.
 **Fix:** A versioned binary encoding of `Program`, keyed by a source digest, so
 compilation can be cached across runs. The `Posns` / `Names` pools already define
 the source-mapping shape to serialize.
+
+---
+
+## 10. Prune unreferenced module bindings
+
+**Problem:** `Machine.Run` eagerly allocates a binding thunk — and its frame
+(`make([]Value, mb.Frame)`) — for *every* public binding of *every* loaded module
+at startup, whether or not the program reaches it. A program that imports `core`
+and `list` but uses a handful of their functions still pays for all of them.
+
+**Fix:** Compute the set of module bindings transitively reachable from the program
+body (the resolver already records every use) and allocate environment slots only
+for those. Unreferenced bindings need neither a thunk nor a slot. This trims
+startup allocation and is independent of the hot-loop work above.
+
+---
+
+## 11. Drop the redundant number check in the prim kernel
+
+**Problem:** Before calling `evalPrim`, the machine already forces every operand of
+an arithmetic/comparison prim and verifies each is a `NumberTag`. `evalPrim` then
+reads each operand through `getNumber`, which re-checks the tag (and would panic on
+a non-number) — a dead branch on the arithmetic hot path, paid once per operand
+access, and several kernels read an operand twice.
+
+**Fix:** Since the machine guarantees all operands are numbers at the call, read
+`.Num` directly in the kernel and delete `getNumber`'s tag test. The check is pure
+defensive duplication of the machine's `allNumbers` pass.

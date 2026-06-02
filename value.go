@@ -3,12 +3,12 @@ package main
 // A Value is one runtime value, passed around by value (not by pointer). It is a
 // small tagged union: a Number lives inline in Num, while every compound or
 // heap-resident value keeps a pointer in Ref. This is the deliberate alternative
-// to a Go interface for the runtime representation (see docs/REWRITE_PLAN.md Q2):
+// to a Go interface for the runtime representation:
 //
 //   - A number never allocates. A float64 boxed into an interface{} heap-allocates
 //     on every arithmetic result; Value{Tag: NumberTag, Num: x} does not. Numeric
-//     programs allocated the most under the old design, so this is where the
-//     representation earns its keep.
+//     programs allocate the most, so this is where the representation earns its
+//     keep.
 //   - Ref holds a *pointer* (to Cons, Tuple, …). A pointer stored in an interface
 //     does NOT allocate in Go, so compound values pay only their own heap cost,
 //     never an extra box.
@@ -98,9 +98,8 @@ type Closure struct {
 // A Builtin is a primitive operation as a first-class value. It carries the
 // operation, its arity, and the arguments gathered so far; applying it appends one
 // argument, and when the count reaches Arity the machine runs the operation. This
-// single representation replaces the old per-builtin Go closure and the separate
-// partial-application value: partial application is just a Builtin with fewer Args
-// than Arity (see docs/REWRITE_PLAN.md Q6 and prims.go).
+// single representation is both the saturated and the partially-applied form:
+// partial application is just a Builtin with fewer Args than Arity (see prims.go).
 type Builtin struct {
 	Prim  PrimOp
 	Arity int
