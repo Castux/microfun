@@ -187,7 +187,7 @@ func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int)
 
 	case PushArg:
 		if pos := posText(p.Posns[in.A]); pos != "" {
-			return pos
+			return fmt.Sprintf("pos #%d  ; %s", in.A, pos)
 		}
 		return fmt.Sprintf("pos #%d", in.A)
 
