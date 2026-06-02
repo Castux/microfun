@@ -6,19 +6,36 @@ the existing bytecode backend (see
 
 ---
 
-## 1. Direct-reduction machine (the big one)
+## 1. Direct-reduction machine (the big one) — ✅ DONE (`--mode=stg`)
 
 **Problem:** The builder VM still materializes a fresh `RuntimeApplication` /
 `RuntimeCons` / `RuntimeTuple` / `NamedValue` graph per activation (each node
 embeds frame-specific thunk pointers, so it cannot be shared across activations),
 so allocation counts are essentially the same as the tree-walking interpreter.  
-**Fix:** Evolve the builder VM toward a spineless-tagless-G-machine-style
-evaluator so that bodies are *reduced* directly instead of materializing a
-`RuntimeValue` graph that the separate reducer then forces. This eliminates the
-per-activation graph entirely and is where the largest allocation win lives. The
-flat instruction stream and constant pools of the bytecode IR are a stepping stone
-toward this. See the design discussion in
-[5.Bytecode compiler §Design decision](5.Bytecode%20compiler.md#design-decision-a-builder-vm-not-a-reduction-vm).
+**Fix (implemented):** A spineless-tagless-G-machine backend
+([stg.go](../stg.go), [stgcompiler.go](../stgcompiler.go), [stgir.go](../stgir.go),
+`--mode=stg`) that *reduces* bodies directly: an application pushes its argument
+thunks onto the reduction stack and enters the head function, so the application
+spine is never built. Only genuine argument sub-expressions still allocate (as
+thunks); atoms are passed by reference. WHNF results stay ordinary `RuntimeValue`s,
+so the entire runtime (builtins, `show`, `DeepEqual`, stdin, errors) is reused
+unchanged. The full design is in [6.STG machine](6.STG%20machine.md); the build
+log is in [STG_PLAN.md](STG_PLAN.md). Measured: fewer GC cycles than the builder VM
+on allocation-heavy workloads, and a wall-clock speedup over both other backends
+(see `bench/run.sh`).
+
+**Remaining headroom (future work building on the STG):**
+
+- *Minimal free-variable capture.* Thunks currently capture the whole activation
+  frame by reference (simple, no slot renumbering) at the cost of retaining the
+  frame. Computing each thunk's exact free variables and capturing only those — as
+  the analyzer already does for lambda upvalues — would cut retention.
+- *Strictness / known-call optimization.* The arithmetic and comparison builtins
+  are strict; arguments to them need not be thunked at all. A simple strictness
+  pass (or special-casing known strict builtins at compile time) would remove a
+  large fraction of the remaining thunk allocations.
+- *Constructor field unboxing* and avoiding the pattern-bind `NamedValue` wrapper
+  when the bound subject is already a thunk.
 
 ---
 

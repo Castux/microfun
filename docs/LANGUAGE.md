@@ -49,7 +49,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 ## 2. Running a program
 
 ```
-microfun [--mode=interp|compiled] [--dump-ir] <path>
+microfun [--mode=interp|compiled|stg] [--dump-ir] <path>
 ```
 
 Loads the file at `<path>`, loads any modules it imports, analyzes everything,
@@ -60,8 +60,15 @@ not run; a run-time error is reported with a source location and a reduction
 trace.
 
 - `--mode=interp` (default) — tree-walking interpreter.
-- `--mode=compiled` — bytecode compiler + VM; produces identical output.
-- `--dump-ir` — disassemble the compiled IR to stdout and exit.
+- `--mode=compiled` — builder bytecode compiler + VM; produces identical output.
+- `--mode=stg` — spineless tagless G-machine; reduces bodies directly without
+  building the application spine. Produces identical output and is the fastest
+  backend.
+- `--dump-ir` — disassemble the selected mode's IR to stdout and exit
+  (the STG IR for `--mode=stg`, otherwise the builder bytecode).
+
+All three backends are guaranteed to produce byte-identical output; the choice is
+purely about evaluation strategy and performance.
 
 **Module search order.** For each import `name`, the interpreter first looks for
 `./name.mf` in the current working directory. If that file does not exist, it

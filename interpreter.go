@@ -328,6 +328,7 @@ func Interpret(analyzer *Analyzer) (result RuntimeValue) {
 		Modules: analyzer.Modules,
 	}
 	interpreter.applyClosure = interpreter.ApplyClosure
+	interpreter.reduce = interpreter.reduceGraph
 
 	// A RuntimeError is a program error we can report cleanly; anything else is
 	// an interpreter bug, so we re-panic to keep its Go stack trace.

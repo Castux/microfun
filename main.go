@@ -89,7 +89,7 @@ func main() {
 	var path string
 	for _, arg := range os.Args[1:] {
 		switch {
-		case arg == "--mode=interp" || arg == "--mode=compiled":
+		case arg == "--mode=interp" || arg == "--mode=compiled" || arg == "--mode=stg":
 			mode = arg[len("--mode="):]
 		case arg == "--dump-ir":
 			dumpIR = true
@@ -102,7 +102,7 @@ func main() {
 	}
 
 	if path == "" {
-		fmt.Println("Usage: microfun [--mode=interp|compiled] [--dump-ir] <path>")
+		fmt.Println("Usage: microfun [--mode=interp|compiled|stg] [--dump-ir] <path>")
 		os.Exit(1)
 	}
 
@@ -115,14 +115,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --dump-ir disassembles whichever backend's IR the selected mode would run.
 	if dumpIR {
-		fmt.Print(DisassembleProgram(Compile(analyzer)))
+		if mode == "stg" {
+			fmt.Print(DisassembleSTGProgram(CompileSTG(analyzer)))
+		} else {
+			fmt.Print(DisassembleProgram(Compile(analyzer)))
+		}
 		return
 	}
 
-	if mode == "compiled" {
+	switch mode {
+	case "compiled":
 		RunVM(NewVM(Compile(analyzer), analyzer.Modules))
-	} else {
+	case "stg":
+		RunSTG(NewMachine(CompileSTG(analyzer), analyzer.Modules))
+	default:
 		Interpret(analyzer)
 	}
 }

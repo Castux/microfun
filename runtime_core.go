@@ -33,8 +33,19 @@ type Runtime struct {
 	// applyClosure performs one beta reduction for the active backend. The
 	// interpreter sets it to its AST ApplyClosure; the VM to its bytecode apply.
 	// One indirect call per beta reduction; a whole run is one mode, so the call
-	// target is constant and perfectly predicted.
+	// target is constant and perfectly predicted. The STG machine does not use
+	// this hook — it beta-reduces inline in its own reduction loop — so it leaves
+	// it nil.
 	applyClosure func(RuntimeClosure, RuntimeValue) (RuntimeValue, bool)
+
+	// reduce is the weak-head-normal-form evaluator for the active backend.
+	// EvaluateToWeakHeadNormalForm (and therefore EvaluateToNumber/Tuple,
+	// EvaluateToFullNormalForm, DeepEqual, matchCase, and show) routes through it.
+	// The interpreter and builder VM both set it to reduceGraph (the explicit-stack
+	// reducer that forces the materialized value graph). The STG machine sets it to
+	// its own reduceSTG, which forces code-thunks by running their code. A whole run
+	// is one mode, so the target is constant.
+	reduce func(RuntimeValue) RuntimeValue
 }
 
 // builtinError reports a runtime error raised from inside a builtin, using the
@@ -65,14 +76,23 @@ type StackFrame struct {
 // EvaluateToWeakHeadNormalForm reduces a value until its outermost shape is
 // known: either a constructor (a number or a tuple, whose contents are left
 // untouched as thunks) or a function value that has no argument left to consume
-// (a closure, a builtin, or a composition).
+// (a closure, a builtin, or a composition). It dispatches to the active backend's
+// reducer (reduceGraph for the interpreter and builder VM, reduceSTG for the STG
+// machine); see the reduce hook on Runtime.
+func (rt *Runtime) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeValue {
+	return rt.reduce(value)
+}
+
+// reduceGraph is the reducer shared by the interpreter and the builder VM: it
+// forces the materialized RuntimeValue graph those backends build. It is the
+// default value of the reduce hook.
 //
 // The reduction runs on the explicit stack below rather than on the Go call
 // stack. Unwinding the spine of an application, following a chain of thunks, and
 // tail calls (a closure body that is itself an application) therefore all run in
 // constant Go stack space, which is what lets an infinite list be consumed one
 // cell at a time without overflowing.
-func (rt *Runtime) EvaluateToWeakHeadNormalForm(value RuntimeValue) RuntimeValue {
+func (rt *Runtime) reduceGraph(value RuntimeValue) RuntimeValue {
 
 	control := value
 	var stack []StackFrame
@@ -266,6 +286,57 @@ func (rt *Runtime) matchStringSpine(argument RuntimeValue, runes []rune) bool {
 	if !ok || len(rest) != 0 {
 		return false
 	}
+	return true
+}
+
+// matchCase runs a compiled matcher program (the flat pre-order encoding of a
+// pattern, see ir.go) against argument, filling frame with the pattern's bindings
+// on success and returning whether it matched. It forces exactly what the AST
+// matcher matchPatternInto forces, no more. It is shared by the builder VM and the
+// STG machine; both compile patterns to the same MInstr/MOp form. A fresh subject
+// stack is allocated per call because forcing a subject can re-enter the reducer
+// (and thus matchCase) — a shared stack would be corrupted by that reentrancy.
+func (rt *Runtime) matchCase(match []MInstr, consts []RuntimeValue, names []string, argument RuntimeValue, frame Environment) bool {
+	subjects := make([]RuntimeValue, 1, len(match)+1)
+	subjects[0] = argument
+
+	for pc := 0; pc < len(match); pc++ {
+		m := match[pc]
+		subject := subjects[len(subjects)-1]
+		subjects = subjects[:len(subjects)-1]
+
+		switch m.Op {
+		case MOpBind:
+			frame[m.A] = &NamedValue{Name: names[m.B], Value: subject}
+
+		case MOpNumber:
+			n, ok := rt.EvaluateToNumber(subject)
+			if !ok || float64(n) != float64(consts[m.A].(RuntimeNumber)) {
+				return false
+			}
+
+		case MOpTuple:
+			forced := rt.EvaluateToWeakHeadNormalForm(subject)
+			if cons, isCons := forced.(RuntimeCons); isCons {
+				if m.A != 2 {
+					return false
+				}
+				subjects = append(subjects, cons.Tail, cons.Head) // Head on top → matched first
+			} else if tuple, ok := forced.(RuntimeTuple); ok && len(tuple) == int(m.A) {
+				for j := len(tuple) - 1; j >= 0; j-- {
+					subjects = append(subjects, tuple[j])
+				}
+			} else {
+				return false
+			}
+
+		case MOpString:
+			if !rt.matchStringSpine(subject, []rune(consts[m.A].(stringConst))) {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 

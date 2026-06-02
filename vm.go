@@ -34,6 +34,7 @@ func NewVM(program *CompiledProgram, modules map[string]*Module) *VM {
 		Modules: modules,
 	}
 	vm.applyClosure = vm.applyClosure_
+	vm.reduce = vm.reduceGraph
 	return vm
 }
 
@@ -148,54 +149,10 @@ func (vm *VM) makeClosure(cl *CompiledLambda) RuntimeClosure {
 }
 
 // runMatcher runs a case's matcher program against the argument, filling frame
-// with the pattern's bindings on success. It forces exactly what matchPatternInto
-// forces, no more. The subject stack is reusable for the same non-reentrancy
-// reason as the operand stack.
+// with the pattern's bindings on success. It delegates to the shared
+// Runtime.matchCase (see runtime_core.go), which the STG machine reuses too.
 func (vm *VM) runMatcher(c *CompiledCase, argument RuntimeValue, frame Environment) bool {
-	// A fresh subject stack per call: runMatcher forces subjects, and a force can
-	// re-enter the reducer and thus another runMatcher, so a shared stack would be
-	// corrupted by reentrancy (unlike runBlock's opstack, which never forces).
-	subj := make([]RuntimeValue, 1, len(c.Match)+1)
-	subj[0] = argument
-
-	for pc := 0; pc < len(c.Match); pc++ {
-		m := c.Match[pc]
-		s := subj[len(subj)-1]
-		subj = subj[:len(subj)-1]
-
-		switch m.Op {
-		case MOpBind:
-			frame[m.A] = &NamedValue{Name: c.MNames[m.B], Value: s}
-
-		case MOpNumber:
-			n, ok := vm.EvaluateToNumber(s)
-			if !ok || float64(n) != float64(c.MConsts[m.A].(RuntimeNumber)) {
-				return false
-			}
-
-		case MOpTuple:
-			forced := vm.EvaluateToWeakHeadNormalForm(s)
-			if cons, isCons := forced.(RuntimeCons); isCons {
-				if m.A != 2 {
-					return false
-				}
-				subj = append(subj, cons.Tail, cons.Head) // Head on top → matched first
-			} else if t, ok := forced.(RuntimeTuple); ok && len(t) == int(m.A) {
-				for j := len(t) - 1; j >= 0; j-- {
-					subj = append(subj, t[j])
-				}
-			} else {
-				return false
-			}
-
-		case MOpString:
-			if !vm.matchStringSpine(s, []rune(c.MConsts[m.A].(stringConst))) {
-				return false
-			}
-		}
-	}
-
-	return true
+	return vm.matchCase(c.Match, c.MConsts, c.MNames, argument, frame)
 }
 
 // applyClosure_ is the VM's beta-reduction hook (installed as Runtime.applyClosure).

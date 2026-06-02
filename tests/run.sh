@@ -4,9 +4,10 @@
 #
 # For every tests/cases/<category>/<name>.mf this performs two checks:
 #
-#   * DIFFERENTIAL — run under --mode=interp (the AST tree-walker, the oracle)
-#     and --mode=compiled (the bytecode VM); their combined output and exit code
-#     must be byte-identical. Any divergence is a compiler bug.
+#   * DIFFERENTIAL — run under --mode=interp (the AST tree-walker, the oracle),
+#     --mode=compiled (the builder bytecode VM), and --mode=stg (the spineless
+#     tagless G-machine); each backend's combined output and exit code must be
+#     byte-identical to the interpreter's. Any divergence is a compiler bug.
 #
 #   * GOLDEN — the interpreter's output and exit code must match the recorded
 #     expectation in <name>.expected (and <name>.exit, when non-zero). This
@@ -50,7 +51,8 @@ fi
 
 tmp_i=$(mktemp)
 tmp_c=$(mktemp)
-trap 'rm -f "$tmp_i" "$tmp_c" "$BIN"' EXIT
+tmp_s=$(mktemp)
+trap 'rm -f "$tmp_i" "$tmp_c" "$tmp_s" "$BIN"' EXIT
 
 pass=0
 fail=0
@@ -85,12 +87,18 @@ while IFS= read -r mf; do
 	"$BIN" --mode=compiled "$mf" <"$in" >"$tmp_c" 2>&1
 	c_code=$?
 
+	"$BIN" --mode=stg "$mf" <"$in" >"$tmp_s" 2>&1
+	s_code=$?
+
 	expected_exit=0
 	[ -f "$base.exit" ] && expected_exit=$(cat "$base.exit")
 
 	reasons=""
 	if ! cmp -s "$tmp_i" "$tmp_c" || [ "$i_code" != "$c_code" ]; then
-		reasons="$reasons differential(interp exit $i_code != compiled exit $c_code or output differs)"
+		reasons="$reasons differential-compiled(interp exit $i_code != compiled exit $c_code or output differs)"
+	fi
+	if ! cmp -s "$tmp_i" "$tmp_s" || [ "$i_code" != "$s_code" ]; then
+		reasons="$reasons differential-stg(interp exit $i_code != stg exit $s_code or output differs)"
 	fi
 	if [ ! -f "$base.expected" ]; then
 		reasons="$reasons golden(no .expected — run --bless)"

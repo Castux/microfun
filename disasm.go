@@ -141,6 +141,118 @@ func opName(op Op) string {
 	}
 }
 
+// DisassembleSTGProgram renders a whole STGProgram (--mode=stg --dump-ir): the
+// module binding blocks followed by the program body. It is the STG counterpart of
+// DisassembleProgram and is debug-only.
+func DisassembleSTGProgram(p *STGProgram) string {
+	var sb strings.Builder
+	for name, blocks := range p.Modules {
+		for j, block := range blocks {
+			fmt.Fprintf(&sb, "module %s binding #%d:\n", name, j)
+			disassembleSTGBlock(&sb, block, 1)
+			sb.WriteByte('\n')
+		}
+	}
+	sb.WriteString("program body:\n")
+	disassembleSTGBlock(&sb, p.Body, 1)
+	return sb.String()
+}
+
+func disassembleSTGBlock(sb *strings.Builder, b *STGBlock, indent int) {
+	pad := strings.Repeat("  ", indent)
+	for pc, in := range b.Code {
+		fmt.Fprintf(sb, "%s%4d  %-12s %s\n", pad, pc, stgOpName(in.Op), stgOperandText(b, in))
+	}
+	for idx, block := range b.Blocks {
+		fmt.Fprintf(sb, "%sthunk block #%d:\n", pad, idx)
+		disassembleSTGBlock(sb, block, indent+1)
+	}
+	for idx, lambda := range b.Lambdas {
+		fmt.Fprintf(sb, "%slambda #%d (%d case(s)):\n", pad, idx, len(lambda.Cases))
+		for ci := range lambda.Cases {
+			c := &lambda.Cases[ci]
+			fmt.Fprintf(sb, "%s  case #%d  frame=%d\n", pad, ci, c.FrameSize)
+			disassembleSTGMatcher(sb, c, indent+2)
+			fmt.Fprintf(sb, "%s  body:\n", pad)
+			disassembleSTGBlock(sb, c.Body, indent+2)
+		}
+	}
+}
+
+// disassembleSTGMatcher renders an STGCase's matcher program. The matcher IR is
+// shared with the builder VM (MInstr/MOp), so this mirrors disassembleMatcher.
+func disassembleSTGMatcher(sb *strings.Builder, c *STGCase, indent int) {
+	pad := strings.Repeat("  ", indent)
+	for pc, m := range c.Match {
+		var operand string
+		switch m.Op {
+		case MOpNumber:
+			operand = showConst(c.MConsts[m.A])
+		case MOpBind:
+			operand = fmt.Sprintf("slot=%d name=%q", m.A, c.MNames[m.B])
+		case MOpTuple:
+			operand = fmt.Sprintf("arity=%d", m.A)
+		case MOpString:
+			operand = showConst(c.MConsts[m.A])
+		}
+		fmt.Fprintf(sb, "%s%4d  %-10s %s\n", pad, pc, mopName(m.Op), operand)
+	}
+}
+
+func stgOperandText(b *STGBlock, in STGInstr) string {
+	switch in.Op {
+	case SOpConst:
+		return showConst(b.Consts[in.A])
+	case SOpLocal:
+		return fmt.Sprintf("slot=%d", in.A)
+	case SOpUpvalue:
+		return fmt.Sprintf("slot=%d", in.A)
+	case SOpThunk:
+		return fmt.Sprintf("block=%d name=%q", in.A, b.Names[in.B])
+	case SOpMakeClosure:
+		return fmt.Sprintf("lambda=%d", in.A)
+	case SOpTuple:
+		return fmt.Sprintf("arity=%d", in.A)
+	case SOpPushArg:
+		return fmt.Sprintf("pos=%d", in.A)
+	case SOpStoreLet:
+		return fmt.Sprintf("slot=%d block=%d name=%q", in.A, in.B, b.Names[in.C])
+	default:
+		return ""
+	}
+}
+
+func stgOpName(op STGOp) string {
+	switch op {
+	case SOpConst:
+		return "Const"
+	case SOpStdin:
+		return "Stdin"
+	case SOpBstdin:
+		return "Bstdin"
+	case SOpLocal:
+		return "Local"
+	case SOpUpvalue:
+		return "Upvalue"
+	case SOpThunk:
+		return "Thunk"
+	case SOpMakeClosure:
+		return "MakeClosure"
+	case SOpCons:
+		return "Cons"
+	case SOpTuple:
+		return "Tuple"
+	case SOpCompose:
+		return "Compose"
+	case SOpPushArg:
+		return "PushArg"
+	case SOpStoreLet:
+		return "StoreLet"
+	default:
+		return fmt.Sprintf("STGOp(%d)", op)
+	}
+}
+
 func mopName(op MOp) string {
 	switch op {
 	case MOpNumber:
