@@ -42,12 +42,14 @@ func DumpBytecode(p *Program) string {
 	// State updated as we walk the instructions linearly.
 	slotNames := make(map[int]string) // current case/body: slot → bound name
 	closureIdx := -1                  // index of the closure span we're in, or -1
+	caseNum := 0                      // which case we're on within a closure, or 0
 
 	for pc := 0; pc < len(p.Code); pc++ {
 		if label, ok := labels[PC(pc)]; ok {
 			fmt.Fprintf(&sb, "\n%s\n", label)
 			slotNames = make(map[int]string)
 			closureIdx = closureByPC[PC(pc)]
+			caseNum = 0
 		}
 
 		in := p.Code[pc]
@@ -56,6 +58,9 @@ func DumpBytecode(p *Program) string {
 		switch in.Op {
 		case Case:
 			slotNames = make(map[int]string)
+			if closureIdx >= 0 {
+				caseNum++ // increment case counter within closures
+			}
 		case Bind:
 			if in.B >= 0 {
 				slotNames[int(in.A)] = p.Names[in.B]
@@ -66,7 +71,7 @@ func DumpBytecode(p *Program) string {
 			}
 		}
 
-		fmt.Fprintf(&sb, "│ %5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in, slotNames, closureIdx))
+		fmt.Fprintf(&sb, "│ %5d  %-12s  %s\n", pc, opName(in.Op), operandText(p, in, slotNames, closureIdx, caseNum))
 	}
 	return sb.String()
 }
@@ -138,8 +143,9 @@ func showCaptures(captures []Capture) string {
 
 // operandText decodes an instruction's operands against the program's pools.
 // slotNames is the current case/body's slot→name table; closureIdx is the index
-// of the enclosing closure (for PushUpvalue names), or -1.
-func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int) string {
+// of the enclosing closure (for PushUpvalue names), or -1; caseNum is which case
+// we're on within a closure (1-indexed), or 0 for non-closure spans.
+func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int, caseNum int) string {
 	switch in.Op {
 	case PushConst:
 		return value.ShowConst(p.Consts[in.A])
@@ -161,7 +167,11 @@ func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int)
 		return fmt.Sprintf("slot=%d", in.A)
 
 	case PushModule:
-		return fmt.Sprintf("%s[%d]", p.ModuleNames[in.A], in.B)
+		modName := p.ModuleNames[in.A]
+		if mbs, ok := p.Modules[modName]; ok && int(in.B) < len(mbs) {
+			return fmt.Sprintf("%s[%d]  ; %q", modName, in.B, mbs[in.B].Name)
+		}
+		return fmt.Sprintf("%s[%d]", modName, in.B)
 
 	case MakeTuple:
 		return fmt.Sprintf("arity=%d", in.A)
@@ -199,6 +209,20 @@ func operandText(p *Program, in Instr, slotNames map[int]string, closureIdx int)
 
 	case Bind:
 		return fmt.Sprintf("slot=%d name=%s", in.A, quotedName(p, in.B))
+
+	case Case:
+		if closureIdx >= 0 {
+			return fmt.Sprintf("case %d", caseNum)
+		}
+		return ""
+
+	case NoMatch:
+		if closureIdx >= 0 {
+			if pos := posText(p.Closures[closureIdx].NoMatch); pos != "" {
+				return fmt.Sprintf("; %s", pos)
+			}
+		}
+		return ""
 
 	case Prim:
 		name := value.PrimName(value.PrimOp(in.A))
