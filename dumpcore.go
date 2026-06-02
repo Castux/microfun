@@ -31,6 +31,9 @@ func DumpCore(mainCore CoreExpr, modCores map[string][]CoreBind) string {
 	}
 	sort.Strings(names)
 	for _, name := range names {
+		if len(modCores[name]) == 0 {
+			continue // every binding of this module was pruned as unreachable
+		}
 		fmt.Fprintf(&sb, "\nmodule %s\n", name)
 		for _, bind := range modCores[name] {
 			thunk := bind.Body.(CoreThunk)

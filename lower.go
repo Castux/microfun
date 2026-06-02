@@ -78,23 +78,37 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 		modSlots: make(map[*Binding]int),
 	}
 
-	// Module binding slots are needed before any body is lowered, since modules
-	// (and the program) may reference each other in any order.
+	// Only module bindings reachable from the program body are compiled. The rest
+	// are dead code: laziness means an unreferenced binding never runs, and the
+	// resolver has already checked every module independently, so dropping them
+	// changes nothing observable — it only spares them a compiled span and a startup
+	// thunk. Module binding slots are needed before any body is lowered, since
+	// modules (and the program) may reference each other in any order; they are
+	// assigned densely over the surviving bindings, per module in declaration order,
+	// so the module environment a slot indexes stays gap-free.
+	reachable := reachableModuleBindings(program, res)
 	for _, mod := range modules {
-		for i, pb := range mod.PublicBindings {
-			l.modSlots[pb] = i
+		slot := 0
+		for _, pb := range mod.PublicBindings {
+			if reachable[pb] {
+				l.modSlots[pb] = slot
+				slot++
+			}
 		}
 	}
 
 	modBinds := make(map[string][]CoreBind)
 	for modName, mod := range modules {
 		var binds []CoreBind
-		for i, pb := range mod.PublicBindings {
+		for _, pb := range mod.PublicBindings {
+			if !reachable[pb] {
+				continue
+			}
 			fb := &FrameBuilder{node: mod}
 			l.current = fb
 			body := l.lowerTail(pb.Expression)
 			binds = append(binds, CoreBind{
-				Slot: i,
+				Slot: l.modSlots[pb],
 				Name: pb.Name.Value,
 				Body: CoreThunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true},
 			})
@@ -110,6 +124,43 @@ func Lower(program *ASTProgram, modules map[string]*Module, res *Resolution) (Co
 	mainThunk := CoreThunk{Body: mainBody, Frame: fb.size, Name: "", Update: true}
 
 	return mainThunk, modBinds
+}
+
+// reachableModuleBindings computes the set of module public bindings transitively
+// referenced from the program body: a binding is live if the body uses it, or a
+// live binding's right-hand side uses it. It reads the resolver's facts — a plain
+// name resolving to a module binding, or any qualified name — so it needs no extra
+// analysis, just a worklist closure over the "references" relation.
+func reachableModuleBindings(program *ASTProgram, res *Resolution) map[*Binding]bool {
+	reachable := make(map[*Binding]bool)
+	var worklist []*Binding
+
+	collectRefs := func(expr Expression) {
+		Traverse(expr, func(n Node) {
+			switch x := n.(type) {
+			case *Name:
+				if fact, ok := res.Uses[x]; ok && fact.Kind == ResolveModule {
+					worklist = append(worklist, fact.Def.(*Binding))
+				}
+			case *QualifiedName:
+				if b, ok := res.Quals[x]; ok {
+					worklist = append(worklist, b)
+				}
+			}
+		}, nil)
+	}
+
+	collectRefs(program.Body)
+	for len(worklist) > 0 {
+		b := worklist[len(worklist)-1]
+		worklist = worklist[:len(worklist)-1]
+		if reachable[b] {
+			continue
+		}
+		reachable[b] = true
+		collectRefs(b.Expression)
+	}
+	return reachable
 }
 
 // lowerTail lowers an expression in demanded position.

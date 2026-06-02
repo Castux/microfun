@@ -135,21 +135,7 @@ the source-mapping shape to serialize.
 
 ---
 
-## 10. Prune unreferenced module bindings
-
-**Problem:** `Machine.Run` eagerly allocates a binding thunk — and its frame
-(`make([]Value, mb.Frame)`) — for *every* public binding of *every* loaded module
-at startup, whether or not the program reaches it. A program that imports `core`
-and `list` but uses a handful of their functions still pays for all of them.
-
-**Fix:** Compute the set of module bindings transitively reachable from the program
-body (the resolver already records every use) and allocate environment slots only
-for those. Unreferenced bindings need neither a thunk nor a slot. This trims
-startup allocation and is independent of the hot-loop work above.
-
----
-
-## 11. Drop the redundant number check in the prim kernel
+## 10. Drop the redundant number check in the prim kernel
 
 **Problem:** Before calling `evalPrim`, the machine already forces every operand of
 an arithmetic/comparison prim and verifies each is a `NumberTag`. `evalPrim` then
