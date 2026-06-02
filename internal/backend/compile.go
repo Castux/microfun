@@ -29,10 +29,12 @@ import (
 //   - compileValue(e): leaves exactly one value on the operand stack and never
 //     touches the reduction stack, so it is safe in any sub-expression position.
 //
-// Builtins (arithmetic included) are ordinary Builtin values applied through the
-// spine, saturating in the reducer — there is no Prim opcode in a body, so a body
-// never forces while it builds. That is what lets the machine reuse one operand
-// buffer (see machine.go).
+// Saturated builtin calls are lowered to Prim nodes (see lower.go) and compiled
+// to the Prim opcode, which forces its operands inline rather than going through
+// the spine. The operand buffer is always empty when a Prim is reached in body
+// position (any surrounding App has already PushArg'd its frames to the stack),
+// so the re-entrant runFrom calls triggered by forcing never overlap with live
+// operand data.
 
 // compiler accumulates the single flat Program. emit* helpers append to the shared
 // Code slice; intern* helpers deduplicate pool entries; pending holds out-of-line
@@ -196,6 +198,13 @@ func (c *compiler) compileBody(expr core.Expr) {
 			c.emit(PushArg, posIdx)
 		}
 		c.compileBody(e.Head) // the head extends the same spine
+
+	case core.Prim:
+		posIdx := c.internPos(e.Pos)
+		for _, arg := range e.Args {
+			c.compileValue(arg)
+		}
+		c.emitAB(Prim, int32(e.Op), posIdx)
 
 	case core.Let:
 		c.compileLetBindings(e.Binds)

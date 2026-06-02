@@ -256,8 +256,25 @@ func (l *Lowerer) lowerValue(expr syntax.Expression) Expr {
 }
 
 // lowerApp flattens an application spine `f a1 … an` in tail position.
+// When the head is a builtin name applied to exactly its arity of arguments,
+// it emits Prim directly — no Builtin value is built, no spine saturation in
+// the reducer. lowerArg still wraps any forcing sub-expression in a thunk;
+// the machine forces those when executing the Prim opcode.
 func (l *Lowerer) lowerApp(op *syntax.Operation) Expr {
 	pos := syntax.NodePos(op)
+
+	if name, ok := op.Operands[0].(*syntax.Name); ok {
+		if fact := l.res.Uses[name]; fact.Kind == syntax.ResolveBuiltin {
+			if b := value.InitialBuiltins[name.Value]; b != nil && len(op.Operands)-1 == b.Arity {
+				args := make([]Expr, b.Arity)
+				for k := range args {
+					args[k] = l.lowerArg(op.Operands[k+1])
+				}
+				return Prim{Op: b.Prim, Args: args, Pos: pos}
+			}
+		}
+	}
+
 	head := l.lowerTail(op.Operands[0])
 	var args []Expr
 	for k := 1; k < len(op.Operands); k++ {

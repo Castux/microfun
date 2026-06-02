@@ -11,14 +11,8 @@ import (
 var InitialBuiltins = map[string]*Builtin{}
 
 func init() {
-	for name, op := range map[string]PrimOp{
-		"add": PrimAdd, "sub": PrimSub, "mul": PrimMul, "div": PrimDiv,
-		"fdiv": PrimFdiv, "mod": PrimMod, "fmod": PrimFmod, "pow": PrimPow,
-		"sqrt": PrimSqrt, "eq": PrimEq, "lt": PrimLt, "lte": PrimLte,
-		"gte": PrimGte, "gt": PrimGt, "neq": PrimNeq,
-		"equal": PrimEqual, "eval": PrimEval, "peek": PrimPeek,
-		"show": PrimShow, "write": PrimWrite, "bwrite": PrimBwrite,
-	} {
+	for op := PrimOp(0); op < primOpCount; op++ {
+		name := PrimNames[op]
 		InitialBuiltins[name] = &Builtin{Prim: op, Arity: PrimArity[op], Name: name}
 	}
 }

@@ -24,20 +24,14 @@ arithmetic operands. This needs a continuation/return frame and an interleaved
 exec/reduce loop (an EVAL-style machine), which is harder to read than the current
 build-then-reduce split — hence deferred. A cheaper down payment:
 
-- **Saturated direct prim calls.** The Core IR and bytecode already reserve a
-  `CorePrim` / `Prim` form for a syntactically saturated, direct prim call
-  (`add 2 3`) that skips the `Builtin` value entirely. The lowerer currently does
-  not emit it (every builtin goes through the application spine). Emitting
-  `CorePrim` for the common case would cut the
-  per-call `Builtin` allocation and one spine round-trip. Note the operand-buffer
-  hazard: a `Prim` that forces mid-body would re-enter `runFrom` while its operand
-  buffer is live, so this must either force on a separate path or be restricted to
-  positions where the buffer is empty.
-
-  The `Prim` opcode is already fully wired in `runFrom` / `runMatch`; only the
-  compiler does not emit it. When it goes live, `PrimArity` / `PrimNames`
-  (currently `map[PrimOp]…`) should become arrays indexed by the dense `PrimOp`
-  enum, since the arity lookup then sits on the hot path.
+- **Saturated direct prim calls.** *(implemented)* The lowerer now detects when
+  a builtin name is applied to exactly its arity of arguments and emits `CorePrim`
+  / `Prim` directly, skipping the `Builtin` value and the spine saturation dance in
+  the reducer. `PrimArity` / `PrimNames` are arrays indexed by the dense `PrimOp`
+  enum. The operand buffer is always empty when a `Prim` is reached in body
+  position (surrounding `App` nodes PushArg their args to the reduction stack
+  before recursing into the head), so re-entrant `runFrom` calls from forcing never
+  overlap with live operand data.
 
 ---
 

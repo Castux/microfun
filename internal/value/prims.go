@@ -32,43 +32,31 @@ const (
 	PrimShow
 	PrimWrite
 	PrimBwrite
+
+	primOpCount // sentinel for array sizing
 )
 
-// PrimNames maps each numeric/comparison PrimOp to its builtin name, used to word
-// the "argument to <name> is not a number" error.
-var PrimNames = map[PrimOp]string{
+// PrimNames gives the source-level name of each PrimOp, indexed by the dense enum.
+// Used in error messages and bytecode/IR dumps.
+var PrimNames = [primOpCount]string{
 	PrimAdd: "add", PrimSub: "sub", PrimMul: "mul", PrimDiv: "div",
 	PrimFdiv: "fdiv", PrimMod: "mod", PrimFmod: "fmod", PrimPow: "pow",
 	PrimSqrt: "sqrt",
-	PrimEq:   "eq", PrimLt: "lt", PrimLte: "lte", PrimGte: "gte", PrimGt: "gt", PrimNeq: "neq",
+	PrimEq:  "eq", PrimLt: "lt", PrimLte: "lte", PrimGte: "gte", PrimGt: "gt", PrimNeq: "neq",
+	PrimEqual: "equal",
+	PrimEval:  "eval", PrimPeek: "peek", PrimShow: "show", PrimWrite: "write", PrimBwrite: "bwrite",
 }
 
-// PrimName returns the source-level name of a primitive operation, covering both
-// the numeric/comparison kernels (from PrimNames) and the structural builtins.
+// PrimName returns the source-level name of a primitive operation.
 func PrimName(op PrimOp) string {
-	if name, ok := PrimNames[op]; ok {
-		return name
+	if int(op) < len(PrimNames) {
+		return PrimNames[op]
 	}
-	switch op {
-	case PrimEqual:
-		return "equal"
-	case PrimEval:
-		return "eval"
-	case PrimPeek:
-		return "peek"
-	case PrimShow:
-		return "show"
-	case PrimWrite:
-		return "write"
-	case PrimBwrite:
-		return "bwrite"
-	default:
-		return fmt.Sprintf("prim(%d)", op)
-	}
+	return fmt.Sprintf("prim(%d)", op)
 }
 
-// PrimArity maps each PrimOp to its required number of arguments.
-var PrimArity = map[PrimOp]int{
+// PrimArity gives each PrimOp's required number of arguments, indexed by the dense enum.
+var PrimArity = [primOpCount]int{
 	PrimAdd: 2, PrimSub: 2, PrimMul: 2, PrimDiv: 2, PrimFdiv: 2, PrimMod: 2, PrimFmod: 2, PrimPow: 2,
 	PrimSqrt: 1,
 	PrimEq:   2, PrimLt: 2, PrimLte: 2, PrimGte: 2, PrimGt: 2, PrimNeq: 2,
