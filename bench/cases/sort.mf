@@ -11,7 +11,7 @@
 -- reproducible; `sum` forces the whole sorted spine.
 import core, list, math in
 let
-  randomNext = n -> mod 100000 (add 1013904223 (mul 1664525 n)),
-  data       = take 9000 (iterate randomNext 1)
+  randomNext = n -> mul 1664525 n > add 1013904223 > mod 100000,
+  data       = iterate randomNext 1 > take 9000
 in
-show (sum (sort data))
+data > sort > sum > show

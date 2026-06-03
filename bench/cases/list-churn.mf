@@ -13,6 +13,6 @@
 -- deep thunk; the work, not the depth, is what scales.
 import core, list, math in
 let
-  pass = seed -> sum (filter even (map (mul 3) (range 1 4000)))
+  pass = seed -> range 1 4000 > map (mul 3) > filter even > sum
 in
-show (sum (map pass (range 1 175)))
+range 1 175 > map pass > sum > show

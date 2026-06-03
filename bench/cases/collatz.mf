@@ -9,7 +9,7 @@
 -- thunk depth at the list length (15000), well under the deep-recursion ceiling.
 import core, list, math in
 let
-  step = n -> if (even n) (div 2 n) (add 1 (mul 3 n)),
-  len  = n -> if (lte 1 n) 0 (add 1 (len (step n)))
+  step = n -> if (even n) (div 2 n) (mul 3 n > add 1),
+  len  = n -> if (lte 1 n) 0 (step n > len > add 1)
 in
-show (sum (map len (range 1 15000)))
+range 1 15000 > map len > sum > show

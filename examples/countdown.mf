@@ -30,8 +30,8 @@
 import list, core, text, comb in
 
 let
-	target  = 800,
-	numbers = [100; 25; 3; 2; 4; 7],
+	target  = 364,
+	numbers = [100; 25; 1; 9; 4; 7],
 
 	-- Node accessors -------------------------------------------------------
 
@@ -49,9 +49,9 @@ let
 		let lv = value left, rv = value right in
 			flatten [
 				if (lte lv rv)                                 [ [add lv rv, '+', left, right]; ] [];
-				if (and (gt 1 lv) (and (gt 1 rv) (lte lv rv))) [ [mul lv rv, '*', left, right]; ] [];
+				if (lte lv rv > and (gt 1 rv) > and (gt 1 lv)) [ [mul lv rv, '*', left, right]; ] [];
 				if (gt rv lv)                                  [ [sub rv lv, '-', left, right]; ] [];
-				if (and (gt 1 rv) (eq 0 (mod rv lv)))          [ [div rv lv, '/', left, right]; ] []
+				if (mod rv lv > eq 0 > and (gt 1 rv))          [ [div rv lv, '/', left, right]; ] []
 			],
 
 	-- Every left result against every right result.

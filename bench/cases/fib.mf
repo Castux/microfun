@@ -12,6 +12,6 @@ import core, math in
 let fib = {
   0 -> 0,
   1 -> 1,
-  n -> add (fib (sub 1 n)) (fib (sub 2 n))
+  n -> add (fib < sub 1 n) (fib < sub 2 n)
 } in
 show (fib 32)

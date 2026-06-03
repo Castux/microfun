@@ -1,3 +1,7 @@
 -- Folds and product.
 import core, list in
-show [foldl add 0 [1; 2; 3; 4; 5]; foldr add 0 [1; 2; 3]; product [1; 2; 3; 4]]
+show [
+  [1; 2; 3; 4; 5] > foldl add 0;
+  [1; 2; 3] > foldr add 0;
+  [1; 2; 3; 4] > product
+]
