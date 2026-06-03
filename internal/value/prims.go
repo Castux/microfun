@@ -42,7 +42,7 @@ var PrimNames = [primOpCount]string{
 	PrimAdd: "add", PrimSub: "sub", PrimMul: "mul", PrimDiv: "div",
 	PrimFdiv: "fdiv", PrimMod: "mod", PrimFmod: "fmod", PrimPow: "pow",
 	PrimSqrt: "sqrt",
-	PrimEq:  "eq", PrimLt: "lt", PrimLte: "lte", PrimGte: "gte", PrimGt: "gt", PrimNeq: "neq",
+	PrimEq:   "eq", PrimLt: "lt", PrimLte: "lte", PrimGte: "gte", PrimGt: "gt", PrimNeq: "neq",
 	PrimEqual: "equal",
 	PrimEval:  "eval", PrimPeek: "peek", PrimShow: "show", PrimWrite: "write", PrimBwrite: "bwrite",
 }

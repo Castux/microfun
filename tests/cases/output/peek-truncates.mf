@@ -1,0 +1,5 @@
+-- peek bounds its output by width; show does not. A list longer than peek's
+-- width limit is rendered truncated by peek but in full by show, so the two
+-- lines differ — and each builtin prints exactly once (memoisation).
+import core, list in
+range 1 120 > peek > show

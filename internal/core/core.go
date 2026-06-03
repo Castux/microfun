@@ -52,14 +52,13 @@ type Let struct {
 type Lambda struct {
 	Cases     []Case
 	Free      []Addr
-	FreeNames []string        // debug: name of each captured variable, parallel to Free
+	FreeNames []string // debug: name of each captured variable, parallel to Free
 	Frame     int
 	NoMatch   source.SourcePos // span of the whole pattern set, for the "no pattern matched" error
 }
 
 type Thunk struct {
 	Body  Expr
-	Free  []Addr
 	Frame int
 	Name  string
 	Pos   source.SourcePos // debug: definition site, for the bytecode dump
