@@ -48,8 +48,8 @@ const (
 	MakeTuple             // pop A operands; push Tuple of arity A (A ≠ 2)
 	MakeCompose           // pop second, first; push Composition{first, second}
 	MakeClosure           // push a closure from Closures[A], capturing the current frames
-	MakeThunk             // push a call-by-name thunk from Thunks[A] over the current frames
-	StoreLet              // Locals[A] = a call-by-need thunk from Thunks[B] over the current frames
+	MakeThunk             // push a (memoising) thunk from Thunks[A] over the current frames
+	StoreLet              // Locals[A] = a (memoising) thunk from Thunks[B] over the current frames
 
 	// Apply / tail position (push/enter: push arguments, then enter the head).
 	PushArg // pop an operand; push it as an argument frame (with Posns[A]) onto the reduction stack

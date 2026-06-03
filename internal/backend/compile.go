@@ -263,7 +263,8 @@ func (c *compiler) compileValue(expr core.Expr) {
 		c.emit(MakeClosure, c.declareLambda(e))
 
 	case core.Thunk:
-		// A thunk in value position is a lazy argument or field (call-by-name).
+		// A thunk in value position is a lazy argument or field; like every thunk
+		// it memoises, so the deferred computation runs at most once.
 		c.emit(MakeThunk, c.declareThunk(e))
 
 	case core.Let:

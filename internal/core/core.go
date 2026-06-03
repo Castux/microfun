@@ -58,12 +58,11 @@ type Lambda struct {
 }
 
 type Thunk struct {
-	Body   Expr
-	Free   []Addr
-	Frame  int
-	Name   string
-	Update bool
-	Pos    source.SourcePos // debug: definition site, for the bytecode dump
+	Body  Expr
+	Free  []Addr
+	Frame int
+	Name  string
+	Pos   source.SourcePos // debug: definition site, for the bytecode dump
 }
 
 type AddrKind uint8

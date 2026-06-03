@@ -471,10 +471,17 @@ and then only to the depth required. Reduction is forced by:
   bounded in width and depth; `write` forces the spine and elements of a code-point
   list.
 
-A bound expression is **memoized**: once reduced to weak head normal form, the
+Every expression is **memoized**: once reduced to weak head normal form, the
 result is shared, so it is never recomputed and further reduction resumes where it
-stopped. Together with mutual `let` bindings, this makes self-referential
-definitions efficient — `fibonacci` above computes each element once.
+stopped. This holds for *all* values — not just names bound by `let` or a pattern,
+but also unnamed arguments, tuple fields, and the intermediate results of a pipe.
+Together with mutual `let` bindings, memoization makes self-referential definitions
+efficient — `fibonacci` above computes each element once.
+
+A consequence for the output builtins: `peek`, `show`, `write`, and `bwrite`
+return their argument, but because every value is computed at most once, threading
+a value through several of them prints each one's view once — `xs > peek > show`
+prints exactly two lines, not three.
 
 A consequence of laziness is that infinite structures are fine as long as only a
 finite part is forced:

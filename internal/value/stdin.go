@@ -30,7 +30,6 @@ func getStdinReader() *bufio.Reader {
 func makeInputStream(readCell func() (float64, bool)) Value {
 	var thunk *Thunk
 	thunk = &Thunk{
-		Update: true,
 		Read: func() Value {
 			num, ok := readCell()
 			if !ok {

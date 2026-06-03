@@ -19,7 +19,7 @@ import (
 //     position; everything else is a value.
 //   - lowerArg(e): e is an argument or a data field, so it must stay lazy. Anything
 //     that could force when entered (an application, a pipe, a let) becomes a
-//     call-by-name thunk; atoms and pure constructors are built directly.
+//     thunk; atoms and pure constructors are built directly.
 //   - lowerValue(e): builds a value (literal, constructor, name, closure,
 //     composition). Its compound parts are lowered with lowerArg so they stay lazy.
 //
@@ -142,7 +142,7 @@ func Lower(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			binds = append(binds, Bind{
 				Slot: l.modSlots[pb],
 				Name: pb.Name.Value,
-				Body: Thunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Update: true, Pos: syntax.NodePos(pb.Expression)},
+				Body: Thunk{Body: body, Frame: fb.size, Name: pb.Name.Value, Pos: syntax.NodePos(pb.Expression)},
 			})
 		}
 		modBinds[modName] = binds
@@ -153,7 +153,7 @@ func Lower(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	mainBody := l.lowerTail(program.Body)
 	// The program body has no binding name, so it never appears in a trace and its
 	// thunk is left anonymous.
-	mainThunk := Thunk{Body: mainBody, Frame: fb.size, Name: "", Update: true}
+	mainThunk := Thunk{Body: mainBody, Frame: fb.size, Name: ""}
 
 	return mainThunk, modBinds
 }
@@ -220,12 +220,12 @@ func (l *Lowerer) lowerArg(expr syntax.Expression) Expr {
 	case *syntax.Operation:
 		switch e.Operator {
 		case "", ">", "<": // an application/pipe may force when entered → defer it
-			return Thunk{Body: l.lowerTail(e), Update: false, Pos: syntax.NodePos(e)}
+			return Thunk{Body: l.lowerTail(e), Pos: syntax.NodePos(e)}
 		default: // a composition only builds a value → build it directly
 			return l.lowerValue(e)
 		}
 	case *syntax.Let:
-		return Thunk{Body: l.lowerTail(e), Update: false, Pos: syntax.NodePos(e)}
+		return Thunk{Body: l.lowerTail(e), Pos: syntax.NodePos(e)}
 	default:
 		return l.lowerValue(expr)
 	}
@@ -330,7 +330,7 @@ func (l *Lowerer) lowerPipe(operator string, operands []syntax.Expression, pos s
 	if len(rest) == 1 {
 		arg = l.lowerArg(rest[0])
 	} else {
-		arg = Thunk{Body: l.lowerPipe(operator, rest, pos), Update: false}
+		arg = Thunk{Body: l.lowerPipe(operator, rest, pos)}
 	}
 	return App{Head: l.lowerTail(head), Args: []Expr{arg}, Pos: pos}
 }
@@ -363,7 +363,7 @@ func (l *Lowerer) lowerLet(let *syntax.Let) Expr {
 		binds[i] = Bind{
 			Slot: slots[i],
 			Name: b.Name.Value,
-			Body: Thunk{Body: body, Name: b.Name.Value, Update: true, Pos: syntax.NodePos(b.Expression)},
+			Body: Thunk{Body: body, Name: b.Name.Value, Pos: syntax.NodePos(b.Expression)},
 		}
 	}
 	return Let{Binds: binds, Body: l.lowerTail(let.Expression)}

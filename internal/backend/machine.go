@@ -72,7 +72,6 @@ func (m *Machine) Run() value.Value {
 				Code:   mb.Code,
 				Locals: make([]value.Value, mb.Frame),
 				Name:   mb.Name,
-				Update: true,
 			})
 		}
 		m.ModEnvs[modName] = env
@@ -148,17 +147,14 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				continue
 			}
 			if thunk.Code >= 0 {
-				// Code thunk: push update frame if memoizing, then run its body.
-				if thunk.Update {
-					stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
-				}
+				// Code thunk: push an update frame to memoise, then run its body.
+				stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
 				control, stack = m.runFrom(thunk.Code, thunk.Locals, thunk.Upvalues, stack)
 				continue
 			}
-			// Graph-style indirection (NoCode).
-			if thunk.Update {
-				stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
-			}
+			// Graph-style indirection (NoCode): push an update frame to memoise the
+			// reduced value, then continue with the value it stands for.
+			stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
 			control = thunk.Value
 			continue
 		}
@@ -333,7 +329,6 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFr
 				Locals:   locals,
 				Upvalues: upvalues,
 				Name:     name,
-				Update:   false, // MakeThunk is call-by-name
 			}))
 
 		case StoreLet:
@@ -347,7 +342,6 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFr
 				Locals:   locals,
 				Upvalues: upvalues,
 				Name:     name,
-				Update:   true, // let bindings are call-by-need
 			})
 
 		case PushArg:
@@ -459,10 +453,9 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 				name = m.Prog.Names[in.B]
 			}
 			locals[in.A] = value.ThunkValue(&value.Thunk{
-				Code:   value.NoCode,
-				Value:  subject,
-				Name:   name,
-				Update: true,
+				Code:  value.NoCode,
+				Value: subject,
+				Name:  name,
 			})
 
 		case NoMatch:
@@ -530,7 +523,6 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 				Locals:   locals,
 				Upvalues: upvalues,
 				Name:     name,
-				Update:   false,
 			}))
 
 		case StoreLet:
@@ -544,7 +536,6 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 				Locals:   locals,
 				Upvalues: upvalues,
 				Name:     name,
-				Update:   true,
 			})
 
 		case PushArg:

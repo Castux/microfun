@@ -185,7 +185,7 @@ func writeCoreExpr(sb *strings.Builder, expr Expr, prefix string, isLast bool) {
 		}
 
 	case Thunk:
-		coreLine(sb, prefix, isLast, "thunk (update %t, frame %d%s)", e.Update, e.Frame, thunkName(e.Name))
+		coreLine(sb, prefix, isLast, "thunk (frame %d%s)", e.Frame, thunkName(e.Name))
 		nextPrefix := prefix
 		if isLast {
 			nextPrefix += "    "
