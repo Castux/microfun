@@ -1,60 +1,63 @@
 # microfun — performance benchmarks
 
-A small set of heavy programs used to compare the two execution backends — the
-AST tree-walking **interpreter** (`--mode=interp`) and the **compiled** bytecode
-VM (`--mode=compiled`) — described in
-[IMPLEMENTATION.md §16](../IMPLEMENTATION.md#16-the-compiled-backend-bytecode)
-and [BYTECODE.md](../BYTECODE.md).
+A small set of heavy programs used to measure the microfun engine: the flat
+bytecode ([5.Bytecode and Compiler](../docs/5.Bytecode%20and%20Compiler.md)) run
+by the spineless-tagless G-machine
+([6.The G-machine](../docs/6.The%20G-machine.md)). microfun has a **single
+execution engine**, so there is no cross-backend comparison — the headline number
+is wall-clock per case.
 
 These are **not** regression tests. The correctness suite lives in
 [tests/](../tests/) (fast, byte-exact, differential + golden) and the in-language
 standard-library unit tests in [examples/core_tests.mf](../examples/core_tests.mf).
-The programs here are deliberately slow — each runs roughly **10–30 s per mode** —
-so they are run by hand, not in CI.
+The programs here are deliberately slow — each runs roughly **10–30 s** — so they
+are run by hand, not in CI.
 
 ## Running
 
 ```
-bench/run.sh                 # all cases, both modes, one run each
+bench/run.sh                 # all cases, one run each
 bench/run.sh fib             # only bench/cases/fib.mf
-bench/run.sh --reps 3        # run each mode 3× and keep the fastest
+bench/run.sh --reps 3        # run each case 3× and keep the fastest
 pwsh bench/run.ps1 [name]    # PowerShell equivalent (-Reps N)
 ```
 
-Each runner builds `microfun.bench.exe`, runs every `bench/cases/*.mf` under both
-modes, **verifies the two modes produce identical output** (a perf number is
-meaningless if the backends disagree), times each, and prints a table with the
-per-case and total speedup (`interp / compiled`). A non-`ok` `match` column means
-the backends diverged — a correctness bug to fix before trusting any timing.
+Each runner builds `microfun.bench.exe`, runs every `bench/cases/*.mf`, times each,
+and prints a table of per-case and total wall-clock.
+
+**Optional oracle baseline.** If a frozen binary `microfun.oracle.exe` is present
+in the repo root, each case is also timed against it and the engine's output is
+checked to still match the oracle's (a perf number is meaningless if the engine
+has changed behaviour). The table then gains `oracle(s)`, `speedup`
+(`oracle / engine`), and `match` columns; a non-`ok` `match` is a correctness
+regression to fix before trusting any timing. To create one, build at a known-good
+commit: `go build -o microfun.oracle.exe .`.
 
 Timings are wall-clock; close other load for stable numbers, and prefer
 `--reps`/`-Reps` to discount one-off noise.
 
 ## What each case stresses
 
-The compiled backend's win today is narrow by design: it replaces the two
-per-activation AST walks (body translation and pattern matching) but still builds
-the same lazy `RuntimeValue` graph that the shared reducer forces
-([BYTECODE.md §2–3](../BYTECODE.md)). So expect **modest** speedups now. Several
-cases are written specifically to track aspects the implementation is expected to
-change (the optimizations footnoted in [BYTECODE.md §15](../BYTECODE.md)); their
-ratios are sentinels for that future work.
+Each program isolates a particular runtime cost. Several are **sentinels** for the
+optimizations proposed in [IMPROVEMENTS.md](../docs/IMPROVEMENTS.md): their
+absolute time (or, with an oracle, their ratio) is the number to watch when that
+work lands.
 
 | Case | Kind | Stresses |
 |------|------|----------|
-| `fib` | common algorithm | raw β-reduction + number-pattern dispatch; the cleanest test of the two replaced AST walks |
-| `ackermann` | common algorithm | very deep non-tail recursion; the closure-apply hook and reducer spine |
+| `fib` | common algorithm | raw β-reduction + number-pattern dispatch; touches no module, so the cleanest test of closure application and matching |
+| `ackermann` | common algorithm | very deep non-tail recursion; the closure-apply path and reducer spine |
 | `collatz` | common algorithm | integer-arithmetic builtins + user-driven conditionals + per-number recursion |
-| `sort` | common algorithm | compound-data allocation (quicksort cons churn), comparison closures, cross-module refs (→ §15.2 link-patching) |
-| `list-churn` | **future-change sentinel** | per-activation graph allocation — the cost a direct-reduction machine (§15.1) would remove. Gap should stay small until then. |
-| `match-dispatch` | **future-change sentinel** | matcher worst case — 19 literal clauses failing before a catch-all (→ §15.3 fail-fast matcher) |
+| `sort` | common algorithm | compound-data allocation (quicksort cons churn), comparison closures, and cross-module references (now resolved to direct slot indexes, not a name lookup — see [5.Bytecode and Compiler §Module and program layout](../docs/5.Bytecode%20and%20Compiler.md#module-and-program-layout)) |
+| `list-churn` | **sentinel** | per-activation graph allocation — the dominant cost the eager-evaluation / frame-reuse work ([IMPROVEMENTS.md §1, §5](../docs/IMPROVEMENTS.md)) would cut |
+| `match-dispatch` | **sentinel** | matcher worst case — 19 literal clauses failing before a catch-all ([IMPROVEMENTS.md §5, fail-fast matcher](../docs/IMPROVEMENTS.md)) |
 
 ## Sizing
 
-Each program is sized so the interpreter (the slower mode) lands in the 10–30 s
-window on the development machine. To retarget, edit the single size constant
-near the top of each `.mf` (the `take` count, the `range` bound, or the argument
-to `fib`/`go`). Two constraints worth knowing:
+Each program is sized to land in the 10–30 s window on the development machine. To
+retarget, edit the single size constant near the top of each `.mf` (the `take`
+count, the `range` bound, or the argument to `fib`/`go`). Two constraints worth
+knowing:
 
 - **Deep-thunk ceiling.** A flat `sum`/`foldl`/`foldr` over a list of length *N*
   forces an *N*-deep chain on the Go stack; past roughly a few hundred thousand
@@ -62,4 +65,4 @@ to `fib`/`go`). Two constraints worth knowing:
   `match-dispatch` avoid it by chunking and by O(log n)-depth balanced recursion
   respectively. Scale by widening the work, not by deepening a single fold.
 - Inputs are reproducible (a fixed LCG seed, fixed ranges), so output hashes are
-  stable across runs and the cross-mode match check is meaningful.
+  stable across runs and the oracle match check is meaningful.
