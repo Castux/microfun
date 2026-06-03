@@ -13,8 +13,12 @@ import (
 // update frames, and forces thunks by running their compiled bodies rather than
 // reducing a graph.
 type Machine struct {
-	Prog    *Program
-	ModEnvs map[string][]value.Value // module name → binding thunks
+	Prog *Program
+	// moduleEnvs holds each module's binding thunks, indexed by module index
+	// (Prog.ModuleNames position) — the same integer a PushModule instruction
+	// carries in its A operand. Resolving module references to a slice index keeps
+	// the build loop free of the per-access string-keyed map lookup it used before.
+	moduleEnvs [][]value.Value
 
 	// The operand buffer runFrom builds values on. It is reused across calls
 	// because runFrom never forces, so two runFrom calls never overlap.
@@ -44,10 +48,7 @@ type StackFrame struct {
 }
 
 func NewMachine(prog *Program) *Machine {
-	m := &Machine{
-		Prog:    prog,
-		ModEnvs: make(map[string][]value.Value),
-	}
+	m := &Machine{Prog: prog}
 	// WHNF re-enters the machine through this package-level handle (show, equal,
 	// the prim kernels, and the stdin streams all force values without a Machine
 	// receiver). A program runs one Machine, so a single handle suffices.
@@ -63,8 +64,12 @@ func NewMachine(prog *Program) *Machine {
 
 // Run initialises module environments and reduces the main body to WHNF.
 func (m *Machine) Run() value.Value {
-	// Create module environments so modules can refer to each other.
-	for _, modName := range m.Prog.ModuleOrder {
+	// Create module environments so modules can refer to each other. They are
+	// indexed by module index (Prog.ModuleNames position) so PushModule reaches one
+	// with a direct slice index; a module that was never referenced has no name in
+	// ModuleNames and so no env, but it is also never accessed.
+	m.moduleEnvs = make([][]value.Value, len(m.Prog.ModuleNames))
+	for i, modName := range m.Prog.ModuleNames {
 		mbs := m.Prog.Modules[modName]
 		env := make([]value.Value, len(mbs))
 		for j, mb := range mbs {
@@ -74,7 +79,7 @@ func (m *Machine) Run() value.Value {
 				Name:   mb.Name,
 			})
 		}
-		m.ModEnvs[modName] = env
+		m.moduleEnvs[i] = env
 	}
 
 	// Reduce the main body.
@@ -280,8 +285,7 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFr
 			operands = append(operands, upvalues[in.A])
 
 		case PushModule:
-			modName := m.Prog.ModuleNames[in.A]
-			operands = append(operands, m.ModEnvs[modName][in.B])
+			operands = append(operands, m.moduleEnvs[in.A][in.B])
 
 		case PushStdin:
 			operands = append(operands, value.StdinCodePoints())
@@ -474,8 +478,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			operands = append(operands, upvalues[in.A])
 
 		case PushModule:
-			modName := m.Prog.ModuleNames[in.A]
-			operands = append(operands, m.ModEnvs[modName][in.B])
+			operands = append(operands, m.moduleEnvs[in.A][in.B])
 
 		case PushStdin:
 			operands = append(operands, value.StdinCodePoints())
