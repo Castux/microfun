@@ -8,10 +8,11 @@
 --
 -- A classic recursion benchmark.
 import core, list, math in
-let ack = m -> n -> if (eq 0 m)
-  (add 1 n)
-  (if (eq 0 n)
-    (ack (sub 1 m) 1)
-    (sub 1 n > ack m > ack (sub 1 m))))
+let
+	ack = m -> n -> [m,n] > {
+		[0,n] -> succ n,
+		[m,0] -> ack (pred m) 1,
+		[m,n] -> ack (pred m) (ack m (pred n))
+	}
 in
-[5; 6; 7] > map (ack 3) > sum > show
+range 5 8 > map (ack 3) > sum > show
