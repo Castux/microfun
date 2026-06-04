@@ -95,6 +95,15 @@ filter = f -> {
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
 
+-- findIndex f l: index of first element of l matching predicate p (returns maybe)
+findIndex = p -> l -> let
+	rec = i -> {
+		[] -> maybe.none,
+		[h,t] -> if (p h) (maybe.some i) (rec (add 1 i) t)
+	}
+in
+	 rec 0 l,
+
 -- foldr f acc l: right-associative reduction: f l1 (f l2 (... (f ln acc)))
 foldr = f -> acc -> {
 	[] -> acc,

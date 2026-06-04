@@ -9,11 +9,11 @@ let
   -- Cell-index decomposition.
   rowOf = div 9,
   colOf = mod 9,
-  boxOf = i -> add (i > rowOf > div 3 > mul 3) (i colOf > div 3),
+  boxOf = i -> add (i > rowOf > div 3 > mul 3) (i > colOf > div 3),
 
   -- All 9 values for a row / column / box.
-  rowCells = r -> board -> range (mul 9 r) (add 8 (mul 9 r)) > map (n -> nth n board),
-  colCells = c -> board -> range 0 8 > map (n -> nth (add c (mul 9 n)) board),
+  rowCells = r -> board -> range (mul 9 r) (mul 9 r > add 8) > map (n -> nth n board),
+  colCells = c -> board -> range 0 8 > map (n -> nth (mul 9 n > add c) board),
   boxCells = b -> board ->
     let br = mul 3 (div 3 b), bc = mul 3 (mod 3 b) in
       range 0 8 > map (n -> nth (add (mul 9 (add br (div 3 n))) (add bc (mod 3 n))) board),
@@ -24,33 +24,17 @@ let
       > and (colCells c board > contains d > not)
       > and (boxCells b board > contains d > not),
 
-  -- First zero-valued index, or -1 if none.
-  firstEmpty = board ->
-    let
-      search = i ->
-        if (gte 81 i)
-          (math.negate 1)
-          (if (eq 0 (nth i board)) i (search (add 1 i)))
-    in
-      search 0,
-
-  -- Return first non-none element from a list of maybe-boards.
-  -- find returns some(some board) = [[board]] or none; unwrap one level.
-  -- Laziness gives early-exit: map is only forced as far as findFirst needs.
-  findFirst = find (not <* isNone) *> { [] -> [], [x] -> x },
-
-  -- Backtracking solver. Returns some board on success, none on failure.
-  solve = board ->
-    let empty = firstEmpty board in
-      if (lt 0 empty)
-        [board]
-        (range 1 9
-         > filter (isValid board empty)
-         > map (d -> solve (boardSet empty d board))
-         > findFirst),
+  -- Backtracking solver. Returns all solutions.
+  solutions = board -> board > findIndex (eq 0) > {
+        [] -> [board;],
+        [emptyIdx] -> (range 1 9
+         > filter (isValid board emptyIdx)
+         > map (d -> solutions (boardSet emptyIdx d board))
+         > flatten)
+	 },
 
   -- Pretty-printing with box borders.
-  cellStr = n -> if (eq n 0) "." (text.intToString n),
+  cellStr = { 0 -> ".", n -> intToString n },
 
   rowStr = r -> board ->
     let cells = map cellStr (rowCells r board) in
@@ -63,7 +47,7 @@ let
         [text.lf;]
       ],
 
-  sepLine = flatten ["------+-------+------"; [text.lf;]],
+  sepLine = concat "------+-------+------" [text.lf;],
 
   boardStr = board ->
     range 0 8
@@ -73,23 +57,23 @@ let
 in
 
 let puzzle = [
-  5; 3; 0; 0; 7; 0; 0; 0; 0;
+  5; 3; 0; 0; 0; 0; 0; 0; 0;
   6; 0; 0; 1; 9; 5; 0; 0; 0;
   0; 9; 8; 0; 0; 0; 0; 6; 0;
   8; 0; 0; 0; 6; 0; 0; 0; 3;
   4; 0; 0; 8; 0; 3; 0; 0; 1;
-  7; 0; 0; 0; 2; 0; 0; 0; 6;
+  7; 0; 0; 0; 0; 0; 0; 0; 6;
   0; 6; 0; 0; 0; 0; 2; 8; 0;
   0; 0; 0; 4; 1; 9; 0; 0; 5;
   0; 0; 0; 0; 8; 0; 0; 7; 9
-] in
+],
 
-let result = solve puzzle in
-  if (isEmpty result)
-    (write (concat "No solution" [text.lf;]))
-    (write (flatten [
-      "Puzzle:"; [text.lf;];
-      boardStr puzzle;
-      "Solution:"; [text.lf;];
-      boardStr (maybe.value result)
-    ]))
+results = solutions puzzle
+
+in
+
+eval < map write < concat [
+	"Puzzle:";
+	boardStr puzzle;
+	"Solutions:"
+] (map boardStr results)
