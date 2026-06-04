@@ -1,0 +1,13 @@
+id = "microfun"
+name = "microfun"
+version = "0.0.1"
+schema_version = 1
+authors = ["Noé Falzon"]
+description = "microfun language support for Zed (.mf files)"
+repository = "https://github.com/noefalzon/tree-sitter-microfun"
+
+# grammars/microfun is a local git repo with remote = tree-sitter-microfun.
+# Update the commit hash after each grammar regeneration (grammar.js change).
+[grammars.microfun]
+repository = "https://github.com/noefalzon/tree-sitter-microfun"
+commit = "2db000641bbd781c3c11c57c45ac2e033904680a"

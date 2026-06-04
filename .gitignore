@@ -5,5 +5,5 @@ microfun.exe
 microfun.test.exe
 microfun.bench.exe
 microfun.oracle.exe
-microfun
+/microfun
 etc/experiment/*.exe

@@ -1,0 +1,4 @@
+name = "microfun"
+grammar = "microfun"
+path_suffixes = ["mf"]
+line_comments = ["-- "]

@@ -1,0 +1,31 @@
+## Syntax highlighting for the microfun language (.mf files)
+## Install: copy to ~/.config/micro/syntax/microfun.yaml
+## Micro will pick it up automatically on next launch.
+
+filetype: microfun
+
+detect:
+  filename: "\\.mf$"
+
+rules:
+  # Line comments
+  - comment: "--.*$"
+
+  # String literals (single-line; no escape sequences in microfun)
+  - constant.string: "\"[^\"]*\""
+  - constant.string: "'[^']*'"
+
+  # Keywords
+  - statement: "\\b(let|in|module|import)\\b"
+
+  # Built-in functions
+  - identifier: "\\b(add|mul|sub|div|fdiv|mod|fmod|pow|sqrt|eq|lt|lte|gte|gt|neq|equal|eval|peek|show|write|bwrite|stdin|bstdin)\\b"
+
+  # Numeric literals
+  - constant.number: "\\b[0-9]+(\\.[0-9]+)?\\b"
+
+  # Lambda arrow and pipe/compose operators
+  - special: "(->|<\\*|\\*>|>|<)"
+
+  # Punctuation
+  - symbol.operator: "[=,;.]"

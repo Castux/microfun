@@ -1,0 +1,33 @@
+## Syntax highlighting for the microfun language (.mf files)
+## Install: copy to /usr/share/nano/ and add to /etc/nanorc:
+##   include "/usr/share/nano/microfun.nanorc"
+## Or add to ~/.config/nano/nanorc:
+##   include "/path/to/microfun.nanorc"
+
+syntax "microfun" "\.mf$"
+
+# Line comments — must be first so "--" inside strings is still coloured correctly
+# (nano applies the last matching rule, so put strings after comments to win)
+color brightblack "--.*$"
+
+# String literals (no escape sequences; strings cannot span lines)
+color green "\"[^\"]*\""
+color green "'[^']*'"
+
+# Keywords
+color cyan "\<(let|in|module|import)\>"
+
+# Built-in functions
+color magenta "\<(add|mul|sub|div|fdiv|mod|fmod|pow|sqrt|eq|lt|lte|gte|gt|neq|equal|eval|peek|show|write|bwrite|stdin|bstdin)\>"
+
+# Numeric literals (integer and fractional)
+color yellow "\<[0-9]+(\.[0-9]+)?\>"
+
+# Lambda arrow and pipe/compose operators
+color red "(->|<\*|\*>|>|<)"
+
+# Brackets and grouping
+color white "[\[\](){}]"
+
+# Punctuation
+color white "[=,;.]"
