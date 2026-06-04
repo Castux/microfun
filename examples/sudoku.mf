@@ -2,78 +2,75 @@ import core, maybe, list, math, text in
 
 let
 
-  -- Replace element at index i in a flat list.
-  boardSet = i -> v -> board ->
-    drop (add 1 i) board > cons v > concat (take i board),
+	-- Replace element at index i in a flat list.
+	boardSet = i -> v -> board ->
+		drop (add 1 i) board > cons v > concat (take i board),
 
-  -- Cell-index decomposition.
-  rowOf = div 9,
-  colOf = mod 9,
-  boxOf = i -> add (i > rowOf > div 3 > mul 3) (i > colOf > div 3),
+	-- Cell-index decomposition.
+	rowOf = div 9,
+	colOf = mod 9,
+	boxOf = i -> add (i > rowOf > div 3 > mul 3) (i > colOf > div 3),
 
-  -- All 9 values for a row / column / box.
-  rowCells = r -> board -> range (mul 9 r) (mul 9 r > add 8) > map (n -> nth n board),
-  colCells = c -> board -> range 0 8 > map (n -> nth (mul 9 n > add c) board),
-  boxCells = b -> board ->
-    let br = mul 3 (div 3 b), bc = mul 3 (mod 3 b) in
-      range 0 8 > map (n -> nth (add (mul 9 (add br (div 3 n))) (add bc (mod 3 n))) board),
+	-- All 9 values for a row / column / box.
+	rowCells = r -> drop (mul r 9) *> take 9,
 
-  isValid = board -> i -> d ->
-    let r = rowOf i, c = colOf i, b = boxOf i in
-      rowCells r board > contains d > not
-      > and (colCells c board > contains d > not)
-      > and (boxCells b board > contains d > not),
+	hotCells = board -> i -> let
+		sameRow = j -> eq (rowOf i) (rowOf j),
+		sameCol = j -> eq (colOf i) (colOf j),
+		sameBox = j -> eq (boxOf i) (boxOf j),
+		isHot = j -> (sameRow j) > or (sameCol j) > or (sameBox j)
+	in
+		zip (range 0 80) board > filter (first *> isHot) > map second,
 
-  -- Backtracking solver. Returns all solutions.
-  solutions = board -> board > findIndex (eq 0) > {
-        [] -> [board;],
-        [emptyIdx] -> (range 1 9
-         > filter (isValid board emptyIdx)
-         > map (d -> solutions (boardSet emptyIdx d board))
-         > flatten)
-	 },
+	isValid = board -> i -> d ->
+		hotCells board i > contains d > not,
 
-  -- Pretty-printing with box borders.
-  cellStr = { 0 -> ".", n -> intToString n },
+	-- Backtracking solver. Returns all solutions.
+	solutions = board -> board > findIndex (eq 0) > {
+		[] -> [board;],
+		[emptyIdx] -> (range 1 9
+			> filter (isValid board emptyIdx)
+			> map (d -> solutions (boardSet emptyIdx d board))
+			> flatten)
+	},
 
-  rowStr = r -> board ->
-    let cells = map cellStr (rowCells r board) in
-      flatten [
-        text.join " " (take 3 cells);
-        " | ";
-        text.join " " (take 3 (drop 3 cells));
-        " | ";
-        text.join " " (drop 6 cells);
-        [text.lf;]
-      ],
+	-- Pretty-printing with box borders.
+	cellStr = { 0 -> ".", n -> intToString n },
 
-  sepLine = concat "------+-------+------" [text.lf;],
+	rowStr = r -> board ->
+		let cells = map cellStr (rowCells r board) in
+			flatten [
+				text.join " " (take 3 cells);
+				" | ";
+				text.join " " (take 3 (drop 3 cells));
+				" | ";
+				text.join " " (drop 6 cells);
+				[text.lf;]
+			],
 
-  boardStr = board ->
-    range 0 8
-    > map (r -> rowStr r board > concat (if (or (eq r 3) (eq r 6)) sepLine []))
-    > flatten
+	sepLine = concat "------+-------+------" [text.lf;],
+
+	boardStr = board ->
+		range 0 8
+		> map (r -> rowStr r board > concat (if (or (eq r 3) (eq r 6)) sepLine []))
+		> flatten
 
 in
 
 let puzzle = [
-  5; 3; 0; 0; 0; 0; 0; 0; 0;
-  6; 0; 0; 1; 9; 5; 0; 0; 0;
-  0; 9; 8; 0; 0; 0; 0; 6; 0;
-  8; 0; 0; 0; 6; 0; 0; 0; 3;
-  4; 0; 0; 8; 0; 3; 0; 0; 1;
-  7; 0; 0; 0; 0; 0; 0; 0; 6;
-  0; 6; 0; 0; 0; 0; 2; 8; 0;
-  0; 0; 0; 4; 1; 9; 0; 0; 5;
-  0; 0; 0; 0; 8; 0; 0; 7; 9
-],
-
-results = solutions puzzle
+	5; 3; 0; 0; 0; 0; 0; 0; 0;
+	6; 0; 0; 1; 9; 5; 0; 0; 0;
+	0; 9; 8; 0; 0; 0; 0; 6; 0;
+	8; 0; 0; 0; 6; 0; 0; 0; 3;
+	4; 0; 0; 8; 0; 3; 0; 0; 1;
+	7; 0; 0; 0; 0; 0; 0; 0; 6;
+	0; 6; 0; 0; 0; 0; 2; 8; 0;
+	0; 0; 0; 4; 1; 9; 0; 0; 5;
+	0; 0; 0; 0; 8; 0; 0; 7; 9
+]
 
 in
 
-eval < map write < concat [
-	"Puzzle:";
-	boardStr puzzle;
-	"Solutions:"
-] (map boardStr results)
+eval < map write < concat
+	[ "Puzzle:"; boardStr puzzle; "Solutions:"]
+	(solutions puzzle > take 1 > map boardStr)
