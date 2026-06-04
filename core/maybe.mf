@@ -1,0 +1,21 @@
+module
+
+some = x -> [x],
+none = [],
+
+fmap = f -> {
+	[] -> [],
+	[x] -> [f x]
+},
+
+then = f -> {
+	[] -> [],
+	[x] -> f x
+},
+
+value = [x] -> x,
+
+default = def -> {
+	[] -> def,
+	[x] -> x
+}

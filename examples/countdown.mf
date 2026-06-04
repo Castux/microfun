@@ -27,7 +27,7 @@
 -- numbers and recursing, which produced every tree in many build orders and
 -- leaned on a slow final pass to remove the flood of duplicates.
 
-import list, core, text, comb in
+import list, core, text, comb, maybe in
 
 let
 	target  = 364,
@@ -76,8 +76,7 @@ let
 			> flatten
 	},
 
-	partitionsOf = subset ->
-		assignments subset > filter ([l, r] -> and (not (isEmpty l)) (not (isEmpty r))),
+	partitionsOf = assignments *> filter ([l, r] -> and (not (isEmpty l)) (not (isEmpty r))),
 
 	-- Memoised results -----------------------------------------------------
 	--
@@ -88,10 +87,8 @@ let
 	-- results to a name and store that name. eval forces the list to normal
 	-- form on first use, so later uses read it back rather than rebuilding it.
 
-	lookup = subset -> {
-		[[s, res], rest] -> if (equal subset s) res (lookup subset rest),
-		[] -> []
-	},
+	lookup = subset ->
+		find (first *> equal subset) *> then second,
 
 	resultsFor = memo -> {
 		[x;] -> [ leaf x; ],
@@ -108,11 +105,9 @@ let
 		in
 			[[subset, results], memo],
 
-	bySize = a -> b -> lt (length a) (length b),
-
 	memo = subsets numbers
 		> filter (not <* isEmpty)
-		> sortWith bySize
+		> sortWith (on lt length)
 		> foldl addSubset [],
 
 	-- Solutions ------------------------------------------------------------
@@ -122,47 +117,36 @@ let
 	solutionNodes = memo
 		> map ([subset, res] -> res)
 		> flatten
-		> filter (node -> eq target (value node)),
+		> filter (value *> eq target),
 
 	-- Flatten a solution tree into its internal (operation) nodes, post-order.
 
-	collect = [v, sym, left, right] ->
-		if (isEmpty left)
-			[]
-			(flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]),
+	collect = {
+		[v, 'given', [], []] -> [],
+		[v, sym, left, right] ->
+			flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]
+		},
 
 	-- Render a solution tree as "a op b = c, …".
 
-	solutionToString = tree ->
-		tree
-			> collect
-			> map ([v, sym, left, right] ->
-				join '' [ toString < value left; sym; toString < value right; '='; toString v ])
-			> join ', ',
+	solutionToString = collect
+		*> map ([v, sym, left, right] ->
+			flatten [ toString < value left; sym; toString < value right; '='; toString v ])
+		*> join ', ',
 
 	-- Drop duplicate solution strings, keeping the first occurrence. Two
 	-- different trees can print the same line when a sub-expression equals a
 	-- source number (e.g. 25*4 and 100), so a light final pass still helps;
 	-- by now the list is the real solutions, not a sea of duplicates.
 
-	unique =
-		let
-			addIfUnique = elem -> seen -> if (contains elem seen) seen [elem, seen]
-		in
-			foldr addIfUnique [],
-
-	-- Comparator for sortWith: shortest solutions first.
-
-	byLength = a -> b -> lt (length a) (length b),
-
 	solutions = solutionNodes
 		> map solutionToString
-		> unique
-		> sortWith byLength,
+		> nub
+		> sortWith (on lt length),
 
-	header = join '' [ 'reaching '; toString target; ' from '; toString numbers ],
-	footer = join '' [ toString (length solutions); ' solution(s)' ],
+	header = flatten [ 'reaching '; toString target; ' from '; toString numbers ],
+	footer = flatten [ toString (length solutions); ' solution(s)' ],
 
-	report = concat [ header; ] (concat solutions [ footer; ])
+	report = concat [ header; ] < concat solutions < [ footer; ]
 in
 	report > map write > eval

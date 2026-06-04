@@ -1,6 +1,6 @@
 -- list.mf: list operations and infinite lists.
 -- Circular with core (core imports list for `ifs`) — permitted by the language.
-import math, core in
+import math, core, maybe in
 
 module
 
@@ -23,6 +23,14 @@ length = {
 
 head = [h,t] -> h, -- first element of a non-empty list
 tail = [h,t] -> t, -- everything but the first element of a non-empty list
+headSafe = {
+	[] -> maybe.none,
+	[h,t] -> maybe.some h
+},
+tailSafe = {
+	[] -> maybe.none,
+	[h,t] -> maybe.some t
+},
 
 -- last l: last element of a non-empty list
 last = {
@@ -30,10 +38,20 @@ last = {
 	[h, t] -> last t
 },
 
+lastSafe = {
+	[] -> maybe.none,
+	l -> maybe.some (last l)
+},
+
 -- init l: everything but the last element of a non-empty list
 init = {
 	[x, []] -> [],
 	[h, t] -> [h, init t]
+},
+
+initSafe = {
+	[] -> maybe.none,
+	l -> maybe.some (init l)
 },
 
 emptyList = [], -- the empty list
@@ -74,11 +92,8 @@ filter = f -> {
 	[h,t] -> if (f h) [h, filter f t] (filter f t)
 },
 
--- find p l: first element of l matching predicate p (returns [val;] or [])
-find = p -> {
-	[] -> [],
-	[h, t] -> if (p h) [h;] (find p t)
-},
+-- find p l: first element of l matching predicate p (returns maybe)
+find = p -> filter p *> headSafe,
 
 -- foldr f acc l: right-associative reduction: f l1 (f l2 (... (f ln acc)))
 foldr = f -> acc -> {
