@@ -73,4 +73,4 @@ in
 
 eval < map write < concat
 	[ "Puzzle:"; boardStr puzzle; "Solutions:"]
-	(solutions puzzle > take 1 > map boardStr)
+	(solutions puzzle > map boardStr)
