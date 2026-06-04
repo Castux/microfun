@@ -218,6 +218,13 @@ runTests [
 	-- maybe.mf
 	assert "maybe.none" maybe.none [];
 	assert "maybe.some" (maybe.some 42) [42];
+	assert "maybe.isSome-some" (maybe.isSome (maybe.some 1)) 1;
+	assert "maybe.isSome-none" (maybe.isSome maybe.none) 0;
+	assert "maybe.isNone-none" (maybe.isNone maybe.none) 1;
+	assert "maybe.isNone-some" (maybe.isNone (maybe.some 1)) 0;
+	assert "maybe.isMaybe-some" (maybe.isMaybe (maybe.some 1)) 1;
+	assert "maybe.isMaybe-none" (maybe.isMaybe maybe.none) 1;
+	assert "maybe.isMaybe-other" (maybe.isMaybe 42) 0;
 	assert "maybe.fmap-some" (maybe.fmap (add 1) (maybe.some 5)) [6];
 	assert "maybe.fmap-none" (maybe.fmap (add 1) maybe.none) [];
 	assert "maybe.then-some-some" (maybe.then maybe.some (maybe.some 5)) [5];

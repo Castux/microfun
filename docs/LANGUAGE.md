@@ -617,6 +617,9 @@ A *maybe* value is either `none` (absent) or `some x` (present). The representat
 |------|-----------|-------------|
 | `none` | `[]` | the absent value |
 | `some x` | `[x]` | wrap `x` as a present value |
+| `isSome m` | `maybe → bool` | `1` if `m` is `some x`, `0` otherwise |
+| `isNone m` | `maybe → bool` | `1` if `m` is `none`, `0` otherwise |
+| `isMaybe m` | `any → bool` | `1` if `m` is a valid maybe value (`none` or `some x`) |
 | `fmap f m` | `maybe → maybe` | apply `f` to the wrapped value; propagate `none` |
 | `then f m` | `maybe → a` | extract the value and apply `f` |
 | `value m` | `maybe → a` | extract the wrapped value; runtime error on `none` |
