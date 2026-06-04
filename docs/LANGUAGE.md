@@ -567,7 +567,7 @@ import list in
 
 The standard library is a collection of microfun modules **embedded in the
 microfun binary** — no separate installation is needed. Modules are written in
-microfun itself and are split by concern across five files in `core/`.
+microfun itself and are split by concern across six files in `core/`.
 
 **Module search order.** For every `import name`, the runtime first checks
 `./name.mf` in the working directory, then falls back to the embedded library.
@@ -609,6 +609,40 @@ Each module can be imported directly when only part of the library is needed.
 
 ---
 
+#### `maybe` — optional values
+
+A *maybe* value is either `none` (absent) or `some x` (present). The representation is a 0- or 1-element tuple.
+
+| Name | Signature | Description |
+|------|-----------|-------------|
+| `none` | `[]` | the absent value |
+| `some x` | `[x]` | wrap `x` as a present value |
+| `fmap f m` | `maybe → maybe` | apply `f` to the wrapped value; propagate `none` |
+| `then f m` | `maybe → a` | extract the value and apply `f` |
+| `value m` | `maybe → a` | extract the wrapped value; runtime error on `none` |
+| `default def m` | `a → maybe → a` | extract the value, or return `def` if `none` |
+
+`some` and `none` are plain values — `some` is sugar for `x -> [x]` and `none`
+is `[]`. Because maybes are single-element tuples, tuple pattern matching works
+directly: `[x] -> …` matches `some x` and `[] -> …` matches `none`.
+
+```
+import maybe in
+
+let safeDivide = x -> y ->
+  if (eq y 0)
+    (maybe.none)
+    (maybe.some (fdiv x y))
+in
+show [
+  maybe.fmap (mul 2) (safeDivide 10 5),   -- [4.0]  (some 4.0)
+  maybe.fmap (mul 2) (safeDivide 10 0),   -- []     (none)
+  maybe.default 0 (safeDivide 10 0)       -- 0
+]
+```
+
+---
+
 #### `math` — numeric operations
 
 **Numbers** (builtins: `add`, `mul`, `sub`, `div`, `fdiv`, `mod`, `fmod`, `sqrt`,
@@ -640,8 +674,19 @@ Each module can be imported directly when only part of the library is needed.
 **Construction and inspection**
 `emptyList`, `cons`, `isList`, `length`, `head`, `tail`, `last`, `init`, `isEmpty`, `concat`, `remove`, `reverse`, `intersperse`
 
+The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. Safe counterparts return a `maybe` value instead:
+
+| Safe variant | Crashes as | Returns |
+|---|---|---|
+| `headSafe l` | `head []` | `some h` or `none` |
+| `tailSafe l` | `tail []` | `some t` or `none` |
+| `lastSafe l` | `last []` | `some x` or `none` |
+| `initSafe l` | `init []` | `some l'` or `none` |
+
 **Higher-order**
-`map`, `filter`, `find`, `foldr`, `foldl`
+`map`, `filter`, `foldr`, `foldl`
+
+`find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
 
 **Aggregations**
 `sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
