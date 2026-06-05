@@ -665,6 +665,7 @@ show [
 | `floor n` | round towards −∞ |
 | `ceil n` | round towards +∞ |
 | `round n` | round half-up |
+| `isInteger n` | `1` if `n` has no fractional part |
 | `even n` | `1` if `n mod 2 = 0` |
 | `odd n` | `1` if `n mod 2 ≠ 0` |
 | `gcd a b` | greatest common divisor |
@@ -747,7 +748,9 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `sort l` — ascending sort using the builtin `lt` comparator.
 
 **Infinite lists**
-`iterate`, `downFrom`, `upFrom`, `repeat`, `cycle`
+`iterate`, `times`, `downFrom`, `upFrom`, `repeat`, `cycle`
+
+`times n f x` — apply `f` to `x` exactly `n` times: `f (f (… (f x) …))`.
 
 ```
 import list in
@@ -842,6 +845,7 @@ character of a string, and is the idiomatic way to write character literals:
 | `padLeft n fill s` | left-pad `s` with single-char string `fill` to width `n` |
 | `intToString n` | render an integer as a string (wrong output for non-integers) |
 | `floatToString prec n` | render `n` with exactly `prec` decimal digits |
+| `numberToString n` | render an integer without decimal point, or a float with 6 digits |
 | `toString x` | render any number, list, or tuple as a string for `write` |
 
 `toString` does not support tuples with more than 10 elements or function values.

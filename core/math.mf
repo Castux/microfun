@@ -23,6 +23,9 @@ clamp = lo -> hi -> n -> max lo (min hi n), -- clamp n to the range [lo, hi]
 -- trunc n: round n towards zero (integer division by 1)
 trunc = div 1,
 
+-- isInteger n: checks if number is integer
+isInteger = x -> eq x (trunc x),
+
 -- floor n: round n towards negative infinity
 floor = n ->
 	let t = trunc n in

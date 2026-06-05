@@ -61,6 +61,8 @@ floatToString = precision -> n ->
 			(concat sign (intToString whole))
 			(flatten [sign; intToString whole; '.'; padLeft precision '0' (intToString frac)]),
 
+numberToString = n -> if (isInteger n) (intToString n) (floatToString 6 n),
+
 -- toString x: render any number, list, or tuple as a code-point string, ready for `write`.
 -- Tuples with more than 10 elements are not supported and will produce a runtime error.
 toString =
@@ -91,40 +93,37 @@ toString =
 			in
 				if (isList asList)
 					(flatten ['[' ; asList > map toString > join ', ' ; ']'])
-					(intToString asList)
+					(numberToString asList)
 	in
 		x -> if (isList x) (listToString x) (tupleToString x),
 
 -- Character classification — all functions take a Unicode code point (integer)
 
-isDigit    = c -> and (lte c (head '0')) (lte (head '9') c), -- 1 if c is a digit
-isLower    = c -> and (lte c (head 'a')) (lte (head 'z') c), -- 1 if c is lowercase
-isUpper    = c -> and (lte c (head 'A')) (lte (head 'Z') c), -- 1 if c is uppercase
+isDigit    = c -> and (lte c (char '0')) (lte (char '9') c), -- 1 if c is a digit
+isLower    = c -> and (lte c (char 'a')) (lte (char 'z') c), -- 1 if c is lowercase
+isUpper    = c -> and (lte c (char 'A')) (lte (char 'Z') c), -- 1 if c is uppercase
 isAlpha    = c -> or (isLower c) (isUpper c), -- 1 if c is a letter
 isAlphaNum = c -> or (isAlpha c) (isDigit c), -- 1 if c is a letter or digit
 isSpace    = c -> eq c space > or (eq c tab) > or (eq c lf) > or (eq c cr), -- 1 if c is whitespace
 
 -- Character conversion
-digitToInt = c -> sub (head '0') c, -- convert digit character to its numeric value
-intToDigit = n -> add (head '0') n, -- convert numeric value to its digit character
-toLower    = c -> if (isUpper c) (add (sub (head 'A') (head 'a')) c) c, -- convert to lowercase
-toUpper    = c -> if (isLower c) (sub (sub (head 'A') (head 'a')) c) c, -- convert to uppercase
+digitToInt = c -> sub (char '0') c, -- convert digit character to its numeric value
+intToDigit = n -> add (char '0') n, -- convert numeric value to its digit character
+toLower    = c -> if (isUpper c) (add (sub (char 'A') (char 'a')) c) c, -- convert to lowercase
+toUpper    = c -> if (isLower c) (sub (sub (char 'A') (char 'a')) c) c, -- convert to uppercase
 
 stringToLower = map toLower, -- convert a whole string to lowercase
 stringToUpper = map toUpper, -- convert a whole string to uppercase
 
 -- stringToInt s: parse a decimal integer string (optional leading '-') as a number.
 -- No validation; non-digit characters produce wrong results.
-stringToInt = s ->
-	let
-		zero         = head '0',
-		neg          = head '-',
-		parsePositive = foldl (acc -> c -> add (mul 10 acc) (sub zero c)) 0
-	in
-		s > {
-			[] -> 0,
-			[c, rest] -> if (equal c neg) (negate (parsePositive rest)) (parsePositive s)
-		},
+
+parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitToInt c)) 0,
+
+stringToInt = {
+	[] -> 0,
+	[c, rest] -> if (eq c < char '-') (negate (parsePositive rest)) (parsePositive [c, rest])
+},
 
 -- startsWith prefix s: 1 if string s begins with prefix, else 0
 startsWith = prefix -> s -> equal prefix (take (length prefix) s),
@@ -136,11 +135,10 @@ endsWith = suffix -> s -> let lenS = length s, lenP = length suffix in equal suf
 -- No validation; non-digit/non-dot characters produce wrong results.
 stringToFloat = s ->
 	let
-		zero         = head '0',
-		neg          = head '-',
-		dot          = head '.',
-		parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitToInt c)) 0,
-		parseFrac     = foldr (c -> acc -> fdiv 10 (add acc (digitToInt c))) 0,
+		zero         = char '0',
+		neg          = char '-',
+		dot          = char '.',
+		parseFrac    = s -> parsePositive s > times (length s) (fdiv 10),
 		parseUnsigned = span (c -> neq c dot) *> {
 				[intPart, []]        -> parsePositive intPart,
 				[intPart, [d, frac]] -> add (parsePositive intPart) (parseFrac frac)
@@ -148,8 +146,8 @@ stringToFloat = s ->
 	in
 		s > {
 			[] -> 0,
-			[c, rest] -> if (equal c neg)
-				(negate (parseUnsigned rest))
+			[c, rest] -> if (eq c neg)
+				(negate < parseUnsigned rest)
 				(parseUnsigned s)
 		},
 

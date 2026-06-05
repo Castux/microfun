@@ -259,9 +259,7 @@ maximum = [h,t] -> foldl max h t,
 minimum = [h,t] -> foldl min h t,
 
 -- nth n l: zero-based index into list l
-nth = n -> {
-	[h,t] -> if (eq n 0) h (nth (sub 1 n) t)
-},
+nth = n -> drop n *> head,
 
 -- nub l: remove duplicates, keeping only the first occurrence of each value
 nub = {
@@ -302,6 +300,7 @@ sort = sortWith lt, -- sort in ascending order using lt
 -- Infinite lists
 
 iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
+times    = n -> f -> iterate f *> nth n, -- apply function f n times
 downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
 repeat   = iterate id, -- lazy infinite list of x
