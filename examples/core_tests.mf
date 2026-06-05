@@ -1,4 +1,4 @@
-import core, math, list, comb, text, heap, maybe in
+import core, math, list, comb, text, heap, maybe, table in
 
 let
 	assert = name -> expr -> expected ->
@@ -302,6 +302,33 @@ runTests [
 	assert "heap.sortDesc" (heap.sortDesc [3; 1; 4; 1; 5]) [5; 4; 3; 1; 1];
 	assert "heap.topSafe-some" (heap.topSafe (heap.singleton 5)) [5];
 	assert "heap.topSafe-none" (heap.topSafe heap.emptyHeap) [];
+
+	-- table.mf
+	assert "table.empty" (equal table.empty []) 1;
+	assert "table.singleton" (table.singleton "a" 1) [["a", 1];];
+	assert "table.get-found" (table.get "b" [["a", 1]; ["b", 2]; ["c", 3]]) [2];
+	assert "table.get-missing" (table.get "z" [["a", 1]; ["b", 2]]) [];
+	assert "table.getOr-found" (table.getOr 0 "b" [["a", 1]; ["b", 2]]) 2;
+	assert "table.getOr-missing" (table.getOr 0 "z" [["a", 1];]) 0;
+	assert "table.containsKey-true" (table.containsKey "a" [["a", 1]; ["b", 2]]) 1;
+	assert "table.containsKey-false" (table.containsKey "z" [["a", 1]; ["b", 2]]) 0;
+	assert "table.containsValue-true" (table.containsValue 2 [["a", 1]; ["b", 2]]) 1;
+	assert "table.containsValue-false" (table.containsValue 9 [["a", 1]; ["b", 2]]) 0;
+	assert "table.set-insert" (table.set "c" 3 [["a", 1]; ["b", 2]]) [["c", 3]; ["a", 1]; ["b", 2]];
+	assert "table.set-update" (table.set "a" 9 [["a", 1]; ["b", 2]]) [["a", 9]; ["b", 2]];
+	assert "table.remove-present" (table.remove "a" [["a", 1]; ["b", 2]]) [["b", 2];];
+	assert "table.remove-missing" (table.remove "z" [["a", 1]; ["b", 2]]) [["a", 1]; ["b", 2]];
+	assert "table.update-present" (table.update "a" (add 1) [["a", 5]; ["b", 2]]) [["a", 6]; ["b", 2]];
+	assert "table.update-missing" (table.update "z" (add 1) [["a", 5];]) [["a", 5];];
+	assert "table.updateOr-present" (table.updateOr "a" (add 1) 0 [["a", 5]; ["b", 2]]) [["a", 6]; ["b", 2]];
+	assert "table.updateOr-missing" (table.updateOr "z" (add 1) 0 [["a", 5];]) [["z", 0]; ["a", 5]];
+	assert "table.keys" (table.keys [["a", 1]; ["b", 2]]) ["a"; "b"];
+	assert "table.values" (table.values [["a", 1]; ["b", 2]]) [1; 2];
+	assert "table.mapValues" (table.mapValues (add 10) [["a", 1]; ["b", 2]]) [["a", 11]; ["b", 12]];
+	assert "table.filterByKey" (table.filterByKey (equal "a") [["a", 1]; ["b", 2]]) [["a", 1];];
+	assert "table.filterByValue" (table.filterByValue (gt 1) [["a", 1]; ["b", 2]]) [["b", 2];];
+	assert "table.merge-left-biased" (table.get "a" (table.merge [["a", 9];] [["a", 1]; ["b", 2]])) [9];
+	assert "table.merge-right-kept" (table.get "b" (table.merge [["a", 9];] [["a", 1]; ["b", 2]])) [2];
 
 	-- maybe.mf
 	assert "maybe.none" maybe.none [];

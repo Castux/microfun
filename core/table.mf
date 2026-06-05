@@ -1,0 +1,52 @@
+-- table.mf: association lists — lists of [key, value] pairs.
+-- Keys are compared with `equal` (structural equality).
+-- All key-based operations use the first match, so prepending a new entry
+-- naturally shadows any existing entry for the same key.
+import list, maybe, core in
+
+module
+
+empty     = [],                   -- the empty table
+singleton = k -> v -> [[k, v];],  -- single-entry table
+fromList  = id,                   -- treat a list of [k, v] pairs as a table (documents intent)
+toList    = id,                   -- convert a table to a list of [k, v] pairs (identity)
+
+-- get k t: some v for the first entry with key k, or none
+get = lookup,
+
+-- getOr def k t: value for key k, or def if absent
+getOr = def -> k -> t -> maybe.default def (get k t),
+
+-- containsKey k t: 1 if any entry has key k
+containsKey = k -> anyMatch (first *> equal k),
+
+-- containsValue v t: 1 if any entry has value v
+containsValue = v -> anyMatch (second *> equal v),
+
+-- remove k t: remove all entries for key k
+remove = k -> filter (first *> equal k *> not),
+
+-- set k v t: upsert — remove existing entries for k, then prepend [k, v]; O(n)
+set = k -> v -> remove k *> prepend [[k, v];],
+
+-- update k f t: apply f to the value for k if present; no-op if absent
+update = k -> f -> map ([k2, v] -> if (equal k2 k) [k2, f v] [k2, v]),
+
+-- updateOr k f def t: apply f to existing value if k is present, else set k to def
+updateOr = k -> f -> def -> t ->
+	if (containsKey k t) (update k f t) (set k def t),
+
+keys   = map first,   -- list of all keys, in order
+values = map second,  -- list of all values, in order
+
+-- mapValues f t: apply f to each value, leaving keys unchanged
+mapValues = f -> map ([k, v] -> [k, f v]),
+
+-- filterByKey p t: keep only entries where p k holds
+filterByKey = p -> filter (first *> p),
+
+-- filterByValue p t: keep only entries where p v holds
+filterByValue = p -> filter (second *> p),
+
+-- merge t1 t2: left-biased union; for duplicate keys, t1's entry is found first by get
+merge = prepend

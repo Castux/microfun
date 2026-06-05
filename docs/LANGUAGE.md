@@ -592,7 +592,7 @@ import list in
 
 The standard library is a collection of microfun modules **embedded in the
 microfun binary** — no separate installation is needed. Modules are written in
-microfun itself and are split by concern across six files in `core/`.
+microfun itself and are split by concern across seven files in `core/`.
 
 **Module search order.** For every `import name`, the runtime first checks
 `./name.mf` in the working directory, then falls back to the embedded library.
@@ -857,6 +857,46 @@ Use `sortAsc` / `sortDesc` for sorting without reasoning about the comparator.
 | `sortBy cmp l` | heapsort using the provided comparator |
 | `sortAsc l` | sort ascending (smallest first); equivalent to `list.sort` |
 | `sortDesc l` | sort descending (largest first) |
+
+---
+
+#### `table` — association lists
+
+A *table* is a list of `[key, value]` pairs. Keys are compared with `equal` (structural equality). All key-based operations use the **first match**, so prepending a new entry for a key naturally shadows any existing entry — this is the standard association-list model.
+
+Because a table is just a list, all `list` functions work on it directly. This module adds the semantic wrappers.
+
+| Name | Description |
+|------|-------------|
+| `empty` | the empty table |
+| `singleton k v` | single-entry table |
+| `fromList pairs` | treat a list of `[k, v]` pairs as a table (identity; documents intent) |
+| `toList t` | convert a table to a list of `[k, v]` pairs (identity) |
+| `get k t` | `some v` for the first entry with key `k`, or `none` |
+| `getOr def k t` | value for key `k`, or `def` if absent |
+| `containsKey k t` | `1` if any entry has key `k` |
+| `containsValue v t` | `1` if any entry has value `v` |
+| `set k v t` | upsert: remove all entries for `k`, prepend `[k, v]`; O(n) |
+| `remove k t` | remove all entries for key `k` |
+| `update k f t` | apply `f` to the value for `k` if present; no-op if absent |
+| `updateOr k f def t` | apply `f` if `k` is present; set `k` to `def` if absent |
+| `keys t` | list of all keys, in order |
+| `values t` | list of all values, in order |
+| `mapValues f t` | apply `f` to each value, leaving keys unchanged |
+| `filterByKey p t` | keep only entries where `p k` holds |
+| `filterByValue p t` | keep only entries where `p v` holds |
+| `merge t1 t2` | left-biased union: for duplicate keys, `t1`'s entry is found first |
+
+```
+import table in
+let t = table.empty
+      > table.set "x" 10
+      > table.set "y" 20
+in
+show [table.get "x" t; table.getOr 0 "z" t]   -- [[10]; 0]
+```
+
+> **Syntax note.** A table literal with a single entry must use list notation: `[["key", val];]` (semicolon). `[["key", val]]` is a 1-element *tuple*, not a list, and will fail at runtime when any table function tries to traverse it.
 
 ---
 

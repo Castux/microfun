@@ -13,6 +13,25 @@ I am a 15 years programmer, I worked in network security, games, education.
 
 The unit tests in examples/core_tests.mf, written in microfun itself, can be used as a quick regression test. If they all pass, it is likely that the compiler is still working.
 
+## Tuple vs list literals — a frequent mistake
+
+In microfun, `[` … `]` uses **commas for tuples** and **semicolons for lists**:
+
+- `[a, b]` — 2-element tuple (fixed-size, not a cons cell)
+- `[a; b]` — 2-element list = cons cell `[a, [b, []]]`
+- `[a, b, c]` — 3-element **tuple**
+- `[a; b; c]` — 3-element **list** = `[a, [b, [c, []]]]`
+- `[a]` — 1-element **tuple** — NOT a list, NOT a cons cell
+- `[a;]` — 1-element **list** = cons cell `[a, []]`
+
+The critical case is single-element containers. `[[k, v]]` is a 1-element tuple containing a 2-tuple — it is **not** a list and will fail at runtime when any list function (prepend, filter, lookup, …) tries to traverse it. The correct form is `[[k, v];]`.
+
+More examples — the separator determines the type, regardless of what the elements are:
+- `[[1, 2], [3, 4], [5, 6]]` — 3-element **tuple** of three 2-tuples
+- `[[1, 2]; [3, 4]; [5, 6]]` — 3-element **list** of three 2-tuples ✓
+
+When writing list literals with compound elements (pairs, tuples as elements), always check that the outer separator is `;`, not `,`. Whenever there is only one element, the trailing `;` in `[x;]` is mandatory to make it a list.
+
 ## Comparator convention
 
 The builtin comparators (`lt`, `lte`, `gt`, `gte`) are **threshold-first**: the first argument is the reference value, the second is the value being tested. `lt 4` is the predicate "is less than 4". The natural reading is through the pipe: `x > lt 4` reads as "is x less than 4?". Written as `lt 4 x` it appears reversed but means the same thing: `x < 4`.
