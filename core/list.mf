@@ -290,6 +290,10 @@ span = f -> {
 -- splitAt n l: split l into [first n elements, rest]
 splitAt = n -> l -> [take n l, drop n l],
 
+-- splitEqual n l: split l into sublists of length n
+splitEqual = n ->
+	iterate (drop n) *> map (take n) *> takeWhile (not <* isEmpty),
+
 -- all successive splits of the list in two parts
 spans = l -> zip (inits l) (tails l),
 

@@ -1,0 +1,120 @@
+-- hashmap.mf: binary search tree keyed by hash codes.
+-- Node structure: [hash, key, value, left, right]; empty tree and leaves are [].
+-- Hashes are numbers compared with the builtin lt.
+-- On hash collision (same hash, different key), the new entry is placed in the
+-- right subtree, so lookup and removal continue rightward past a key miss.
+import list, maybe, core in
+
+module
+
+empty = [],
+
+singleton = k -> v -> [hash k, k, v, [], []],
+
+fromList = foldr ([k,v] -> set k v) empty,
+
+-- minNode t: [hash, key, value] of the leftmost node of non-empty tree t
+minNode = {
+	[h, k, v, [], _] -> [h, k, v],
+	[h, k, v, left, _] -> minNode left
+},
+
+-- removeMin t: tree t with its leftmost node removed
+removeMin = {
+	[h, k, v, [], right] -> right,
+	[h, k, v, left, right] -> [h, k, v, removeMin left, right]
+},
+
+-- get k m: some value if key k is in m, none otherwise
+get = k ->
+	let
+		h = hash k,
+		go = {
+			[] -> maybe.none,
+			[nh, nk, nv, left, right] ->
+				if (lt nh h) (go left)
+				(if (gt nh h) (go right)
+				(if (equal nk k) (maybe.some nv)
+				(go right)))
+		}
+	in go,
+
+-- getOr def k m: value for key k, or def if absent
+getOr = def -> k -> m -> maybe.default def (get k m),
+
+-- set k v m: insert or replace the entry for key k
+set = k -> v ->
+	let
+		h = hash k,
+		go = {
+			[] -> [h, k, v, [], []],
+			[nh, nk, nv, left, right] ->
+				if (lt nh h) [nh, nk, nv, go left, right]
+				(if (gt nh h) [nh, nk, nv, left, go right]
+				(if (equal nk k) [nh, k, v, left, right]
+				[nh, nk, nv, left, go right]))
+		}
+	in go,
+
+-- remove k m: remove the entry for key k (no-op if absent)
+remove = k ->
+	let
+		h = hash k,
+		go = {
+			[] -> [],
+			[nh, nk, nv, left, right] ->
+				if (lt nh h) [nh, nk, nv, go left, right]
+				(if (gt nh h) [nh, nk, nv, left, go right]
+				(if (equal nk k)
+					({ [] -> left, _ -> minNode right > ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]) } right)
+					[nh, nk, nv, left, go right]))
+		}
+	in go,
+
+-- update k f m: apply f to the value at key k
+update = k -> f ->
+	let
+		h = hash k,
+		go = {
+			[] -> [],
+			[nh, nk, nv, left, right] ->
+				if (lt nh h) [nh, nk, nv, go left, right]
+				(if (gt nh h) [nh, nk, nv, left, go right]
+				(if (equal nk k) [nh, k, f nv, left, right]
+				[nh, nk, nv, left, go right]))
+		}
+	in
+		go,
+
+-- updateOr k f def m: apply f to the value at key k, or insert def if not found
+updateOr = k -> f -> def ->
+	let
+		h = hash k,
+		go = {
+			[] -> [h, k, def, [], []],
+			[nh, nk, nv, left, right] ->
+				if (lt nh h) [nh, nk, nv, go left, right]
+				(if (gt nh h) [nh, nk, nv, left, go right]
+				(if (equal nk k) [nh, k, f nv, left, right]
+				[nh, nk, nv, left, go right]))
+		}
+	in
+		go,
+
+-- keys m: list of all keys in hash order
+keys = {
+	[] -> [],
+	[h, k, v, left, right] -> prepend (keys left) [k, keys right]
+},
+
+-- values m: list of all values in hash order
+values = {
+	[] -> [],
+	[h, k, v, left, right] -> prepend (values left) [v, values right]
+},
+
+-- keyValues m: list of all key-value pairs in hash order
+keyValues = {
+	[] -> [],
+	[h, k, v, left, right] -> prepend (keyValues left) [[k,v], keyValues right]
+}

@@ -1,4 +1,4 @@
-import core, math, list, comb, text, heap, maybe, table in
+import core, math, list, comb, text, heap, maybe, table, hashmap in
 
 let
 	assert = name -> expr -> expected ->
@@ -352,5 +352,35 @@ runTests [
 	assert "maybe.mapDefault-none" (maybe.mapDefault 0 (add 1) maybe.none) 0;
 	assert "maybe.value" (maybe.value (maybe.some 42)) 42;
 	assert "maybe.default-some" (maybe.default 0 (maybe.some 42)) 42;
-	assert "maybe.default-none" (maybe.default 0 maybe.none) 0
+	assert "maybe.default-none" (maybe.default 0 maybe.none) 0;
+
+	-- hashmap.mf
+	assert "hashmap.empty" (equal hashmap.empty []) 1;
+	assert "hashmap.get-empty" (hashmap.get "a" hashmap.empty) [];
+	assert "hashmap.singleton-get" (hashmap.get "x" (hashmap.singleton "x" 42)) [42];
+	assert "hashmap.singleton-miss" (hashmap.get "y" (hashmap.singleton "x" 42)) [];
+	assert "hashmap.set-insert" (hashmap.get "b" (hashmap.empty > hashmap.set "a" 1 > hashmap.set "b" 2)) [2];
+	assert "hashmap.set-update" (hashmap.get "a" (hashmap.empty > hashmap.set "a" 1 > hashmap.set "a" 99)) [99];
+	assert "hashmap.getOr-found" (hashmap.getOr 0 "a" (hashmap.singleton "a" 7)) 7;
+	assert "hashmap.getOr-missing" (hashmap.getOr 0 "z" (hashmap.singleton "a" 7)) 0;
+	assert "hashmap.remove-present" (hashmap.get "a" (hashmap.singleton "a" 1 > hashmap.remove "a")) [];
+	assert "hashmap.remove-missing" (hashmap.get "a" (hashmap.singleton "a" 1 > hashmap.remove "z")) [1];
+	assert "hashmap.remove-sibling-safe" (hashmap.get "b"
+		(hashmap.empty > hashmap.set "a" 1 > hashmap.set "b" 2 > hashmap.remove "a")) [2];
+	assert "hashmap.keys-count" (list.length (hashmap.keys
+		(hashmap.empty > hashmap.set "x" 1 > hashmap.set "y" 2 > hashmap.set "z" 3))) 3;
+	assert "hashmap.values-count" (list.length (hashmap.values
+		(hashmap.empty > hashmap.set "x" 1 > hashmap.set "y" 2 > hashmap.set "z" 3))) 3;
+	assert "hashmap.values-sum" (list.sum (hashmap.values
+		(hashmap.empty > hashmap.set "x" 10 > hashmap.set "y" 20 > hashmap.set "z" 30))) 60;
+	assert "hashmap.fromList"
+		([["a", 1]; ["b", 2]; ["c", 3]] > hashmap.fromList > hashmap.values > sort)
+		[1;2;3];
+	assert "hashmap.fromList-empty" (hashmap.fromList []) [];
+	assert "hashmap.fromList-single" (hashmap.fromList [["2","blah"];]) (hashmap.singleton "2" "blah");
+	assert "hashmap.keyValues"
+		(hashmap.singleton "a" 1 > set "b" 2 > hashmap.keyValues > sortWith (on lt second))
+		[["a", 1]; ["b", 2]];
+	assert "hashmap.keyValues-single" (hashmap.singleton "a" 1 > hashmap.keyValues) [["a",1];];
+	assert "hashmap.keyValues-empty" (hashmap.empty) []
 ]
