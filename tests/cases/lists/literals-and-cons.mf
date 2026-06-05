@@ -1,3 +1,3 @@
--- List literals, concat, and a range.
+-- List literals, prepend, and a range.
 import core, list in
-show [[1; 2; 3]; concat [1; 2] [3; 4]; rangeIncl 1 5]
+show [[1; 2; 3]; prepend [1; 2] [3; 4]; rangeIncl 1 5]

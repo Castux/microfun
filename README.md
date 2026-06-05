@@ -61,11 +61,11 @@ let
 
   -- Primality test: n is prime when no divisor exists in [2, sqrt n]
   divides = d -> n -> eq 0 (mod n d),
-  isPrime = n -> range 2 (floor (sqrt n)) > none (divides n) > and (gte 2 n),
+  isPrime = n -> range 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
   primes  = upFrom 2 > filter isPrime,    -- lazy infinite stream of primes
 
   -- Fibonacci as a self-referential lazy stream (laziness makes this safe)
-  fibs = concat [1;1] (zipWith add fibs (tail fibs)),
+  fibs = prepend [1;1] (zipWith add fibs (tail fibs)),
 
   -- Insertion sort: lambda with cases for structural dispatch, foldr to build result
   insert = x -> {

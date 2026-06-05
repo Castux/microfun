@@ -67,16 +67,19 @@ tails = {
 -- inits l: all successive prefixes of a list
 inits = {
 	[] -> [[];],
-	[h,t] -> concat [[];] (inits t > map (cons h))
+	[h,t] -> prepend [[];] (inits t > map (cons h))
 },
 
 -- Modification
 
--- concat a b: join two lists into one
-concat = {
-	[] -> v -> v,
-	[h,t] -> v -> [h, concat t v]
+-- prepend prefix xs: prefix followed by xs (first arg is fixed for partial application)
+prepend = {
+	[] -> xs -> xs,
+	[h,t] -> xs -> [h, prepend t xs]
 },
+
+-- append suffix xs: xs followed by suffix; natural in a pipe: xs > append suffix
+append = flip prepend,
 
 reverse = foldl (flip cons) [], -- reverse the order of elements in a list
 
@@ -113,15 +116,15 @@ replaceAll = old -> new ->
 
 -- replaceAt idx val list: overwrite the element at index idx (zero-based)
 replaceAt = idx -> val -> list ->
-	concat (take idx list) [val, drop (succ idx) list],
+	prepend (take idx list) [val, drop (succ idx) list],
 
 -- insertAt idx val list: insert val before index idx, shifting the rest right
 insertAt = idx -> val -> list ->
-	concat (take idx list) [val, drop idx list],
+	prepend (take idx list) [val, drop idx list],
 
 -- removeAt idx list: remove the element at index idx (zero-based)
 removeAt = idx -> list ->
-	concat (take idx list) (drop (succ idx) list),
+	prepend (take idx list) (drop (succ idx) list),
 
 -- Higher-order
 
@@ -155,8 +158,8 @@ mapFilter = f -> {
 	}
 },
 
--- concatMap f l: map f over l then flatten the results (flatMap)
-concatMap = f -> map f *> flatten,
+-- flatMap f l: map f over l then flatten the results
+flatMap = f -> map f *> flatten,
 
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
@@ -198,15 +201,15 @@ scanr = f -> acc -> {
 
 -- Aggregations
 
-sum     = foldr add 0, -- sum of a list of numbers
-product = foldr mul 1, -- product of a list of numbers
+sum      = foldr add 0, -- sum of a list of numbers
+product  = foldr mul 1, -- product of a list of numbers
 
-orList  = foldr or 0,  -- logical OR over a list of booleans
-andList = foldr and 1, -- logical AND over a list of booleans
+orList   = foldr or 0,  -- logical OR over a list of booleans
+andList  = foldr and 1, -- logical AND over a list of booleans
 
-any       = f -> l -> orList (map f l),       -- 1 if f returns 1 for any element
-all       = f -> l -> andList (map f l),       -- 1 if f returns 1 for all elements
-noneMatch = f -> l -> not (any f l),           -- 1 if f returns 0 for all elements
+anyMatch  = f -> l -> orList (map f l),       -- 1 if f returns 1 for any element
+allMatch  = f -> l -> andList (map f l),       -- 1 if f returns 1 for all elements
+noneMatch = f -> l -> not (anyMatch f l),      -- 1 if f returns 0 for all elements
 count     = p -> foldl (acc -> x -> if (p x) (succ acc) acc) 0, -- count elements satisfying p
 
 -- Zipping
@@ -299,7 +302,7 @@ groupBy = f -> {
 },
 
 -- flatten l: concatenate a list of lists into one list
-flatten = foldr concat [],
+flatten = foldr prepend [],
 
 -- range a b: [a; a+1; ...; b-1], half open interval
 range = a -> b -> upFrom a > take (sub a b),
@@ -309,7 +312,7 @@ rangeIncl = a -> b -> range a (succ b),
 
 -- Search and set-like
 
-contains = elem -> any (equal elem), -- 1 if list contains elem, else 0
+contains = elem -> anyMatch (equal elem), -- 1 if list contains elem, else 0
 
 -- maximum l: largest element in list l (crashes on empty list)
 maximum = [h,t] -> foldl max h t,
@@ -361,7 +364,7 @@ partition = p ->
 sortWith = f -> {
 	[] -> [],
 	[x,xs] -> partition (f x) xs > {
-		[low,high] -> concat (sortWith f low) [x, sortWith f high]
+		[low,high] -> prepend (sortWith f low) [x, sortWith f high]
 	}
 },
 
@@ -374,4 +377,4 @@ times    = n -> f -> iterate f *> nth n,    -- apply function f n times
 downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
 repeat   = iterate id,   -- lazy infinite list of x
-cycle    = l -> concat l (cycle l) -- lazy infinite cycle of list l
+cycle    = l -> prepend l (cycle l) -- lazy infinite cycle of list l

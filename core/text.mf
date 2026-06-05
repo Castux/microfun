@@ -24,7 +24,7 @@ join = separator -> {
 	[] -> [],
 	[h,t] -> t > {
 		[] -> h,
-		t2 -> concat h (concat separator (join separator t2))
+		t2 -> prepend h (prepend separator (join separator t2))
 	}
 },
 
@@ -32,13 +32,13 @@ join = separator -> {
 padLeft = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0
 in
-	concat (replicate padLen fill) s,
+	prepend (replicate padLen fill) s,
 
 -- padRight n fill s: right-pad string s with code point fill to minimum width n
 padRight = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0
 in
-	concat s (replicate padLen fill),
+	append (replicate padLen fill) s,
 
 -- trim s: remove leading and trailing whitespace from string s
 trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
@@ -108,10 +108,10 @@ splitOne = sep -> s ->
 split = sep ->
 	splitOne sep *> {
 		[s;] -> [s;],
-		[left; right] -> concat [left;] (split sep right)
+		[left; right] -> prepend [left;] (split sep right)
 	},
 
-containsSub = sub -> l -> tails l > any (startsWith sub),
+containsSub = sub -> l -> tails l > anyMatch (startsWith sub),
 replaceSub = sub -> new -> splitOne sub *> join new,
 replaceAllSub = sub -> new -> split sub *> join new,
 
@@ -128,7 +128,7 @@ splitOneWith = f -> s ->
 -- splitWith f s: split on all runs satisfying f; returns a list of non-matching sections.
 splitWith = f -> s ->
 	splitOneWith f s >
-	maybe.fmap ([left, match, rest] -> concat [left;] (splitWith f rest)) >
+	maybe.fmap ([left, match, rest] -> prepend [left;] (splitWith f rest)) >
 	maybe.default [s;],
 
 -- replaceOneWith f repl s: replace the first run satisfying f with repl match.

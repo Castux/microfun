@@ -9,7 +9,7 @@ pairs = choose 2, -- all ordered pairs [a, b] where a appears before b in l
 -- subsets l: power set — all subsets of l (including empty, shortest first)
 subsets = {
 	[] -> [[];],
-	[h, t] -> let ss = subsets t in concat ss (map (cons h) ss)
+	[h, t] -> let ss = subsets t in prepend ss (map (cons h) ss)
 },
 
 -- subsetsWithRest n l: all ways to choose n elements, each result as [chosen, rest]
@@ -18,7 +18,7 @@ subsetsWithRest = {
 	n -> {
 		[] -> [],
 		[h, t] ->
-			concat
+			prepend
 				(map ([ch, r] -> [[h, ch], r]) (subsetsWithRest (pred n) t))
 				(subsetsWithRest n t)
 	}

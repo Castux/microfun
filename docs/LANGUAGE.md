@@ -394,7 +394,7 @@ A self-referential lazy structure is an ordinary definition:
 
 ```
 import list in
-let fibonacci = concat [1; 1] (zipWith add fibonacci (tail fibonacci)) in
+let fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)) in
   show (take 10 fibonacci)             -- [1; 1; 2; 3; 5; 8; 13; 21; 34; 55]
 ```
 
@@ -448,7 +448,7 @@ import list in write "hello"           -- prints: hello
 ```
 
 ```
-import list in write (concat "ab" "cd")  -- prints: abcd
+import list in write (prepend "ab" "cd")  -- prints: abcd
 ```
 
 ## 12. Lazy evaluation
@@ -646,7 +646,7 @@ A *maybe* value is either `none` (absent) or `some x` (present). The representat
 | `isNone m` | `maybe → bool` | `1` if `m` is `none`, `0` otherwise |
 | `isMaybe m` | `any → bool` | `1` if `m` is a valid maybe value (`none` or `some x`) |
 | `fmap f m` | `maybe → maybe` | apply `f` to the wrapped value; propagate `none` |
-| `bind f m` | `maybe → maybe` | monadic bind — extract the value, apply `f` (which must return a maybe); propagate `none` |
+| `andThen f m` | `maybe → a` | if `m` is `some x`, apply `f` to `x` and return the result; propagate `none`. `f` may return a maybe (for chaining) or any other value (for extraction + mapping) |
 | `value m` | `maybe → a` | extract the wrapped value; runtime error on `none` |
 | `default def m` | `a → maybe → a` | extract the value, or return `def` if `none` |
 | `orElse other m` | `maybe → maybe` | return `m` if it is `some`, otherwise `other` |
@@ -717,11 +717,12 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `initSafe l` | `init []` | `some l'` or `none` |
 
 **Modification**
-`concat`, `reverse`, `intersperse`, `intercalate`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
+`prepend`, `append`, `reverse`, `intersperse`, `intercalate`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
 
 | Function | Description |
 |---|---|
-| `concat a b` | append list `b` after list `a` |
+| `prepend prefix xs` | `prefix` followed by `xs`; `prepend prefix` is a partial that prepends a fixed prefix |
+| `append suffix xs` | `xs` followed by `suffix`; natural in a pipe: `xs > append suffix` |
 | `reverse l` | reverse the order of elements |
 | `intersperse sep l` | insert `sep` between every pair of elements |
 | `remove e l` | remove the first occurrence of `e` |
@@ -733,11 +734,11 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `removeAt idx l` | remove the element at zero-based index `idx` |
 
 **Higher-order**
-`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `concatMap`, `foldr`, `foldl`, `scanl`, `scanr`
+`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `flatMap`, `foldr`, `foldl`, `scanl`, `scanr`
 
 `mapFilter f l` — applies `f` to each element; `f` must return a `maybe` value. Elements where `f` returns `none` are dropped; elements where it returns `some x` contribute `x` to the result. Combines a transformation and a filter in a single pass.
 
-`concatMap f l` — maps `f` over `l` then flattens the resulting list of lists (also called `flatMap`).
+`flatMap f l` — maps `f` over `l` then flattens the resulting list of lists.
 
 `scanl f z l` — list of successive left-fold results starting with `z`: `[z; f z l1; f (f z l1) l2; …]`.
 
@@ -752,7 +753,7 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `filterIndex f l` — keep elements where `f index element` returns 1, with zero-based indices.
 
 **Aggregations**
-`sum`, `product`, `orList`, `andList`, `any`, `all`, `noneMatch`, `count`
+`sum`, `product`, `orList`, `andList`, `anyMatch`, `allMatch`, `noneMatch`, `count`
 
 **Zipping**
 `zipWith`, `zip`, `zipWith3`, `zip3`

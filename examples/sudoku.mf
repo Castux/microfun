@@ -44,11 +44,11 @@ let
 				[text.lf;]
 			],
 
-	sepLine = concat "------+-------+------" [text.lf;],
+	sepLine = prepend "------+-------+------" [text.lf;],
 
 	boardStr = board ->
 		range 0 8
-		> map (r -> rowStr r board > concat (if (or (eq r 3) (eq r 6)) sepLine []))
+		> map (r -> rowStr r board > prepend (if (or (eq r 3) (eq r 6)) sepLine []))
 		> flatten
 
 in
@@ -67,6 +67,6 @@ let puzzle = [
 
 in
 
-eval < map write < concat
+eval < map write < prepend
 	[ "Puzzle:"; boardStr puzzle; "Solutions:"]
 	(solutions puzzle > map boardStr)

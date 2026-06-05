@@ -27,7 +27,7 @@ primes2 =
 	in
 		[2, primesUpFrom 3],
 
-fibonacci = concat [1;1] (zipWith add fibonacci (tail fibonacci)),
+fibonacci = prepend [1;1] (zipWith add fibonacci (tail fibonacci)),
 
 fact = {
 	1 -> 1,
@@ -42,7 +42,7 @@ pairWith = f -> {
 	[] -> b -> [],
 	[x,xs] -> {
 		[] -> [],
-		b -> concat (map (f x) b) (pairWith f xs b)
+		b -> prepend (map (f x) b) (pairWith f xs b)
 	}
 },
 

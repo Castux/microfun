@@ -24,9 +24,9 @@ fmap = f -> {
 	[x] -> [f x]
 },
 
--- bind f m: monadic bind — apply f to the wrapped value; propagate none.
--- f must return a maybe value.
-bind = f -> {
+-- andThen f m: if m is some x, apply f to x and return the result; propagate none.
+-- f may return a maybe (chaining) or any other value (extraction + mapping).
+andThen = f -> {
 	[] -> [],
 	[x] -> f x
 },
