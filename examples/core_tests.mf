@@ -197,6 +197,11 @@ runTests [
 	assert "list.removeAt-first" (list.removeAt 0 [1; 2; 3]) [2; 3];
 	assert "list.removeAt-mid" (list.removeAt 1 [1; 2; 3]) [1; 3];
 	assert "list.removeAt-last" (list.removeAt 2 [1; 2; 3]) [1; 2];
+	assert "list.tails" (list.tails [1; 2; 3; 4]) [[1; 2; 3; 4]; [2; 3; 4]; [3; 4]; [4;]; []];
+	assert "list.tails-empty" (list.tails []) [[];];
+	assert "list.inits" (list.inits [1; 2; 3; 4]) [[]; [1;]; [1; 2]; [1; 2; 3]; [1; 2; 3; 4]];
+	assert "list.inits-empty" (list.inits []) [[];];
+
 
 	-- comb.mf
 	assert "comb.subsets-empty" (comb.subsets []) [[];];
@@ -236,8 +241,12 @@ runTests [
 	assert "text.startsWith-false" (text.startsWith "def" "abcdef") 0;
 	assert "text.endsWith-true" (text.endsWith "def" "abcdef") 1;
 	assert "text.endsWith-false" (text.endsWith "abc" "abcdef") 0;
+	assert "text.splitOne" (text.splitOne ", " "abc, def, ghi") ["abc"; "def, ghi"];
+	assert "text.splitOne-empty" (text.splitOne ", " "") ["";];
+	assert "text.splitOne-prefix" (text.splitOne "xyz" "xyzabc") [""; "abc"];
+	assert "text.splitOne-notfound" (text.splitOne "xyz" "abc") ["abc";];
+	assert "text.split" (text.split ", " "abc, def, ghi") ["abc"; "def"; "ghi"];
 	assert "text.split-none" (text.split "," "abc") ["abc";];
-	assert "text.split" (text.split "," "a,b,c") ["a"; "b"; "c"];
 	assert "text.split-empty" (text.split "," "") ["";];
 	assert "text.split-only-sep" (text.split "," ",,,") [""; ""; ""; ""];
 

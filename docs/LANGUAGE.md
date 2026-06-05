@@ -673,13 +673,14 @@ show [
 | `odd n` | `1` if `n mod 2 ≠ 0` |
 | `gcd a b` | greatest common divisor |
 | `lcm a b` | least common multiple |
+| `digits n` | decimal digits of non-negative integer `n` as a list (`digits 123 = [1; 2; 3]`, `digits 0 = [0;]`) |
 
 ---
 
 #### `list` — list operations and infinite lists
 
 **Construction and inspection**
-`emptyList`, `cons`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`
+`emptyList`, `cons`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`, `tails`, `inits`
 
 The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. Safe counterparts return a `maybe` value instead:
 
@@ -724,9 +725,13 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `zipWith`, `zip`, `zipWith3`, `zip3`
 
 **Slicing**
-`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `flatten`, `range`, `rangeIncl`
+`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `splitAt`, `tails`, `inits`, `spans`, `flatten`, `range`, `rangeIncl`
 
 `span f l` returns `[[taken while f holds], [rest]]`.
+`splitAt n l` returns `[[first n elements], [rest]]` — like `span` but splits by index.
+`tails l` returns all successive suffixes: `[[l]; [tail l]; …; []]`.
+`inits l` returns all successive prefixes: `[[]; …; [init l]; [l]]`.
+`spans l` zips `inits` and `tails` — each element is `[prefix, suffix]` for every split point; used to search for substrings.
 `range a b` produces `[a; a+1; …; b-1]` — half-open interval, `b` excluded.
 `rangeIncl a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
 
@@ -873,7 +878,8 @@ All functions below take a Unicode code point (an integer, as found in a microfu
 | `stringToFloat s` | parse a decimal float string (optional `'-'` and `'.'`) |
 | `startsWith pref s` | `1` if `s` begins with `pref` |
 | `endsWith suff s` | `1` if `s` ends with `suff` |
-| `split sep s` | split `s` on separator `sep`; returns a list of strings |
+| `splitOne sep s` | split `s` on the first occurrence of `sep`; returns a two-element list `[before; after]`, or `[s;]` if `sep` is not found |
+| `split sep s` | split `s` on all occurrences of `sep`; returns a list of strings |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
 wrong results silently. `split "" s` splits `s` into individual single-character strings.

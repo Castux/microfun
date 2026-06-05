@@ -1,7 +1,7 @@
 -- text.mf: string formatting, parsing, and value rendering.
 -- Strings in microfun are lists of Unicode code points, so all list operations
 -- work on them directly. This module adds higher-level formatting utilities.
-import list, math, core in
+import list, math, core, maybe in
 
 module
 
@@ -93,19 +93,16 @@ stringToFloat = s ->
 				(parseUnsigned s)
 		},
 
--- split sep s: split string s on separator sep, returning a list of strings.
--- Consecutive separators produce empty strings. Empty sep splits into single-char strings.
-split = sep -> s ->
-	if (isEmpty sep)
-		(map (c -> [c;]) s)
-		(let
-			sepLen = length sep,
-			go     = current -> str ->
-				if (equal sep (take sepLen str))
-					[reverse current, go [] (drop sepLen str)]
-					(str > {
-						[] -> [reverse current;],
-						[c, rest] -> go [c, current] rest
-					})
-		in
-			go [] s)
+-- splitOne sep s: split string s on separator sep, but stop at the first
+splitOne = sub -> s ->
+	spans s >
+	find ([left,right] -> startsWith sub right) >
+	maybe.fmap ([left,right] -> [left; right > drop (length sub)]) >
+	maybe.default [s;],
+
+-- split sep s: split string s on all separators sep
+split = sep ->
+	splitOne sep *> {
+		[s;] -> [s;],
+		[left; right] -> concat [left;] (split sep right)
+	}

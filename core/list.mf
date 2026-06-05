@@ -57,6 +57,18 @@ initSafe = {
 	l -> maybe.some (init l)
 },
 
+-- tails l: all successive suffixes of a list
+tails = {
+	[] -> [[];],
+	[h,t] -> [[h,t], tails t]
+},
+
+-- tails l: all successive prefixes of a list
+inits = {
+	[] -> [[];],
+	[h,t] -> concat [[];] (inits t > map (cons h))
+},
+
 -- Modification
 
 -- concat a b: join two lists into one
@@ -232,13 +244,19 @@ dropWhile = f -> {
 		[x,xs]
 },
 
--- span f l: splits l into [[taken while f holds], [rest of list]]
+-- span f l: splits l into [taken while f holds, rest of list]
 span = f -> {
 	[] -> [[], []],
 	[x, xs] -> if (f x)
 		(span f xs > { [ts, fs] -> [[x, ts], fs] })
 		[[], [x, xs]]
 },
+
+-- splitAt n l: split l into [first n elements, rest]
+splitAt = n -> l -> [take n l, drop n l],
+
+-- all successive splits of the list in two parts
+spans = l -> zip (inits l) (tails l),
 
  -- concatenate a list of lists into one list
 flatten = foldr concat [],
