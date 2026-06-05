@@ -272,10 +272,7 @@ nub = {
 -- Replication and structure
 
 -- replicate n x: list of n copies of x
-replicate = n -> x ->
-	if (eq n 0)
-		[]
-		[x, replicate (sub 1 n) x],
+replicate = n -> repeat *> take n,
 
 -- unzip l: converts [[a1,b1]; ...] into [[a1; ...], [b1; ...]]
 unzip = {

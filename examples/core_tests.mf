@@ -3,10 +3,16 @@ import core, math, list, comb, text, heap, maybe in
 let
 	assert = name -> expr -> expected ->
 		if (equal expr expected)
-			(flatten ["PASS: "; name; [text.lf;]])
-			(flatten ["FAIL: "; name; " (expected "; text.toString expected; ", got "; text.toString expr; ")"; [text.lf;]]),
+			[flatten ["PASS: "; name; [text.lf;]], 1]
+			[flatten ["FAIL: "; name; " (expected "; text.toString expected; ", got "; text.toString expr; ")"; [text.lf;]], 0],
 
-	runTests = l -> write (flatten l)
+	runTests = l -> let
+		total = length l,
+		passed = map second l > sum,
+		lines = map first l > flatten,
+		message = flatten [[lf;]; intToString passed; " passed out of "; intToString total]
+	in
+		write < concat lines message
 in
 
 runTests [
