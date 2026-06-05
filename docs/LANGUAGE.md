@@ -675,7 +675,7 @@ show [
 #### `list` — list operations and infinite lists
 
 **Construction and inspection**
-`emptyList`, `cons`, `isList`, `length`, `head`, `tail`, `last`, `init`, `isEmpty`, `concat`, `remove`, `reverse`, `intersperse`
+`emptyList`, `cons`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`
 
 The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. Safe counterparts return a `maybe` value instead:
 
@@ -686,10 +686,28 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `lastSafe l` | `last []` | `some x` or `none` |
 | `initSafe l` | `init []` | `some l'` or `none` |
 
+**Modification**
+`concat`, `reverse`, `intersperse`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
+
+| Function | Description |
+|---|---|
+| `concat a b` | append list `b` after list `a` |
+| `reverse l` | reverse the order of elements |
+| `intersperse sep l` | insert `sep` between every pair of elements |
+| `remove e l` | remove the first occurrence of `e` |
+| `removeAll val l` | remove every occurrence of `val` |
+| `replace old new l` | replace the first occurrence of `old` with `new` |
+| `replaceAll old new l` | replace every occurrence of `old` with `new` |
+| `replaceAt idx val l` | overwrite the element at zero-based index `idx` |
+| `insertAt idx val l` | insert `val` before index `idx`, shifting the rest right |
+| `removeAt idx l` | remove the element at zero-based index `idx` |
+
 **Higher-order**
 `map`, `filter`, `foldr`, `foldl`
 
 `find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
+
+`findIndex p l` — returns `some i` for the zero-based index of the first element satisfying `p`, or `none` if none does.
 
 **Aggregations**
 `sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
@@ -698,21 +716,23 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `zipWith`, `zip`, `zipWith3`, `zip3`
 
 **Slicing**
-`take`, `drop`, `takeWhile`, `dropWhile`, `span`
+`take`, `drop`, `takeWhile`, `dropWhile`, `span`, `flatten`, `range`
 
 `span f l` returns `[[taken while f holds], [rest]]`.
-
-**Structure**
-`flatten`, `range`
-
 `range a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
 
 **Search and set-like**
-`contains`, `maximum`, `minimum`, `replicate`, `unzip`, `nub`, `nth`
+`contains`, `maximum`, `minimum`, `nth`, `nub`
 
 `nth n l` — zero-based index; runtime error if out of bounds.
 `nub l` — remove duplicates, keeping first occurrences.
 `maximum` / `minimum` — crash on an empty list.
+
+**Replication and structure**
+`replicate`, `unzip`
+
+`replicate n x` — list of `n` copies of `x`.
+`unzip l` — converts `[[a1,b1]; …]` into `[[a1; …], [b1; …]]`.
 
 **Sorting**
 `partition`, `sortWith`, `sort`

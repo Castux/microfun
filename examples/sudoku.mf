@@ -2,10 +2,6 @@ import core, maybe, list, math, text in
 
 let
 
-	-- Replace element at index i in a flat list.
-	boardSet = i -> v -> board ->
-		drop (add 1 i) board > cons v > concat (take i board),
-
 	-- Cell-index decomposition.
 	rowOf = div 9,
 	colOf = mod 9,
@@ -30,7 +26,7 @@ let
 		[] -> [board;],
 		[emptyIdx] -> (range 1 9
 			> filter (isValid board emptyIdx)
-			> map (d -> solutions (boardSet emptyIdx d board))
+			> map (d -> solutions (replaceAt emptyIdx d board))
 			> flatten)
 	},
 

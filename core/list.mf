@@ -6,7 +6,8 @@ module
 
 -- Construction and inspection
 
-cons = h -> t -> [h,t], -- construct a new list cell: h:t
+cons      = h -> t -> [h,t], -- construct a new list cell: h:t
+emptyList = [],               -- the empty list
 
 -- isList x: 1 if x is a proper list, else 0
 isList = {
@@ -14,6 +15,8 @@ isList = {
 	[x,xs] -> isList xs,
 	n -> 0
 },
+
+isEmpty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
 
 -- length l: number of elements in list l
 length = {
@@ -54,19 +57,12 @@ initSafe = {
 	l -> maybe.some (init l)
 },
 
-emptyList = [], -- the empty list
-isEmpty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
+-- Modification
 
 -- concat a b: join two lists into one
 concat = {
 	[] -> v -> v,
 	[h,t] -> v -> [h, concat t v]
-},
-
--- remove e l: remove the first occurrence of e from list l
-remove = e -> {
-	[] -> [],
-	[h,t] -> if (equal e h) t [h, remove e t]
 },
 
 reverse = foldl (flip cons) [], -- reverse the order of elements in a list
@@ -77,6 +73,39 @@ intersperse = sep -> {
 	[x, []] -> [x;],
 	[h, t] -> [h, [sep, intersperse sep t]]
 },
+
+-- remove e l: remove the first occurrence of e from list l
+remove = e -> {
+	[] -> [],
+	[h,t] -> if (equal e h) t [h, remove e t]
+},
+
+-- removeAll val l: remove every occurrence of val from list l
+removeAll = val -> filter (equal val *> not),
+
+-- replace old new l: replace the first occurrence of old with new in list l
+replace = old -> new -> {
+	[] -> [],
+	[h,t] -> if (equal h old)
+		[new, t]
+		[h, replace old new t]
+},
+
+-- replaceAll old new l: replace every occurrence of old with new in list l
+replaceAll = old -> new ->
+	map (x -> if (equal x old) new x),
+
+-- replaceAt idx val list: overwrite the element at index idx (zero-based)
+replaceAt = idx -> val -> list ->
+	concat (take idx list) [val, drop (succ idx) list],
+
+-- insertAt idx val list: insert val before index idx, shifting the rest right
+insertAt = idx -> val -> list ->
+	concat (take idx list) [val, drop idx list],
+
+-- removeAt idx list: remove the element at index idx (zero-based)
+removeAt = idx -> list ->
+	concat (take idx list) (drop (succ idx) list),
 
 -- Higher-order
 
@@ -95,7 +124,7 @@ filter = f -> {
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
 
--- findIndex f l: index of first element of l matching predicate p (returns maybe)
+-- findIndex p l: index of first element of l matching predicate p (returns maybe)
 findIndex = p -> l -> let
 	rec = i -> {
 		[] -> maybe.none,
@@ -175,20 +204,20 @@ drop = {
 	}
 },
 
--- dropWhile f l: list l without the prefix for which f returns 1
-dropWhile = f -> {
-	[] -> [],
-	[x,xs] -> if (f x)
-		(dropWhile f xs)
-		[x,xs]
-},
-
 -- takeWhile f l: the prefix of list l for which f returns 1
 takeWhile = f -> {
 	[] -> [],
 	[x,xs] -> if (f x)
 		[x, takeWhile f xs]
 		[]
+},
+
+-- dropWhile f l: list l without the prefix for which f returns 1
+dropWhile = f -> {
+	[] -> [],
+	[x,xs] -> if (f x)
+		(dropWhile f xs)
+		[x,xs]
 },
 
 -- span f l: splits l into [[taken while f holds], [rest of list]]
@@ -207,7 +236,7 @@ range = a -> b ->
 		[a, range (succ a) b]
 		[],
 
--- Searching and membership
+-- Search and set-like
 
 contains = elem -> any (equal elem), -- 1 if list contains elem, else 0
 
@@ -216,7 +245,18 @@ maximum = [h,t] -> foldl max h t,
 -- minimum l: smallest element in list l (crashes on empty list)
 minimum = [h,t] -> foldl min h t,
 
--- Replication and structural operations
+-- nth n l: zero-based index into list l
+nth = n -> {
+	[h,t] -> if (eq n 0) h (nth (sub 1 n) t)
+},
+
+-- nub l: remove duplicates, keeping only the first occurrence of each value
+nub = {
+	[] -> [],
+	[h, t] -> [h, nub (filter (x -> not (equal x h)) t)]
+},
+
+-- Replication and structure
 
 -- replicate n x: list of n copies of x
 replicate = n -> x ->
@@ -229,17 +269,6 @@ unzip = {
 	[] -> [[], []],
 	[[a,b], rest] ->
 		unzip rest > { [as, bs] -> [[a, as], [b, bs]] }
-},
-
--- nub l: remove duplicates, keeping only the first occurrence of each value
-nub = {
-	[] -> [],
-	[h, t] -> [h, nub (filter (x -> not (equal x h)) t)]
-},
-
--- nth n l: zero-based index into list l
-nth = n -> {
-	[h,t] -> if (eq n 0) h (nth (sub 1 n) t)
 },
 
 -- Sorting

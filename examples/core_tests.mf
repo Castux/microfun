@@ -158,6 +158,23 @@ runTests [
 	assert "list.sort-empty" (list.sort []) [];
 	assert "list.sort" (list.sort [3; 1; 4; 1; 5]) [1; 1; 3; 4; 5];
 	assert "list.sortWith-desc" (list.sortWith gt [3; 1; 4; 1; 5]) [5; 4; 3; 1; 1];
+	assert "list.replace-first" (list.replace 2 9 [1; 2; 3; 2]) [1; 9; 3; 2];
+	assert "list.replace-missing" (list.replace 5 9 [1; 2; 3]) [1; 2; 3];
+	assert "list.replace-empty" (list.replace 1 9 []) [];
+	assert "list.replaceAll" (list.replaceAll 2 9 [1; 2; 3; 2]) [1; 9; 3; 9];
+	assert "list.replaceAll-missing" (list.replaceAll 5 9 [1; 2; 3]) [1; 2; 3];
+	assert "list.removeAll" (list.removeAll 2 [1; 2; 3; 2]) [1; 3];
+	assert "list.removeAll-missing" (list.removeAll 5 [1; 2; 3]) [1; 2; 3];
+	assert "list.removeAll-empty" (list.removeAll 1 []) [];
+	assert "list.replaceAt" (list.replaceAt 1 9 [1; 2; 3]) [1; 9; 3];
+	assert "list.replaceAt-first" (list.replaceAt 0 9 [1; 2; 3]) [9; 2; 3];
+	assert "list.replaceAt-last" (list.replaceAt 2 9 [1; 2; 3]) [1; 2; 9];
+	assert "list.insertAt-start" (list.insertAt 0 9 [1; 2; 3]) [9; 1; 2; 3];
+	assert "list.insertAt-mid" (list.insertAt 1 9 [1; 2; 3]) [1; 9; 2; 3];
+	assert "list.insertAt-end" (list.insertAt 3 9 [1; 2; 3]) [1; 2; 3; 9];
+	assert "list.removeAt-first" (list.removeAt 0 [1; 2; 3]) [2; 3];
+	assert "list.removeAt-mid" (list.removeAt 1 [1; 2; 3]) [1; 3];
+	assert "list.removeAt-last" (list.removeAt 2 [1; 2; 3]) [1; 2];
 
 	-- comb.mf
 	assert "comb.subsets-empty" (comb.subsets []) [[];];
