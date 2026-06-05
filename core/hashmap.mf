@@ -60,13 +60,17 @@ set = k -> v ->
 remove = k ->
 	let
 		h = hash k,
+		removeNode = left -> right -> right > {
+			[] -> left,
+			_ -> minNode right > {[mh, mk, mv] -> [mh, mk, mv, left, removeMin right]}
+		},
+
 		go = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
 				case (lt nh h) [nh, nk, nv, go left, right]
 					(gt nh h) [nh, nk, nv, left, go right]
-					(equal nk k)
-						({ [] -> left, _ -> minNode right > ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]) } right)
+					(equal nk k) (removeNode left right)
 					else [nh, nk, nv, left, go right]
 		}
 	in go,
