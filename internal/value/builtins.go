@@ -11,7 +11,7 @@ import (
 var InitialBuiltins = map[string]*Builtin{}
 
 func init() {
-	for op := PrimOp(0); op < primOpCount; op++ {
+	for op := range primOpCount {
 		name := PrimNames[op]
 		InitialBuiltins[name] = &Builtin{Prim: op, Arity: PrimArity[op], Name: name}
 	}
@@ -31,12 +31,15 @@ func EvalStructuralBuiltin(op PrimOp, args []Value) Value {
 		return FullNormalForm(args[0], make(map[*Thunk]bool))
 
 	case PrimPeek:
-		fmt.Println(ShowValue(args[0]))
+		fmt.Println(StringifyValue(args[0]))
 		return args[0]
 
 	case PrimShow:
-		fmt.Println(ShowValueFull(args[0]))
+		fmt.Println(StringifyValueFull(args[0]))
 		return args[0]
+
+	case PrimString:
+		return FoldStringValue(StringifyValueFull(args[0]))
 
 	case PrimWrite:
 		walkList(args[0], "write", "list of code points", func(num float64) {

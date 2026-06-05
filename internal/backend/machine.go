@@ -229,7 +229,7 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 
 			default:
 				m.raiseRuntimeError(
-					"cannot apply "+value.ShowValue(control)+", it is not a function",
+					"cannot apply "+value.StringifyValue(control)+", it is not a function",
 					frame.Pos, stack)
 			}
 		}
@@ -240,7 +240,7 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 // and run the kernel; structural builtins are dispatched separately.
 func (m *Machine) runBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
 	switch op {
-	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite:
+	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite, value.PrimString:
 		m.builtinPos = pos
 		m.builtinStack = stack
 		return value.EvalStructuralBuiltin(op, args)
@@ -464,7 +464,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 
 		case NoMatch:
 			m.raiseRuntimeError(
-				"no pattern matched value "+value.ShowValue(arg),
+				"no pattern matched value "+value.StringifyValue(arg),
 				noMatch, stack)
 
 		// --- Build instructions (body of the matched case) ---

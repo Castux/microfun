@@ -527,14 +527,17 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
 | `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
 | `bwrite a` | 1 | `a` | prints `a` as raw bytes (list of integers 0–255), then returns it |
+| `string a` | 1 | string representation of `a` | returns the same text `show` would print, as a list of code points |
 | `stdin` | — (a value) | standard input as a lazy list of Unicode code points | see below |
 | `bstdin` | — (a value) | standard input as a lazy list of raw byte values | see below |
 
 `peek`, `show`, `write`, and `bwrite` are the only ways a program produces
 output; each returns its argument so it can be inserted into an expression.
 `bwrite` is the binary counterpart to `write`: it treats each element as a raw
-byte value (`0`–`255`) with no Unicode encoding. `add`, `mul`, and `eq` are
-commutative, so their argument order is immaterial.
+byte value (`0`–`255`) with no Unicode encoding. `string` is the pure counterpart
+to `show`: it returns the same unbounded representation as a list of code points
+instead of printing it, useful for building formatted output. `add`, `mul`, and
+`eq` are commutative, so their argument order is immaterial.
 
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
 a code-point list, is a run-time error.
@@ -840,15 +843,8 @@ character of a string, and is the idiomatic way to write character literals:
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
-| `intersperse sep l` | intercalate `sep` between each element in the list |
 | `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with single-char string `fill` to width `n` |
-| `intToString n` | render an integer as a string (wrong output for non-integers) |
-| `floatToString prec n` | render `n` with exactly `prec` decimal digits |
-| `numberToString n` | render an integer without decimal point, or a float with 6 digits |
-| `toString x` | render any number, list, or tuple as a string for `write` |
-
-`toString` does not support tuples with more than 10 elements or function values.
 
 **Character classification and conversion**
 
@@ -885,8 +881,6 @@ wrong results silently. `split "" s` splits `s` into individual single-character
 ```
 import text, list in
 eval < map write [
-  text.toString [1; 2; 3];            -- [1; 2; 3]
-  text.floatToString 2 3.14159;       -- 3.14
   text.join ", " ["a"; "b"; "c"];     -- a, b, c
   map text.toUpper "hello"            -- HELLO
 ]

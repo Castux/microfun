@@ -32,6 +32,7 @@ const (
 	PrimShow
 	PrimWrite
 	PrimBwrite
+	PrimString
 
 	primOpCount // sentinel for array sizing
 )
@@ -44,7 +45,7 @@ var PrimNames = [primOpCount]string{
 	PrimSqrt: "sqrt",
 	PrimEq:   "eq", PrimLt: "lt", PrimLte: "lte", PrimGte: "gte", PrimGt: "gt", PrimNeq: "neq",
 	PrimEqual: "equal",
-	PrimEval:  "eval", PrimPeek: "peek", PrimShow: "show", PrimWrite: "write", PrimBwrite: "bwrite",
+	PrimEval:  "eval", PrimPeek: "peek", PrimShow: "show", PrimWrite: "write", PrimBwrite: "bwrite", PrimString: "string",
 }
 
 // PrimName returns the source-level name of a primitive operation.
@@ -61,7 +62,7 @@ var PrimArity = [primOpCount]int{
 	PrimSqrt: 1,
 	PrimEq:   2, PrimLt: 2, PrimLte: 2, PrimGte: 2, PrimGt: 2, PrimNeq: 2,
 	PrimEqual: 2,
-	PrimEval:  1, PrimPeek: 1, PrimShow: 1, PrimWrite: 1, PrimBwrite: 1,
+	PrimEval:  1, PrimPeek: 1, PrimShow: 1, PrimWrite: 1, PrimBwrite: 1, PrimString: 1,
 }
 
 // EvalPrim executes the saturated primitive operation.

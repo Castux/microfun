@@ -21,13 +21,13 @@ const (
 	Cyclic
 )
 
-func ShowValue(value Value) string {
+func StringifyValue(value Value) string {
 	var builder strings.Builder
 	writeValue(&builder, value, 0, ShowDefaultDepth, ShowDefaultWidth, make(map[*Thunk]bool))
 	return builder.String()
 }
 
-func ShowValueFull(value Value) string {
+func StringifyValueFull(value Value) string {
 	var builder strings.Builder
 	writeValue(&builder, value, 0, math.MaxInt, math.MaxInt, make(map[*Thunk]bool))
 	return builder.String()
