@@ -240,7 +240,7 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 // and run the kernel; structural builtins are dispatched separately.
 func (m *Machine) runBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
 	switch op {
-	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite, value.PrimString:
+	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite, value.PrimString, value.PrimHash:
 		m.builtinPos = pos
 		m.builtinStack = stack
 		return value.EvalStructuralBuiltin(op, args)

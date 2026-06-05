@@ -150,6 +150,9 @@ func collectListSpine(start *Cons, expanding map[*Thunk]bool, maxWidth int) ([]V
 }
 
 func formatNumber(num float64) string {
+	if num == math.Trunc(num) && math.Abs(num) <= 1<<53 {
+		return strconv.FormatFloat(num, 'f', 0, 64)
+	}
 	return strconv.FormatFloat(num, 'g', -1, 64)
 }
 

@@ -51,6 +51,9 @@ func EvalStructuralBuiltin(op PrimOp, args []Value) Value {
 		fmt.Println()
 		return args[0]
 
+	case PrimHash:
+		return NumberValue(float64(computeHash(args[0]) & ((1 << 53) - 1)))
+
 	case PrimBwrite:
 		walkList(args[0], "bwrite", "list of numbers", func(num float64) {
 			if num != math.Trunc(num) || num < 0 || num > 255 {
@@ -62,6 +65,54 @@ func EvalStructuralBuiltin(op PrimOp, args []Value) Value {
 
 	default:
 		panic("not a structural builtin")
+	}
+}
+
+const (
+	fnvOffset64 uint64 = 14695981039346656037
+	fnvPrime64  uint64 = 1099511628211
+
+	hashTagNumber byte = 0x01
+	hashTagCons   byte = 0x02
+	hashTagTuple  byte = 0x03
+)
+
+func fnvByte(h uint64, b byte) uint64        { return (h ^ uint64(b)) * fnvPrime64 }
+func fnvU64(h, v uint64) uint64              {
+	for i := 0; i < 8; i++ {
+		h = fnvByte(h, byte(v>>(i*8)))
+	}
+	return h
+}
+
+func computeHash(v Value) uint64 {
+	forced := Force(v)
+	switch forced.Tag {
+	case NumberTag:
+		n := forced.Num
+		var bits uint64
+		if n == 0 {
+			bits = 0 // normalize -0.0
+		} else {
+			bits = math.Float64bits(n)
+		}
+		return fnvU64(fnvByte(fnvOffset64, hashTagNumber), bits)
+	case ConsTag:
+		c := forced.Cons()
+		h := fnvByte(fnvOffset64, hashTagCons)
+		h = fnvU64(h, computeHash(c.Head))
+		h = fnvU64(h, computeHash(c.Tail))
+		return h
+	case TupleTag:
+		fields := forced.Tuple().Fields
+		h := fnvU64(fnvByte(fnvOffset64, hashTagTuple), uint64(len(fields)))
+		for _, f := range fields {
+			h = fnvU64(h, computeHash(f))
+		}
+		return h
+	default:
+		RaiseBuiltinError("hash: value is not hashable (contains a function)")
+		return 0 // unreachable
 	}
 }
 
