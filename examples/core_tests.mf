@@ -105,6 +105,10 @@ runTests [
 	assert "list.map" (list.map (add 1) [1; 2; 3]) [2; 3; 4];
 	assert "list.filter-empty" (list.filter (gt 2) []) [];
 	assert "list.filter" (list.filter (gt 2) [1; 2; 3; 4]) [3; 4];
+	assert "list.mapIndex" (list.mapIndex (i -> x -> x > add (mul 2 i)) [10; 20; 30]) [10; 22; 34];
+	assert "list.mapIndex-empty" (list.mapIndex (i -> x -> [i, x]) []) [];
+	assert "list.filterIndex" (list.filterIndex (i -> x -> gt 0 i) [10; 20; 30]) [20; 30];
+	assert "list.filterIndex-empty" (list.filterIndex (i -> x -> 1) []) [];
 	assert "list.find-true" (list.find (gt 2) [1; 2; 3; 4]) [3];
 	assert "list.find-false" (list.find (gt 5) [1; 2; 3; 4]) [];
 	assert "list.foldr" (list.foldr sub 10 [1; 2; 3]) 4;
@@ -137,10 +141,14 @@ runTests [
 	assert "list.takeWhile" (list.takeWhile (lt 4) [1; 2; 3; 4; 5]) [1; 2; 3];
 	assert "list.dropWhile" (list.dropWhile (lt 4) [1; 2; 3; 4; 5]) [4; 5];
 	assert "list.span" (list.span (lt 3) [1; 2; 3; 4; 5]) [[1; 2], [3; 4; 5]];
+	assert "list.slice" (list.slice 1 4 [10; 20; 30; 40; 50]) [20; 30; 40];
+	assert "list.slice-empty" (list.slice 2 2 [10; 20; 30]) [];
 	assert "list.flatten-empty" (list.flatten []) [];
 	assert "list.flatten" (list.flatten [[1; 2]; [3; 4]; [5;]]) [1; 2; 3; 4; 5];
-	assert "list.range" (list.range 1 4) [1; 2; 3; 4];
-	assert "list.range-desc" (list.range 5 2) [];
+	assert "list.range" (list.range 1 5) [1; 2; 3; 4];
+	assert "list.range-empty" (list.range 3 3) [];
+	assert "list.rangeIncl" (list.rangeIncl 1 4) [1; 2; 3; 4];
+	assert "list.rangeIncl-single" (list.rangeIncl 3 3) [3;];
 	assert "list.contains-true" (list.contains 3 [1; 2; 3]) 1;
 	assert "list.contains-false" (list.contains 5 [1; 2; 3]) 0;
 	assert "list.maximum-single" (list.maximum [42;]) 42;

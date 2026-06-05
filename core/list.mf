@@ -115,11 +115,19 @@ map = f -> {
 	[h,t] -> [f h, map f t]
 },
 
+-- mapIndex f l: replace every element with `f index element` with zero-based indices
+mapIndex = f -> l ->
+	zipWith f (upFrom 0) l,
+
 -- filter f l: keep elements in l for which f returns 1
 filter = f -> {
 	[] -> [],
 	[h,t] -> if (f h) [h, filter f t] (filter f t)
 },
+
+-- filterIndex f l: keep elements for which `f index element` returns 1 with zero-based indices
+filterIndex = f ->
+	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
@@ -204,6 +212,10 @@ drop = {
 	}
 },
 
+-- slice a b l: the sub list between indices a and b (exclusive)
+slice = start -> end ->
+	drop start *> take (sub start end),
+
 -- takeWhile f l: the prefix of list l for which f returns 1
 takeWhile = f -> {
 	[] -> [],
@@ -228,13 +240,14 @@ span = f -> {
 		[[], [x, xs]]
 },
 
-flatten = foldr concat [], -- concatenate a list of lists into one list
+ -- concatenate a list of lists into one list
+flatten = foldr concat [],
 
--- range a b: [a; a+1; ...; b], inclusive
-range = a -> b ->
-	if (lte b a)
-		[a, range (succ a) b]
-		[],
+-- range a b: [a; a+1; ...; b-1], half open interval
+range = a -> b -> upFrom a > take (sub a b),
+
+-- rangeIncl a b: [a; a+1; ...; b], inclusive
+rangeIncl = a -> b -> upFrom a > take (b > sub a > add 1),
 
 -- Search and set-like
 

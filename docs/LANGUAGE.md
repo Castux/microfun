@@ -703,11 +703,15 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `removeAt idx l` | remove the element at zero-based index `idx` |
 
 **Higher-order**
-`map`, `filter`, `foldr`, `foldl`
+`map`, `mapIndex`, `filter`, `filterIndex`, `foldr`, `foldl`
 
 `find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
 
 `findIndex p l` — returns `some i` for the zero-based index of the first element satisfying `p`, or `none` if none does.
+
+`mapIndex f l` — apply `f index element` to each element with its zero-based index.
+
+`filterIndex f l` — keep elements where `f index element` returns 1, with zero-based indices.
 
 **Aggregations**
 `sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
@@ -716,10 +720,11 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `zipWith`, `zip`, `zipWith3`, `zip3`
 
 **Slicing**
-`take`, `drop`, `takeWhile`, `dropWhile`, `span`, `flatten`, `range`
+`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `flatten`, `range`, `rangeIncl`
 
 `span f l` returns `[[taken while f holds], [rest]]`.
-`range a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
+`range a b` produces `[a; a+1; …; b-1]` — half-open interval, `b` excluded.
+`rangeIncl a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
 
 **Search and set-like**
 `contains`, `maximum`, `minimum`, `nth`, `nub`
