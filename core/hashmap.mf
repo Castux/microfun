@@ -32,10 +32,10 @@ get = k ->
 		go = {
 			[] -> maybe.none,
 			[nh, nk, nv, left, right] ->
-				if (lt nh h) (go left)
-				(if (gt nh h) (go right)
-				(if (equal nk k) (maybe.some nv)
-				(go right)))
+				case (lt nh h) (go left)
+					(gt nh h) (go right)
+					(equal nk k) (maybe.some nv)
+					else (go right)
 		}
 	in go,
 
@@ -49,10 +49,10 @@ set = k -> v ->
 		go = {
 			[] -> [h, k, v, [], []],
 			[nh, nk, nv, left, right] ->
-				if (lt nh h) [nh, nk, nv, go left, right]
-				(if (gt nh h) [nh, nk, nv, left, go right]
-				(if (equal nk k) [nh, k, v, left, right]
-				[nh, nk, nv, left, go right]))
+				case (lt nh h) [nh, nk, nv, go left, right]
+					(gt nh h) [nh, nk, nv, left, go right]
+					(equal nk k) [nh, k, v, left, right]
+					else [nh, nk, nv, left, go right]
 		}
 	in go,
 
@@ -63,11 +63,11 @@ remove = k ->
 		go = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				if (lt nh h) [nh, nk, nv, go left, right]
-				(if (gt nh h) [nh, nk, nv, left, go right]
-				(if (equal nk k)
-					({ [] -> left, _ -> minNode right > ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]) } right)
-					[nh, nk, nv, left, go right]))
+				case (lt nh h) [nh, nk, nv, go left, right]
+					(gt nh h) [nh, nk, nv, left, go right]
+					(equal nk k)
+						({ [] -> left, _ -> minNode right > ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]) } right)
+					else [nh, nk, nv, left, go right]
 		}
 	in go,
 
@@ -78,10 +78,10 @@ update = k -> f ->
 		go = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				if (lt nh h) [nh, nk, nv, go left, right]
-				(if (gt nh h) [nh, nk, nv, left, go right]
-				(if (equal nk k) [nh, k, f nv, left, right]
-				[nh, nk, nv, left, go right]))
+				case (lt nh h) [nh, nk, nv, go left, right]
+					(gt nh h) [nh, nk, nv, left, go right]
+					(equal nk k) [nh, k, f nv, left, right]
+					else [nh, nk, nv, left, go right]
 		}
 	in
 		go,
@@ -93,10 +93,10 @@ updateOr = k -> f -> def ->
 		go = {
 			[] -> [h, k, def, [], []],
 			[nh, nk, nv, left, right] ->
-				if (lt nh h) [nh, nk, nv, go left, right]
-				(if (gt nh h) [nh, nk, nv, left, go right]
-				(if (equal nk k) [nh, k, f nv, left, right]
-				[nh, nk, nv, left, go right]))
+				case (lt nh h) [nh, nk, nv, go left, right]
+					(gt nh h) [nh, nk, nv, left, go right]
+					(equal nk k) [nh, k, f nv, left, right]
+					else [nh, nk, nv, left, go right]
 		}
 	in
 		go,

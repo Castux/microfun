@@ -26,13 +26,26 @@ second = [a,b] -> b, -- extract the second element of a 2-tuple
 
 -- Booleans and control flow
 
+true = 1,
+false = 0,
+
 -- if cond t f: standard conditional (cond must be 1 or 0)
 if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 
--- ifs l else: find first value in [(cond, val); ...] where cond is 1, else return else
-ifs = l -> else -> foldr ([c, v] -> acc -> if c v acc) else l,
+-- case cond1 val1 cond2 val2 ... else defval
+else = 2,
+case = cond -> t -> cond > {
+	0 -> case,
+	1 -> let
+		bypass = cond2 -> t2 -> cond2 > {
+			2 -> t,
+			_ -> bypass
+		}
+	in
+		bypass,
+	2 -> t
+},
 
 and = a -> b -> if a b 0, -- logical AND (short-circuiting)
 or  = a -> b -> if a 1 b, -- logical OR (short-circuiting)
 not = { 0 -> 1, 1 -> 0 } -- logical NOT
-

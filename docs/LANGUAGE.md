@@ -627,7 +627,7 @@ Each module can be imported directly when only part of the library is needed.
 | Name | Description |
 |------|-------------|
 | `if cond t f` | conditional; `cond` must be `0` or `1` |
-| `ifs [[c1, v1]; …] else` | first `vi` whose `ci` is `1`, or `else` |
+| `case cond1 val1 cond2 val2 ... else defval` | chained conditionals: (else is a constant required to break the chaining) | 
 | `and a b` | logical and (short-circuits: if `a` is 0, `b` is not evaluated) |
 | `or a b` | logical or (short-circuits: if `a` is 1, `b` is not evaluated) |
 | `not b` | logical not |

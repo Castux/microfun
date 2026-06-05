@@ -35,8 +35,8 @@ runTests [
 	assert "core.not-0" (core.not 0) 1;
 	assert "core.on" (core.on add (mul 2) 3 4) 14;
 	assert "core.fix" (core.fix (f -> n -> if (eq n 0) 1 (mul n (f (sub 1 n)))) 5) 120;
-	assert "core.ifs" (core.ifs [[0, 10]; [1, 20]; [1, 30]] 40) 20;
-	assert "core.ifs-else" (core.ifs [[0, 10]; [0, 20]] 40) 40;
+	assert "core.case" (core.case false 0 false 1 true 2 false 3 true 4 else 5) 2;
+	assert "core.case-else" (core.case false 0 false 1 false 2 false 3 false 4 else 5) 5;
 
 	-- math.mf
 	assert "math.succ" (math.succ 5) 6;
