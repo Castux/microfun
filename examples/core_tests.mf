@@ -121,6 +121,8 @@ runTests [
 	assert "list.mapIndex-empty" (list.mapIndex (i -> x -> [i, x]) []) [];
 	assert "list.filterIndex" (list.filterIndex (i -> x -> gt 0 i) [10; 20; 30]) [20; 30];
 	assert "list.filterIndex-empty" (list.filterIndex (i -> x -> 1) []) [];
+	assert "list.mapFilter" (list.mapFilter (x -> core.if (gt 2 x) (maybe.some (mul x 10)) maybe.none) [1; 2; 3; 4; 5]) [30; 40; 50];
+	assert "list.mapFilter-empty" (list.mapFilter (x -> maybe.none) [1; 2; 3]) [];
 	assert "list.find-true" (list.find (gt 2) [1; 2; 3; 4]) [3];
 	assert "list.find-false" (list.find (gt 5) [1; 2; 3; 4]) [];
 	assert "list.foldr" (list.foldr sub 10 [1; 2; 3]) 4;
@@ -249,6 +251,19 @@ runTests [
 	assert "text.split-none" (text.split "," "abc") ["abc";];
 	assert "text.split-empty" (text.split "," "") ["";];
 	assert "text.split-only-sep" (text.split "," ",,,") [""; ""; ""; ""];
+	assert "text.containsSub-true" (text.containsSub "lo" "hello") 1;
+	assert "text.containsSub-false" (text.containsSub "xyz" "hello") 0;
+	assert "text.replaceSub" (text.replaceSub "lo" "LO" "hello world of jello!") "helLO world of jello!";
+	assert "text.replaceSub-notfound" (text.replaceSub "xyz" "!" "hello") "hello";
+	assert "text.replaceAllSub" (text.replaceAllSub "l" "L" "hello world") "heLLo worLd";
+	assert "text.splitOneWith" (text.splitOneWith text.isSpace "hello world fun") [["hello", " ", "world fun"]];
+	assert "text.splitOneWith-none" (text.splitOneWith text.isSpace "helloworld") [];
+	assert "text.splitWith" (text.splitWith text.isSpace "hello   world  great!") ["hello"; "world"; "great!"];
+	assert "text.splitWith-nosep" (text.splitWith text.isSpace "hello") ["hello";];
+	assert "text.replaceOneWith" (text.replaceOneWith text.isSpace (x -> "X") "hello    world  foo") "helloXworld  foo";
+	assert "text.replaceOneWith-none" (text.replaceOneWith text.isSpace (x -> "X") "hello") "hello";
+	assert "text.replaceAllWith" (text.replaceAllWith text.isSpace (length *> string) "hello    world   foo") "hello4world3foo";
+	assert "text.replaceAllWith-none" (text.replaceAllWith text.isSpace (x -> "X") "hello") "hello";
 
 	-- heap.mf
 	assert "heap.emptyHeap" (heap.isEmpty heap.emptyHeap) 1;

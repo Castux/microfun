@@ -141,6 +141,9 @@ filter = f -> {
 filterIndex = f ->
 	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
+-- apply f (which returns a maybe) to all elements, then discard the none and extract the values
+mapFilter = f -> map f *> filter maybe.isSome *> map maybe.value,
+
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
 

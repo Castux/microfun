@@ -708,7 +708,9 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `removeAt idx l` | remove the element at zero-based index `idx` |
 
 **Higher-order**
-`map`, `mapIndex`, `filter`, `filterIndex`, `foldr`, `foldl`
+`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `foldr`, `foldl`
+
+`mapFilter f l` — applies `f` to each element; `f` must return a `maybe` value. Elements where `f` returns `none` are dropped; elements where it returns `some x` contribute `x` to the result. Combines a transformation and a filter in a single pass.
 
 `find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
 
@@ -878,8 +880,15 @@ All functions below take a Unicode code point (an integer, as found in a microfu
 | `stringToFloat s` | parse a decimal float string (optional `'-'` and `'.'`) |
 | `startsWith pref s` | `1` if `s` begins with `pref` |
 | `endsWith suff s` | `1` if `s` ends with `suff` |
-| `splitOne sep s` | split `s` on the first occurrence of `sep`; returns a two-element list `[before; after]`, or `[s;]` if `sep` is not found |
+| `containsSub sub s` | `1` if `sub` appears anywhere in `s` |
+| `splitOne sep s` | split `s` on the first occurrence of `sep`; returns `[before; after]`, or `[s;]` if not found |
 | `split sep s` | split `s` on all occurrences of `sep`; returns a list of strings |
+| `replaceSub old new s` | replace the first occurrence of `old` with `new` in `s` |
+| `replaceAllSub old new s` | replace every occurrence of `old` with `new` in `s` |
+| `splitOneWith f s` | split `s` at the first run of characters satisfying `f`; returns `maybe.some [before, matched, after]` or `maybe.none` |
+| `splitWith f s` | split `s` on all runs satisfying `f`; returns a list of the non-matching sections (may include empty strings at the boundaries) |
+| `replaceOneWith f repl s` | replace the first run satisfying `f` with `repl match` (a function of the matched run); returns `s` unchanged if no run is found |
+| `replaceAllWith f repl s` | replace every run satisfying `f` with `repl match`; returns `s` unchanged if no run is found |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
 wrong results silently. `split "" s` splits `s` into individual single-character strings.

@@ -105,4 +105,35 @@ split = sep ->
 	splitOne sep *> {
 		[s;] -> [s;],
 		[left; right] -> concat [left;] (split sep right)
-	}
+	},
+
+containsSub = sub -> l -> tails l > any (startsWith sub),
+replaceSub = sub -> new -> splitOne sub *> join new,
+replaceAllSub = sub -> new -> split sub *> join new,
+
+-- split on sequences of elements that satisfy condition f. Returns maybe.some [left, match, right] or none.
+splitOneWith = f -> s ->
+	spans s >
+	mapFilter ([left,right] -> span f right > {
+		[[], rest] -> maybe.none,
+		[matched, rest] -> maybe.some [left,matched,rest]
+	}) >
+	headSafe,
+
+-- split on all sequences of elements that satisfy condition f. Returns a list of sections.
+splitWith = f -> s ->
+	splitOneWith f s >
+	maybe.fmap ([left, match, rest] -> concat [left;] (splitWith f rest)) >
+	default [s;],
+
+-- find the first sequence of elements that satisfy condition f, apply function repl to the whole match
+replaceOneWith = f -> repl -> s ->
+	splitOneWith f s >
+	maybe.fmap ([left, match, right] -> flatten [left; repl match; right]) >
+	default s,
+
+-- replace all sequences of elements that satisfy condition by applying function repl to them
+replaceAllWith = f -> repl -> s ->
+	splitOneWith f s >
+	maybe.fmap ([left, match, right] -> flatten [left; repl match; replaceAllWith f repl right]) >
+	default s
