@@ -139,9 +139,9 @@ runTests [
 	assert "list.all" (list.all (gt 0) [1; 2; 3; 4]) 1;
 	assert "list.all-false" (list.all (gt 0) [1; 2; 0; 4]) 0;
 	assert "list.all-empty" (list.all (eq 1) []) 1;
-	assert "list.none" (list.none (lt 0) [1; 2; 3; 4]) 1;
-	assert "list.none-false" (list.none (gt 0) [1; 2; 3; 4]) 0;
-	assert "list.none-empty" (list.none (eq 1) []) 1;
+	assert "list.noneMatch" (list.noneMatch (lt 0) [1; 2; 3; 4]) 1;
+	assert "list.noneMatch-false" (list.noneMatch (gt 0) [1; 2; 3; 4]) 0;
+	assert "list.noneMatch-empty" (list.noneMatch (eq 1) []) 1;
 	assert "list.zipWith" (list.zipWith add [1; 2; 3] [10; 20; 30]) [11; 22; 33];
 	assert "list.zip" (list.zip [1; 2; 3] [10; 20; 30]) [[1, 10]; [2, 20]; [3, 30]];
 	assert "list.zip-diff-len" (list.zip [1; 2; 3] [10; 20]) [[1, 10]; [2, 20]];
@@ -203,6 +203,25 @@ runTests [
 	assert "list.tails-empty" (list.tails []) [[];];
 	assert "list.inits" (list.inits [1; 2; 3; 4]) [[]; [1;]; [1; 2]; [1; 2; 3]; [1; 2; 3; 4]];
 	assert "list.inits-empty" (list.inits []) [[];];
+	assert "list.singleton" (list.singleton 42) [42;];
+	assert "list.concatMap" (list.concatMap (x -> [x; mul x 10]) [1; 2; 3]) [1; 10; 2; 20; 3; 30];
+	assert "list.concatMap-empty" (list.concatMap (x -> [x;]) []) [];
+	assert "list.scanl" (list.scanl add 0 [1; 2; 3]) [0; 1; 3; 6];
+	assert "list.scanl-empty" (list.scanl add 0 []) [0;];
+	assert "list.scanr" (list.scanr add 0 [1; 2; 3]) [6; 5; 3; 0];
+	assert "list.scanr-empty" (list.scanr add 0 []) [0;];
+	assert "list.groupBy" (list.groupBy equal [1; 1; 2; 2; 3]) [[1; 1]; [2; 2]; [3;]];
+	assert "list.groupBy-empty" (list.groupBy equal []) [];
+	assert "list.intercalate" (list.intercalate [0;] [[1; 2]; [3; 4]]) [1; 2; 0; 3; 4];
+	assert "list.intercalate-single" (list.intercalate [0;] [[1; 2];]) [1; 2];
+	assert "list.transpose" (list.transpose [[1; 2; 3]; [4; 5; 6]]) [[1; 4]; [2; 5]; [3; 6]];
+	assert "list.transpose-empty" (list.transpose []) [];
+	assert "list.lookup-found" (list.lookup 2 [[1, 10]; [2, 20]; [3, 30]]) [20];
+	assert "list.lookup-missing" (list.lookup 5 [[1, 10]; [2, 20]]) [];
+	assert "list.count" (list.count (gt 2) [1; 2; 3; 4; 5]) 3;
+	assert "list.count-empty" (list.count (gt 0) []) 0;
+	assert "math.factorial-0" (math.factorial 0) 1;
+	assert "math.factorial-5" (math.factorial 5) 120;
 
 
 	-- comb.mf
@@ -222,8 +241,10 @@ runTests [
 	assert "text.join-single" (text.join ", " ["a";]) "a";
 	assert "text.join" (text.join ", " ["a"; "b"; "c"]) "a, b, c";
 	assert "text.trim" (text.trim "  hello  ") "hello";
-	assert "text.padLeft-noop" (text.padLeft 3 "0" "7000") "7000";
-	assert "text.padLeft" (text.padLeft 5 "0" "42") "00042";
+	assert "text.padLeft-noop" (text.padLeft 3 (text.char "0") "7000") "7000";
+	assert "text.padLeft" (text.padLeft 5 (text.char "0") "42") "00042";
+	assert "text.padRight-noop" (text.padRight 3 (text.char "0") "7000") "7000";
+	assert "text.padRight" (text.padRight 5 (text.char "0") "42") "42000";
 	assert "text.isDigit" (text.isDigit (text.char "5")) 1;
 	assert "text.isDigit-false" (text.isDigit (text.char "a")) 0;
 	assert "text.toUpper" (text.toUpper (text.char "a")) (text.char "A");
@@ -273,7 +294,11 @@ runTests [
 	assert "heap.merge" (heap.singleton 5 > heap.merge gt (heap.singleton 3) > heap.top) 3;
 	assert "heap.toList-min" (heap.toList gt (heap.fromList gt [3; 1; 4; 1; 5])) [1; 1; 3; 4; 5];
 	assert "heap.toList-max" (heap.toList lt (heap.fromList lt [3; 1; 4; 1; 5])) [5; 4; 3; 1; 1];
-	assert "heap.sort" (heap.sort gt [3; 1; 4; 1; 5]) [1; 1; 3; 4; 5];
+	assert "heap.sortBy" (heap.sortBy gt [3; 1; 4; 1; 5]) [1; 1; 3; 4; 5];
+	assert "heap.sortAsc" (heap.sortAsc [3; 1; 4; 1; 5]) [1; 1; 3; 4; 5];
+	assert "heap.sortDesc" (heap.sortDesc [3; 1; 4; 1; 5]) [5; 4; 3; 1; 1];
+	assert "heap.topSafe-some" (heap.topSafe (heap.singleton 5)) [5];
+	assert "heap.topSafe-none" (heap.topSafe heap.emptyHeap) [];
 
 	-- maybe.mf
 	assert "maybe.none" maybe.none [];
@@ -287,9 +312,13 @@ runTests [
 	assert "maybe.isMaybe-other" (maybe.isMaybe 42) 0;
 	assert "maybe.fmap-some" (maybe.fmap (add 1) (maybe.some 5)) [6];
 	assert "maybe.fmap-none" (maybe.fmap (add 1) maybe.none) [];
-	assert "maybe.then-some-some" (maybe.then maybe.some (maybe.some 5)) [5];
-	assert "maybe.then-some-none" (maybe.then (x -> maybe.none) (maybe.some 5)) [];
-	assert "maybe.then-none" (maybe.then maybe.some maybe.none) [];
+	assert "maybe.bind-some-some" (maybe.bind maybe.some (maybe.some 5)) [5];
+	assert "maybe.bind-some-none" (maybe.bind (x -> maybe.none) (maybe.some 5)) [];
+	assert "maybe.bind-none" (maybe.bind maybe.some maybe.none) [];
+	assert "maybe.orElse-some" (maybe.orElse (maybe.some 0) (maybe.some 5)) [5];
+	assert "maybe.orElse-none" (maybe.orElse (maybe.some 0) maybe.none) [0];
+	assert "maybe.mapDefault-some" (maybe.mapDefault 0 (add 1) (maybe.some 5)) 6;
+	assert "maybe.mapDefault-none" (maybe.mapDefault 0 (add 1) maybe.none) 0;
 	assert "maybe.value" (maybe.value (maybe.some 42)) 42;
 	assert "maybe.default-some" (maybe.default 0 (maybe.some 42)) 42;
 	assert "maybe.default-none" (maybe.default 0 maybe.none) 0

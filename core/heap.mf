@@ -3,7 +3,12 @@
 -- This is a max-priority heap: the root is the element that "wins" the comparison.
 -- Node structure: [rank, value, left, right]
 -- where rank is the length of the right spine (the shortest path to an empty node).
-import core, math, list in
+--
+-- Comparator convention: cmp a b = 1 means a beats b (a goes to root).
+--   cmp = lt  →  a beats b when b < a  →  max-heap (largest at root)
+--   cmp = gt  →  a beats b when b > a  →  min-heap (smallest at root)
+-- Use the named helpers sortAsc / sortDesc to avoid thinking about this.
+import core, math, list, maybe in
 
 module
 
@@ -39,22 +44,37 @@ merge = cmp -> {
 
 insert = cmp -> x -> h -> merge cmp (singleton x) h, -- insert x into heap h ($O(\log n)$)
 
-top = {
-	[] -> [],
-	[rank, value, left, right] -> value
-}, -- return the root value of the heap ($O(1)$)
+-- top h: return the root value; crashes on empty heap.
+top = [rank, value, left, right] -> value,
 
-pop = cmp -> {
-	[] -> [],
-	[rank, value, left, right] -> merge cmp left right
-}, -- remove the root and return the new heap ($O(\log n)$)
+-- topSafe h: return some value for the root, or none if empty.
+topSafe = {
+	[] -> maybe.none,
+	[rank, value, left, right] -> maybe.some value
+},
+
+-- pop cmp h: remove the root and return the new heap; crashes on empty heap ($O(\log n)$).
+pop = cmp -> [rank, value, left, right] -> merge cmp left right,
+
+-- popSafe cmp h: return some (new heap) after removing the root, or none if empty.
+popSafe = cmp -> {
+	[] -> maybe.none,
+	[rank, value, left, right] -> maybe.some (merge cmp left right)
+},
 
 fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a list
 
 toList = cmp -> {
 	[] -> [],
 	h -> [top h, toList cmp (pop cmp h)]
-}, -- convert a heap to a sorted list (heapsort)
+}, -- convert a heap to a sorted list
 
--- sort cmp l: Heapsort using the provided cmp.
-sort = cmp -> l -> toList cmp (fromList cmp l)
+-- sortBy cmp l: heapsort using the provided comparator.
+-- Use sortAsc / sortDesc for the common cases.
+sortBy = cmp -> l -> toList cmp (fromList cmp l),
+
+-- sortAsc l: sort ascending (smallest first), equivalent to list.sort.
+sortAsc = sortBy gt,
+
+-- sortDesc l: sort descending (largest first).
+sortDesc = sortBy lt

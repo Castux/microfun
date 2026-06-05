@@ -8,6 +8,7 @@ module
 
 cons      = h -> t -> [h,t], -- construct a new list cell: h:t
 emptyList = [],               -- the empty list
+singleton = x -> [x;],       -- a one-element list
 
 -- isList x: 1 if x is a proper list, else 0
 isList = {
@@ -63,7 +64,7 @@ tails = {
 	[h,t] -> [[h,t], tails t]
 },
 
--- tails l: all successive prefixes of a list
+-- inits l: all successive prefixes of a list
 inits = {
 	[] -> [[];],
 	[h,t] -> concat [[];] (inits t > map (cons h))
@@ -85,6 +86,9 @@ intersperse = sep -> {
 	[x, []] -> [x;],
 	[h, t] -> [h, [sep, intersperse sep t]]
 },
+
+-- intercalate sep lists: flatten lists with sep inserted between each one
+intercalate = sep -> intersperse sep *> flatten,
 
 -- remove e l: remove the first occurrence of e from list l
 remove = e -> {
@@ -141,8 +145,18 @@ filter = f -> {
 filterIndex = f ->
 	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
--- apply f (which returns a maybe) to all elements, then discard the none and extract the values
-mapFilter = f -> map f *> filter maybe.isSome *> map maybe.value,
+-- mapFilter f l: apply f (returning maybe) to each element; keep the some values unwrapped.
+-- Single-pass; more efficient than map *> filter *> map.
+mapFilter = f -> {
+	[] -> [],
+	[h, t] -> f h > {
+		[] -> mapFilter f t,
+		[x] -> [x, mapFilter f t]
+	}
+},
+
+-- concatMap f l: map f over l then flatten the results (flatMap)
+concatMap = f -> map f *> flatten,
 
 -- find p l: first element of l matching predicate p (returns maybe)
 find = p -> filter p *> headSafe,
@@ -168,17 +182,32 @@ foldl = f -> acc -> {
 	[h,t] -> foldl f (f acc h) t
 },
 
+-- scanl f acc l: list of successive left-fold results, starting with acc.
+-- scanl f z [a;b;c] = [z; f z a; f (f z a) b; f (f (f z a) b) c]
+scanl = f -> acc -> {
+	[] -> [acc;],
+	[h, t] -> [acc, scanl f (f acc h) t]
+},
+
+-- scanr f acc l: list of successive right-fold results, ending with acc.
+-- scanr f z [a;b;c] = [f a r0; f b r1; f c z; z] where each r is the next scan value
+scanr = f -> acc -> {
+	[] -> [acc;],
+	[h, t] -> let rest = scanr f acc t in [f h (head rest), rest]
+},
+
 -- Aggregations
 
 sum     = foldr add 0, -- sum of a list of numbers
 product = foldr mul 1, -- product of a list of numbers
 
-orList  = foldr or 0, -- logical OR over a list of booleans
+orList  = foldr or 0,  -- logical OR over a list of booleans
 andList = foldr and 1, -- logical AND over a list of booleans
 
-any  = f -> l -> orList (map f l), -- 1 if f returns 1 for any element in l
-all  = f -> l -> andList (map f l), -- 1 if f returns 1 for all elements in l
-none = f -> l -> not (any f l), -- 1 if f returns 0 for all elements in l
+any       = f -> l -> orList (map f l),       -- 1 if f returns 1 for any element
+all       = f -> l -> andList (map f l),       -- 1 if f returns 1 for all elements
+noneMatch = f -> l -> not (any f l),           -- 1 if f returns 0 for all elements
+count     = p -> foldl (acc -> x -> if (p x) (succ acc) acc) 0, -- count elements satisfying p
 
 -- Zipping
 
@@ -261,14 +290,22 @@ splitAt = n -> l -> [take n l, drop n l],
 -- all successive splits of the list in two parts
 spans = l -> zip (inits l) (tails l),
 
- -- concatenate a list of lists into one list
+-- groupBy f l: split l into runs of consecutive elements where f h x = 1 (h is the first in each group)
+groupBy = f -> {
+	[] -> [],
+	[h, t] -> span (f h) t > {
+		[same, rest] -> [[h, same], groupBy f rest]
+	}
+},
+
+-- flatten l: concatenate a list of lists into one list
 flatten = foldr concat [],
 
 -- range a b: [a; a+1; ...; b-1], half open interval
 range = a -> b -> upFrom a > take (sub a b),
 
--- rangeIncl a b: [a; a+1; ...; b], inclusive
-rangeIncl = a -> b -> upFrom a > take (b > sub a > add 1),
+-- rangeIncl a b: [a; a+1; ...; b], both endpoints inclusive
+rangeIncl = a -> b -> range a (succ b),
 
 -- Search and set-like
 
@@ -288,6 +325,12 @@ nub = {
 	[h, t] -> [h, nub (filter (x -> not (equal x h)) t)]
 },
 
+-- lookup key l: search association list [[key, val]; ...]; returns maybe.some val or maybe.none
+lookup = key -> {
+	[] -> maybe.none,
+	[[k, v], rest] -> if (equal k key) (maybe.some v) (lookup key rest)
+},
+
 -- Replication and structure
 
 -- replicate n x: list of n copies of x
@@ -300,6 +343,12 @@ unzip = {
 		unzip rest > { [as, bs] -> [[a, as], [b, bs]] }
 },
 
+-- transpose rows: turn a list of rows into a list of columns; stops at the shortest row
+transpose = {
+	[] -> [],
+	rows -> if (isEmpty (head rows)) [] [map head rows, transpose (map tail rows)]
+},
+
 -- Sorting
 
 -- partition p l: splits l into [matching, rest]
@@ -308,7 +357,7 @@ partition = p ->
 	( x -> [ts,fs] -> if (p x) [[x,ts],fs] [ts,[x,fs]] )
 	[[],[]],
 
--- sortWith f l: quicksort using comparison function f
+-- sortWith f l: quicksort; f pivot elem = 1 if elem belongs before pivot
 sortWith = f -> {
 	[] -> [],
 	[x,xs] -> partition (f x) xs > {
@@ -321,8 +370,8 @@ sort = sortWith lt, -- sort in ascending order using lt
 -- Infinite lists
 
 iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
-times    = n -> f -> iterate f *> nth n, -- apply function f n times
+times    = n -> f -> iterate f *> nth n,    -- apply function f n times
 downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
-repeat   = iterate id, -- lazy infinite list of x
+repeat   = iterate id,   -- lazy infinite list of x
 cycle    = l -> concat l (cycle l) -- lazy infinite cycle of list l

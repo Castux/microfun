@@ -8,7 +8,7 @@ divides = n -> x -> n > mod x > eq 0,
 divisors = n -> range 1 n > filter (divides n),
 digisdfts = reverse <* map (mod 10) <* takeWhile (gt 0) <* iterate (div 10),
 
-isPrime = n -> range 2 (sqrt n) > none (divides n) > and (gte 2 n),
+isPrime = n -> range 2 (sqrt n) > noneMatch (divides n) > and (gte 2 n),
 primes = upFrom 1 > filter isPrime,
 primeDivisors = {
 	1 -> [],
@@ -20,7 +20,7 @@ primeDivisors = {
 
 primes2 =
 	let
-		isPrime = n -> primes2 > takeWhile (lte (sqrt n)) > none (divides n),
+		isPrime = n -> primes2 > takeWhile (lte (sqrt n)) > noneMatch (divides n),
 		primesUpFrom = n -> if (isPrime n)
 			[n, primesUpFrom (add 2 n)]
 			(primesUpFrom (add 2 n))

@@ -68,4 +68,10 @@ lcm = a -> b ->
 digits = {
 	0 -> [0;],
 	n -> (n > iterate (div 10) > takeWhile (gt 0) > map (mod 10) > reverse)
+},
+
+-- factorial n: n! for non-negative integer n
+factorial = {
+	0 -> 1,
+	n -> mul n (factorial (pred n))
 }

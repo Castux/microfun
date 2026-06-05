@@ -24,7 +24,9 @@ fmap = f -> {
 	[x] -> [f x]
 },
 
-then = f -> {
+-- bind f m: monadic bind — apply f to the wrapped value; propagate none.
+-- f must return a maybe value.
+bind = f -> {
 	[] -> [],
 	[x] -> f x
 },
@@ -34,4 +36,16 @@ value = [x] -> x,
 default = def -> {
 	[] -> def,
 	[x] -> x
+},
+
+-- orElse other m: return m if it is some, otherwise other.
+orElse = other -> {
+	[] -> other,
+	[x] -> [x]
+},
+
+-- mapDefault def f m: apply f to the wrapped value, or return def if none.
+mapDefault = def -> f -> {
+	[] -> def,
+	[x] -> f x
 }

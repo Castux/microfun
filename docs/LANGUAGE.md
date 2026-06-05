@@ -542,6 +542,28 @@ instead of printing it, useful for building formatted output. `add`, `mul`, and
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
 a code-point list, is a run-time error.
 
+### Comparator convention
+
+The binary comparison builtins follow a **threshold-first** convention: the first argument is the reference value (the threshold), and the second is the value being tested. `lt 4` is a predicate meaning "is less than 4". The natural reading is with the pipe operator:
+
+```
+x > lt 4      -- is x less than 4?
+x > gt 0      -- is x positive?
+x > gte 100   -- is x at least 100?
+```
+
+Written as a direct call `lt 4 x` the order looks reversed, but the meaning is the same: `x < 4`. Think of the first argument as *fixing the threshold* and producing a predicate.
+
+This convention makes partial application idiomatic:
+
+```
+filter (lt 10) xs        -- keep elements less than 10
+takeWhile (gt 0) xs      -- take while positive
+sortWith lt xs           -- ascending: elements lt pivot go before it
+```
+
+The entire standard library is built around this convention. Functions that accept a comparator (like `heap.merge`, `heap.insert`) follow the same rule: `cmp a b = 1` means `a` beats `b`. With `cmp = lt`, larger values win (max-heap); with `cmp = gt`, smaller values win (min-heap).
+
 ### Standard input
 
 `stdin` and `bstdin` are not functions but **values**: each is the standard input
@@ -605,7 +627,7 @@ Each module can be imported directly when only part of the library is needed.
 | Name | Description |
 |------|-------------|
 | `if cond t f` | conditional; `cond` must be `0` or `1` |
-| `ifs [(c1,v1); …] else` | first `vi` whose `ci` is `1`, or `else` |
+| `ifs [[c1, v1]; …] else` | first `vi` whose `ci` is `1`, or `else` |
 | `and a b` | logical and (short-circuits: if `a` is 0, `b` is not evaluated) |
 | `or a b` | logical or (short-circuits: if `a` is 1, `b` is not evaluated) |
 | `not b` | logical not |
@@ -624,9 +646,11 @@ A *maybe* value is either `none` (absent) or `some x` (present). The representat
 | `isNone m` | `maybe → bool` | `1` if `m` is `none`, `0` otherwise |
 | `isMaybe m` | `any → bool` | `1` if `m` is a valid maybe value (`none` or `some x`) |
 | `fmap f m` | `maybe → maybe` | apply `f` to the wrapped value; propagate `none` |
-| `then f m` | `maybe → a` | extract the value and apply `f` |
+| `bind f m` | `maybe → maybe` | monadic bind — extract the value, apply `f` (which must return a maybe); propagate `none` |
 | `value m` | `maybe → a` | extract the wrapped value; runtime error on `none` |
 | `default def m` | `a → maybe → a` | extract the value, or return `def` if `none` |
+| `orElse other m` | `maybe → maybe` | return `m` if it is `some`, otherwise `other` |
+| `mapDefault def f m` | `a → (a → b) → maybe → b` | apply `f` to the wrapped value, or return `def` if `none` |
 
 `some` and `none` are plain values — `some` is sugar for `x -> [x]` and `none`
 is `[]`. Because maybes are single-element tuples, tuple pattern matching works
@@ -673,6 +697,7 @@ show [
 | `odd n` | `1` if `n mod 2 ≠ 0` |
 | `gcd a b` | greatest common divisor |
 | `lcm a b` | least common multiple |
+| `factorial n` | `n!` for non-negative integer `n` |
 | `digits n` | decimal digits of non-negative integer `n` as a list (`digits 123 = [1; 2; 3]`, `digits 0 = [0;]`) |
 
 ---
@@ -680,7 +705,7 @@ show [
 #### `list` — list operations and infinite lists
 
 **Construction and inspection**
-`emptyList`, `cons`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`, `tails`, `inits`
+`emptyList`, `cons`, `singleton`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`, `tails`, `inits`
 
 The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. Safe counterparts return a `maybe` value instead:
 
@@ -692,7 +717,7 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `initSafe l` | `init []` | `some l'` or `none` |
 
 **Modification**
-`concat`, `reverse`, `intersperse`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
+`concat`, `reverse`, `intersperse`, `intercalate`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
 
 | Function | Description |
 |---|---|
@@ -708,9 +733,15 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `removeAt idx l` | remove the element at zero-based index `idx` |
 
 **Higher-order**
-`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `foldr`, `foldl`
+`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `concatMap`, `foldr`, `foldl`, `scanl`, `scanr`
 
 `mapFilter f l` — applies `f` to each element; `f` must return a `maybe` value. Elements where `f` returns `none` are dropped; elements where it returns `some x` contribute `x` to the result. Combines a transformation and a filter in a single pass.
+
+`concatMap f l` — maps `f` over `l` then flattens the resulting list of lists (also called `flatMap`).
+
+`scanl f z l` — list of successive left-fold results starting with `z`: `[z; f z l1; f (f z l1) l2; …]`.
+
+`scanr f z l` — list of successive right-fold results ending with `z`.
 
 `find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
 
@@ -721,34 +752,37 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 `filterIndex f l` — keep elements where `f index element` returns 1, with zero-based indices.
 
 **Aggregations**
-`sum`, `product`, `orList`, `andList`, `any`, `all`, `none`
+`sum`, `product`, `orList`, `andList`, `any`, `all`, `noneMatch`, `count`
 
 **Zipping**
 `zipWith`, `zip`, `zipWith3`, `zip3`
 
-**Slicing**
-`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `splitAt`, `tails`, `inits`, `spans`, `flatten`, `range`, `rangeIncl`
+**Slicing and grouping**
+`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `splitAt`, `tails`, `inits`, `spans`, `groupBy`, `flatten`, `range`, `rangeIncl`
 
 `span f l` returns `[[taken while f holds], [rest]]`.
 `splitAt n l` returns `[[first n elements], [rest]]` — like `span` but splits by index.
 `tails l` returns all successive suffixes: `[[l]; [tail l]; …; []]`.
 `inits l` returns all successive prefixes: `[[]; …; [init l]; [l]]`.
 `spans l` zips `inits` and `tails` — each element is `[prefix, suffix]` for every split point; used to search for substrings.
+`groupBy f l` splits `l` into runs of consecutive elements where `f head elem = 1` (head is the first element of the current group). `groupBy equal` groups consecutive equal elements.
 `range a b` produces `[a; a+1; …; b-1]` — half-open interval, `b` excluded.
-`rangeIncl a b` produces `[a; a+1; …; b]` — both endpoints inclusive.
+`rangeIncl a b` produces `[a; a+1; …; b]` — both endpoints inclusive; equivalent to `range a (succ b)`.
 
 **Search and set-like**
-`contains`, `maximum`, `minimum`, `nth`, `nub`
+`contains`, `maximum`, `minimum`, `nth`, `nub`, `lookup`
 
 `nth n l` — zero-based index; runtime error if out of bounds.
 `nub l` — remove duplicates, keeping first occurrences.
 `maximum` / `minimum` — crash on an empty list.
+`lookup key l` — search an association list `[[k1, v1]; [k2, v2]; …]`; returns `some v` for the first matching key, or `none`.
 
 **Replication and structure**
-`replicate`, `unzip`
+`replicate`, `unzip`, `transpose`
 
 `replicate n x` — list of `n` copies of `x`.
 `unzip l` — converts `[[a1,b1]; …]` into `[[a1; …], [b1; …]]`.
+`transpose rows` — turns a list of rows into a list of columns; stops at the shortest row.
 
 **Sorting**
 `partition`, `sortWith`, `sort`
@@ -798,11 +832,13 @@ show [
 
 #### `heap` — purely functional priority queues (leftist heaps)
 
-Provides $O(\log n)$ insertion, merging, and popping. This is a **max-priority heap**.
+Provides $O(\log n)$ insertion, merging, and popping.
 
-To achieve standard behaviors with built-in comparators:
-- Use `lt` for a **max-heap** (root is the largest element).
-- Use `gt` for a **min-heap** (root is the smallest element).
+**Comparator semantics:** `cmp a b = 1` means `a` beats `b` (goes to root).
+- `cmp = lt` → **max-heap** (largest at root): `lt a b = 1` when `b < a`, so `a` wins when `a > b`.
+- `cmp = gt` → **min-heap** (smallest at root).
+
+Use `sortAsc` / `sortDesc` for sorting without reasoning about the comparator.
 
 | Name | Description |
 |------|-------------|
@@ -811,11 +847,15 @@ To achieve standard behaviors with built-in comparators:
 | `singleton x` | a heap containing only `x` |
 | `merge cmp h1 h2` | merge two heaps ($O(\log n)$) |
 | `insert cmp x h` | insert `x` into `h` ($O(\log n)$) |
-| `top h` | return the root element |
-| `pop comparator h` | remove the root element and return the new heap ($O(\log n)$) |
-| `fromList comparator l` | build a heap from a list |
-| `toList comparator h` | convert a heap to a sorted list (heapsort) |
-| `sort comparator l` | Heapsort using the provided comparator |
+| `top h` | return the root element; crashes on empty heap |
+| `topSafe h` | return `some` root or `none` if empty |
+| `pop cmp h` | remove the root and return the new heap; crashes on empty ($O(\log n)$) |
+| `popSafe cmp h` | return `some` (new heap) or `none` if empty |
+| `fromList cmp l` | build a heap from a list |
+| `toList cmp h` | extract elements in comparator order (largest-first for `lt`, smallest-first for `gt`) |
+| `sortBy cmp l` | heapsort using the provided comparator |
+| `sortAsc l` | sort ascending (smallest first); equivalent to `list.sort` |
+| `sortDesc l` | sort descending (largest first) |
 
 ---
 
@@ -851,7 +891,8 @@ character of a string, and is the idiomatic way to write character literals:
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
 | `trim s` | remove leading/trailing whitespace |
-| `padLeft n fill s` | left-pad `s` with single-char string `fill` to width `n` |
+| `padLeft n fill s` | left-pad `s` with code point `fill` to minimum width `n` |
+| `padRight n fill s` | right-pad `s` with code point `fill` to minimum width `n` |
 
 **Character classification and conversion**
 

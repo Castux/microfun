@@ -28,13 +28,17 @@ join = separator -> {
 	}
 },
 
--- padLeft n fill s: left-pad string s with single-char string fill to minimum width n
+-- padLeft n fill s: left-pad string s with code point fill to minimum width n
 padLeft = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0
 in
-	concat
-		(flatten (replicate padLen fill))
-		s,
+	concat (replicate padLen fill) s,
+
+-- padRight n fill s: right-pad string s with code point fill to minimum width n
+padRight = n -> fill -> s -> let
+	padLen = n > sub (length s) > max 0
+in
+	concat s (replicate padLen fill),
 
 -- trim s: remove leading and trailing whitespace from string s
 trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
@@ -93,14 +97,14 @@ stringToFloat = s ->
 				(parseUnsigned s)
 		},
 
--- splitOne sep s: split string s on separator sep, but stop at the first
-splitOne = sub -> s ->
+-- splitOne sep s: split string s on separator sep, but stop at the first occurrence
+splitOne = sep -> s ->
 	spans s >
-	find ([left,right] -> startsWith sub right) >
-	maybe.fmap ([left,right] -> [left; right > drop (length sub)]) >
+	find ([left,right] -> startsWith sep right) >
+	maybe.fmap ([left,right] -> [left; right > drop (length sep)]) >
 	maybe.default [s;],
 
--- split sep s: split string s on all separators sep
+-- split sep s: split string s on all occurrences of sep
 split = sep ->
 	splitOne sep *> {
 		[s;] -> [s;],
@@ -111,7 +115,8 @@ containsSub = sub -> l -> tails l > any (startsWith sub),
 replaceSub = sub -> new -> splitOne sub *> join new,
 replaceAllSub = sub -> new -> split sub *> join new,
 
--- split on sequences of elements that satisfy condition f. Returns maybe.some [left, match, right] or none.
+-- splitOneWith f s: split on the first run of characters satisfying f.
+-- Returns maybe.some [before, matched, after] or maybe.none.
 splitOneWith = f -> s ->
 	spans s >
 	mapFilter ([left,right] -> span f right > {
@@ -120,20 +125,20 @@ splitOneWith = f -> s ->
 	}) >
 	headSafe,
 
--- split on all sequences of elements that satisfy condition f. Returns a list of sections.
+-- splitWith f s: split on all runs satisfying f; returns a list of non-matching sections.
 splitWith = f -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, rest] -> concat [left;] (splitWith f rest)) >
-	default [s;],
+	maybe.default [s;],
 
--- find the first sequence of elements that satisfy condition f, apply function repl to the whole match
+-- replaceOneWith f repl s: replace the first run satisfying f with repl match.
 replaceOneWith = f -> repl -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, right] -> flatten [left; repl match; right]) >
-	default s,
+	maybe.default s,
 
--- replace all sequences of elements that satisfy condition by applying function repl to them
+-- replaceAllWith f repl s: replace every run satisfying f with repl match.
 replaceAllWith = f -> repl -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, right] -> flatten [left; repl match; replaceAllWith f repl right]) >
-	default s
+	maybe.default s
