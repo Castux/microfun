@@ -528,6 +528,7 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `write a` | 1 | `a` | prints `a` as text (list of code points), then returns it |
 | `bwrite a` | 1 | `a` | prints `a` as raw bytes (list of integers 0–255), then returns it |
 | `string a` | 1 | string representation of `a` | returns the same text `show` would print, as a list of code points |
+| `hash a` | 1 | a number derived from the structure of `a` | used by the `hashmap` module; equal values always produce equal hashes; not cryptographic |
 | `stdin` | — (a value) | standard input as a lazy list of Unicode code points | see below |
 | `bstdin` | — (a value) | standard input as a lazy list of raw byte values | see below |
 
@@ -897,6 +898,38 @@ show [table.get "x" t; table.getOr 0 "z" t]   -- [[10]; 0]
 ```
 
 > **Syntax note.** A table literal with a single entry must use list notation: `[["key", val];]` (semicolon). `[["key", val]]` is a 1-element *tuple*, not a list, and will fail at runtime when any table function tries to traverse it.
+
+---
+
+#### `hashmap` — hash maps
+
+A *hashmap* is a binary search tree keyed by hash codes, providing O(log n) insertion, lookup, and removal. Keys are hashed with the builtin `hash` and compared for equality with `equal`. Key enumeration order is hash order (neither insertion order nor sort order).
+
+Use `hashmap` instead of `table` when the number of entries is large enough that O(n) traversal matters. For small maps and readable literals, `table` is simpler.
+
+| Name | Description |
+|------|-------------|
+| `empty` | the empty hashmap |
+| `singleton k v` | single-entry hashmap |
+| `fromList pairs` | build a hashmap from a list of `[k, v]` pairs |
+| `get k m` | `some v` if `k` is present, `none` otherwise; O(log n) |
+| `getOr def k m` | value for `k`, or `def` if absent; O(log n) |
+| `set k v m` | insert or replace the entry for `k`; O(log n) |
+| `remove k m` | remove the entry for `k`; O(log n) |
+| `update k f m` | apply `f` to the value at `k`; no-op if absent; O(log n) |
+| `updateOr k f def m` | apply `f` if `k` is present; insert `def` if absent; O(log n) |
+| `keys m` | all keys in hash order |
+| `values m` | all values in hash order |
+| `keyValues m` | all `[k, v]` pairs in hash order |
+
+```
+import hashmap in
+let m = hashmap.empty
+      > hashmap.set "x" 10
+      > hashmap.set "y" 20
+in
+show [hashmap.get "x" m; hashmap.getOr 0 "z" m]   -- [[10]; 0]
+```
 
 ---
 
