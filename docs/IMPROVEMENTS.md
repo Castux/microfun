@@ -18,20 +18,27 @@ payoff.
 arithmetic builtin. The builtin is strict, so the thunk is forced immediately —
 it is pure overhead.
 
-**Fix:** Force a strict prim's arguments on the *explicit* reduction stack instead
-of via a re-entrant `WHNF`, so the compiler can skip building thunks for
-arithmetic operands. This needs a continuation/return frame and an interleaved
-exec/reduce loop (an EVAL-style machine), which is harder to read than the current
-build-then-reduce split — hence deferred. A cheaper down payment:
+**Status:** The machine-side half is now **implemented**. `runCode` forces a
+strict prim's (and match scrutinee's) operands on the *explicit* reduction stack:
+on hitting a value that needs reduction it suspends the activation into a
+`contState`, pushes a run frame, and lets the single `reduce` loop force it, then
+resumes — the continuation/return-frame, interleaved exec/reduce machine this item
+called for. This removed the Go-stack recursion that made deep evaluation (a long
+`foldr`, `sum`/`length` of a large list, an iterated `hash`) overflow, at roughly
+neutral throughput on the numeric benches.
 
-- **Saturated direct prim calls.** *(implemented)* The lowerer now detects when
-  a builtin name is applied to exactly its arity of arguments and emits `CorePrim`
+**Remaining:** the *allocation* win. Now that the machine forces operands on the
+stack, the compiler could stop building a thunk for a strict prim's arithmetic
+operands and instead push the operand expression to be forced in place — skipping
+the per-argument thunk entirely. That compiler change is the outstanding part.
+
+- **Saturated direct prim calls.** *(implemented)* The lowerer detects when a
+  builtin name is applied to exactly its arity of arguments and emits `CorePrim`
   / `Prim` directly, skipping the `Builtin` value and the spine saturation dance in
   the reducer. `PrimArity` / `PrimNames` are arrays indexed by the dense `PrimOp`
-  enum. The operand buffer is always empty when a `Prim` is reached in body
-  position (surrounding `App` nodes PushArg their args to the reduction stack
-  before recursing into the head), so re-entrant `runFrom` calls from forcing never
-  overlap with live operand data.
+  enum. When a `Prim` forces an operand that needs reduction it suspends, copying
+  its live operands into the suspension, so the shared operand buffer stays valid
+  across the forcing.
 
 ---
 

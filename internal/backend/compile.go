@@ -30,11 +30,10 @@ import (
 //     touches the reduction stack, so it is safe in any sub-expression position.
 //
 // Saturated builtin calls are lowered to Prim nodes (see lower.go) and compiled
-// to the Prim opcode, which forces its operands inline rather than going through
-// the spine. The operand buffer is always empty when a Prim is reached in body
-// position (any surrounding App has already PushArg'd its frames to the stack),
-// so the re-entrant runFrom calls triggered by forcing never overlap with live
-// operand data.
+// to the Prim opcode, which forces its operands directly rather than going through
+// the spine. Forcing an operand that needs reduction suspends the activation onto
+// the explicit stack (see runCode in machine.go); the live operands are snapshotted
+// into the suspension, so the shared operand buffer is free for the forcing.
 
 // compiler accumulates the single flat Program. emit* helpers append to the shared
 // Code slice; intern* helpers deduplicate pool entries; pending holds out-of-line

@@ -8,6 +8,17 @@ baked into the data model or the hot loops, not micro-optimisations.
 Findings are ordered by estimated impact. Each notes the mechanism, where it
 lives, and a possible direction. None are bugs; they are design costs.
 
+> **Note (reducer restructure).** The reducer has since been made *suspendable*:
+> `runFrom`/`runMatch` are now a single `runCode` that, at a strict point (a `Prim`
+> or `Match*` instruction), snapshots itself onto the explicit stack instead of
+> forcing through a re-entrant `WHNF`. This removed the Go-stack recursion that made
+> deep evaluation overflow. It supersedes finding #4 below (re-entrant forcing no
+> longer allocates a fresh reduction stack) and changes finding #9 (`StackFrame`
+> gained `Cont`/`Prim` pointers and now unions four payloads). Findings that quote
+> the old `runFrom`/`runMatch` split or `WHNF`-based operand forcing predate it;
+> their *allocation* observations (per-frame, per-arg) still broadly hold and have
+> not been re-profiled against the new loop.
+
 ---
 
 ## 1. Runtime string-keyed map lookup on every module reference  — `machine.go` `PushModule`  — ✅ FIXED

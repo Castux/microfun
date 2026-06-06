@@ -9,9 +9,10 @@ import (
 )
 
 // Machine is the STG-style push/enter reducer. It executes the flat bytecode
-// produced by compile.go, keeps an explicit reduction stack of argument and
-// update frames, and forces thunks by running their compiled bodies rather than
-// reducing a graph.
+// produced by compile.go and keeps an explicit, heap-allocated reduction stack.
+// Every strict point — forcing a thunk, applying an argument, forcing a builtin's
+// operand or a match scrutinee — is a frame on that stack rather than a Go
+// recursive call, so it forces values of arbitrary depth in bounded Go stack.
 type Machine struct {
 	Prog *Program
 	// moduleEnvs holds each module's binding thunks, indexed by module index
@@ -20,8 +21,10 @@ type Machine struct {
 	// the build loop free of the per-access string-keyed map lookup it used before.
 	moduleEnvs [][]value.Value
 
-	// The operand buffer runFrom builds values on. It is reused across calls
-	// because runFrom never forces, so two runFrom calls never overlap.
+	// The shared operand buffer runCode builds values on. Exactly one activation
+	// runs on it at a time: when a body suspends at a strict point it snapshots its
+	// live operands into its contState, so the buffer is free for the forcing it
+	// triggers and is restored on resume (see runCode / resume).
 	opstack []value.Value
 
 	// The application span and reduction stack of the builtin currently running,
@@ -31,12 +34,14 @@ type Machine struct {
 	builtinStack []StackFrame
 }
 
-// StackFrameKind distinguishes argument frames from update frames.
+// StackFrameKind distinguishes the four entries the reduction stack can hold.
 type StackFrameKind uint8
 
 const (
-	argFrame StackFrameKind = iota
-	updateFrame
+	argFrame      StackFrameKind = iota // an argument waiting to be applied to the head
+	updateFrame                         // memoise the WHNF result back into a thunk
+	runFrame                            // resume a suspended body activation (see contState)
+	primArgsFrame                       // force a saturated builtin's args, then run its kernel
 )
 
 // StackFrame is one entry of the reduction stack.
@@ -45,6 +50,47 @@ type StackFrame struct {
 	Arg   value.Value      // valid when Kind == argFrame
 	Pos   source.SourcePos // valid when Kind == argFrame
 	Thunk *value.Thunk     // valid when Kind == updateFrame
+	Cont  *contState       // valid when Kind == runFrame
+	Prim  *primArgs        // valid when Kind == primArgsFrame
+}
+
+// contState is a suspended body activation: the state runCode needs to resume
+// after a strict point (a Prim or a Match instruction) had to force a value that
+// was not yet in WHNF. Rather than forcing it on the Go call stack — the recursion
+// that made deep evaluation overflow — runCode snapshots itself into a contState,
+// pushes a runFrame, and hands the value to the single reduce loop. When that value
+// reaches WHNF, reduce writes it into the recorded slot and re-enters runCode at pc,
+// which re-executes the suspending instruction (now finding the slot in WHNF).
+//
+// pc points at the suspending instruction itself, so resumption re-runs it. operands
+// is a snapshot (the live operand buffer is scratch, reused by the forcing); subjects
+// is owned outright by the activation, so it is kept by reference. Exactly one
+// activation is ever running on the shared operand buffer: all suspended ancestors
+// hold their operands safely in their contState.
+type contState struct {
+	pc       PC
+	locals   []value.Value
+	upvalues []value.Value
+	operands []value.Value
+	subjects []value.Value
+	arg      value.Value
+	noMatch  source.SourcePos
+
+	// On resume, the forced value is written here before runCode re-executes the
+	// suspending instruction: into subjects[injectIdx] for a Match, operands[injectIdx]
+	// for a Prim.
+	injectSubjects bool
+	injectIdx      int
+}
+
+// primArgs drives the forcing of a saturated numeric builtin's arguments through the
+// reduce loop (the spine-application path, where a Builtin value gathers its last
+// argument). idx is the next argument to force; when all are forced the kernel runs.
+type primArgs struct {
+	op   value.PrimOp
+	args []value.Value
+	idx  int
+	pos  source.SourcePos
 }
 
 func NewMachine(prog *Program) *Machine {
@@ -82,9 +128,10 @@ func (m *Machine) Run() value.Value {
 		m.moduleEnvs[i] = env
 	}
 
-	// Reduce the main body.
+	// Reduce the main body. runFrom may itself suspend (its head needs forcing);
+	// reduce drives the returned stack to completion either way.
 	mainLocals := make([]value.Value, m.Prog.EntryFrame)
-	control, stack := m.runFrom(m.Prog.Entry, mainLocals, nil, nil)
+	control, stack, _ := m.runFrom(m.Prog.Entry, mainLocals, nil, nil)
 	return m.reduce(control, stack)
 }
 
@@ -134,15 +181,20 @@ var globalMachine *Machine
 
 // --- the reducer ---
 
-// reduce is the main reduction loop. control is the current value in hand;
-// stack is the reduction stack of argument and update frames.
+// reduce is the main reduction loop and the only place evaluation depth is kept.
+// control is the current value in hand; stack is the explicit, heap-allocated
+// reduction stack. Every strict point — forcing a thunk, applying an argument,
+// forcing a builtin's operand, forcing a match subject — is expressed as a frame on
+// this stack rather than a Go recursive call, so the loop forces values of arbitrary
+// depth in bounded Go stack. (Structural builtins — show/eval/equal/hash — still
+// recurse over a value's *structure* in Go; that is a separate, shallow-by-data path.)
 func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 	for {
-		// Force thunks.
-		for control.Tag == value.ThunkTag {
+		switch control.Tag {
+		case value.ThunkTag:
 			thunk := control.Thunk()
 			if thunk.Forced {
-				control = thunk.Value
+				control = thunk.Value // forced thunks always hold a WHNF value
 				continue
 			}
 			if thunk.Read != nil {
@@ -152,9 +204,11 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				continue
 			}
 			if thunk.Code >= 0 {
-				// Code thunk: push an update frame to memoise, then run its body.
+				// Code thunk: push an update frame to memoise, then run its body. The
+				// body may run to a head (control := head) or suspend at a strict point
+				// (control := the value it needs forced); either way the loop continues.
 				stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
-				control, stack = m.runFrom(thunk.Code, thunk.Locals, thunk.Upvalues, stack)
+				control, stack, _ = m.runFrom(thunk.Code, thunk.Locals, thunk.Upvalues, stack)
 				continue
 			}
 			// Graph-style indirection (NoCode): push an update frame to memoise the
@@ -162,10 +216,9 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 			stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
 			control = thunk.Value
 			continue
-		}
 
-		// Unwind Apply nodes (only created by composition reduction).
-		if control.Tag == value.ApplyTag {
+		case value.ApplyTag:
+			// Unwind Apply nodes (only created by composition reduction).
 			ap := control.Apply()
 			stack = append(stack, StackFrame{Kind: argFrame, Arg: ap.Arg, Pos: ap.Pos})
 			control = ap.Fn
@@ -186,17 +239,43 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 			frame.Thunk.Forced = true
 			stack = stack[:len(stack)-1]
 
+		case runFrame:
+			// A suspended activation whose forced value is now in hand: inject it into
+			// the recorded slot and resume the body (which re-executes the instruction
+			// that suspended). Resumption may run to a head or suspend again.
+			stack = stack[:len(stack)-1]
+			cs := frame.Cont
+			if cs.injectSubjects {
+				cs.subjects[cs.injectIdx] = control
+			} else {
+				cs.operands[cs.injectIdx] = control
+			}
+			control, stack, _ = m.resume(cs, stack)
+
+		case primArgsFrame:
+			// A saturated numeric builtin gathering forced operands. Store the operand
+			// just forced; force the next, or run the kernel once all are in WHNF.
+			pa := frame.Prim
+			pa.args[pa.idx] = control
+			pa.idx++
+			if pa.idx < len(pa.args) {
+				control = pa.args[pa.idx]
+			} else {
+				stack = stack[:len(stack)-1]
+				control = m.finishBuiltin(pa.op, pa.args, pa.pos, stack)
+			}
+
 		case argFrame:
 			// Apply control to the argument.
 			switch control.Tag {
 			case value.ClosureTag:
 				closure := control.Closure()
 				stack = stack[:len(stack)-1] // consume the argument
-				// Try each case: run the match+body code from the closure's entry
-				// point. The Case instruction resets the subject, and on match
-				// failure the match instructions jump to the next Case (or NoMatch).
+				// Run the closure's match+body code. The Case instruction resets the
+				// subject; on match failure the match instructions jump to the next Case
+				// (or NoMatch). This may run to a head or suspend at a strict point.
 				locals := make([]value.Value, closure.Frame)
-				control, stack = m.runMatch(closure.Code, locals, closure.Env, frame.Arg, closure.NoMatch, stack)
+				control, stack, _ = m.runCode(closure.Code, locals, closure.Env, m.opstack[:0], nil, frame.Arg, closure.NoMatch, stack)
 
 			case value.BuiltinTag:
 				b := control.Builtin()
@@ -205,8 +284,13 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				copy(newArgs, b.Args)
 				newArgs[len(b.Args)] = frame.Arg
 				if len(newArgs) == b.Arity {
-					// Saturated: run the primitive.
-					control = m.runBuiltin(b.Prim, newArgs, frame.Pos, stack)
+					// Saturated: force every argument to WHNF through the loop via a
+					// primArgsFrame, then run the kernel (finishBuiltin). Forcing the
+					// arguments here — rather than letting a structural kernel force them
+					// inline through Go-recursive WHNF — is what keeps a deep argument
+					// chain (e.g. iterated hash) off the Go stack.
+					stack = append(stack, StackFrame{Kind: primArgsFrame, Prim: &primArgs{op: b.Prim, args: newArgs, pos: frame.Pos}})
+					control = newArgs[0]
 				} else {
 					// Partial application: return a new Builtin with one more arg.
 					control = value.BuiltinValue(&value.Builtin{
@@ -236,160 +320,96 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 	}
 }
 
-// runBuiltin dispatches a saturated builtin. Math prims force their arguments
-// and run the kernel; structural builtins are dispatched separately.
-func (m *Machine) runBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
+// shallowWHNF returns v in WHNF if that needs no reduction — v is already a
+// constructor/number/function, or a chain of already-forced thunks — reporting ok.
+// It reports ok == false for anything that needs the reducer (an unforced code or
+// stdin thunk, or a pending application); the caller then suspends and lets the
+// reduce loop force it. This is the fast, allocation-free path that keeps matching
+// an already-evaluated value off the suspension machinery.
+func shallowWHNF(v value.Value) (value.Value, bool) {
+	for {
+		switch v.Tag {
+		case value.ThunkTag:
+			t := v.Thunk()
+			if t.Forced {
+				v = t.Value
+				continue
+			}
+			return v, false
+		case value.ApplyTag:
+			return v, false
+		default:
+			return v, true
+		}
+	}
+}
+
+// isStructural reports whether a primitive forces its own arguments (and may recurse
+// over their structure) rather than expecting the machine to force them first.
+func isStructural(op value.PrimOp) bool {
 	switch op {
-	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite, value.PrimString, value.PrimHash:
+	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow,
+		value.PrimWrite, value.PrimBwrite, value.PrimString, value.PrimHash:
+		return true
+	}
+	return false
+}
+
+// finishBuiltin runs a saturated builtin once every argument is in WHNF. A structural
+// builtin's kernel may still walk its arguments' structure (and re-enter the reducer
+// for deeper sub-values), but its top-level arguments are already forced, so a deep
+// argument *chain* was reduced on the explicit stack rather than the Go stack. A
+// numeric builtin first checks every argument is a number, naming the operation on
+// failure, then evaluates the kernel.
+func (m *Machine) finishBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
+	if isStructural(op) {
 		m.builtinPos = pos
 		m.builtinStack = stack
 		return value.EvalStructuralBuiltin(op, args)
-	default:
-		// Numeric/comparison prims force every operand left-to-right, then check
-		// that all are numbers — every operand is forced before any non-number is
-		// reported, so the error names the operation rather than the first bad arg.
-		allNumbers := true
-		for i := range args {
-			args[i] = WHNF(args[i])
-			if args[i].Tag != value.NumberTag {
-				allNumbers = false
-			}
-		}
-		if !allNumbers {
+	}
+	for i := range args {
+		if args[i].Tag != value.NumberTag {
 			m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
 		}
-		return value.EvalPrim(op, args)
 	}
+	return value.EvalPrim(op, args)
 }
 
-// --- runFrom: body execution (build phase, never forces) ---
-
-// runFrom executes instructions from pc, building values on the operand buffer,
-// pushing argument frames onto the reduction stack, and returning the head value
-// when Enter is reached. It never forces — it is the build phase.
-func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFrame) (value.Value, []StackFrame) {
-	operands := m.opstack[:0]
-
-	for {
-		in := m.Prog.Code[pc]
-		pc++
-
-		switch in.Op {
-		case PushConst:
-			operands = append(operands, m.Prog.Consts[in.A])
-
-		case PushLocal:
-			operands = append(operands, locals[in.A])
-
-		case PushUpvalue:
-			operands = append(operands, upvalues[in.A])
-
-		case PushModule:
-			operands = append(operands, m.moduleEnvs[in.A][in.B])
-
-		case PushStdin:
-			operands = append(operands, value.StdinCodePoints())
-
-		case PushBstdin:
-			operands = append(operands, value.StdinBytes())
-
-		case MakeCons:
-			n := len(operands)
-			operands[n-2] = value.ConsValue(operands[n-2], operands[n-1])
-			operands = operands[:n-1]
-
-		case MakeTuple:
-			n := len(operands)
-			k := int(in.A)
-			fields := make([]value.Value, k)
-			copy(fields, operands[n-k:])
-			operands = append(operands[:n-k], value.TupleValue(&value.Tuple{Fields: fields}))
-
-		case MakeCompose:
-			n := len(operands)
-			operands[n-2] = value.Value{Tag: value.CompositionTag, Ref: &value.Composition{
-				First: operands[n-2], Second: operands[n-1],
-			}}
-			operands = operands[:n-1]
-
-		case MakeClosure:
-			tmpl := &m.Prog.Closures[in.A]
-			env := m.captureEnv(tmpl.Capture, locals, upvalues)
-			operands = append(operands, value.ClosureValue(&value.Closure{
-				Code:    tmpl.Code,
-				Env:     env,
-				Frame:   tmpl.Frame,
-				NoMatch: tmpl.NoMatch,
-			}))
-
-		case MakeThunk:
-			tmpl := &m.Prog.Thunks[in.A]
-			name := ""
-			if tmpl.Name >= 0 {
-				name = m.Prog.Names[tmpl.Name]
-			}
-			operands = append(operands, value.ThunkValue(&value.Thunk{
-				Code:     tmpl.Code,
-				Locals:   locals,
-				Upvalues: upvalues,
-				Name:     name,
-			}))
-
-		case StoreLet:
-			tmpl := &m.Prog.Thunks[in.B]
-			name := ""
-			if tmpl.Name >= 0 {
-				name = m.Prog.Names[tmpl.Name]
-			}
-			locals[in.A] = value.ThunkValue(&value.Thunk{
-				Code:     tmpl.Code,
-				Locals:   locals,
-				Upvalues: upvalues,
-				Name:     name,
-			})
-
-		case PushArg:
-			n := len(operands)
-			stack = append(stack, StackFrame{
-				Kind: argFrame,
-				Arg:  operands[n-1],
-				Pos:  m.Prog.Posns[in.A],
-			})
-			operands = operands[:n-1]
-
-		case Prim:
-			op := value.PrimOp(in.A)
-			arity := value.PrimArity[op]
-			n := len(operands)
-			args := make([]value.Value, arity)
-			copy(args, operands[n-arity:])
-			operands = operands[:n-arity]
-			// Force and evaluate the prim.
-			result := m.runBuiltin(op, args, m.Prog.Posns[in.B], stack)
-			operands = append(operands, result)
-
-		case Enter:
-			head := operands[len(operands)-1]
-			m.opstack = operands[:0] // keep the backing array
-			return head, stack
-
-		default:
-			panic(fmt.Sprintf("machine: unexpected opcode %d in runFrom", in.Op))
-		}
-	}
+// snapshotOperands copies the live operand buffer, which is scratch reused by the
+// forcing a suspension triggers, into a slice the contState owns.
+func snapshotOperands(operands []value.Value) []value.Value {
+	s := make([]value.Value, len(operands))
+	copy(s, operands)
+	return s
 }
 
-// --- runMatch: closure application with inline pattern matching ---
+// --- runCode: body execution (build + match), suspendable at strict points ---
 
-// runMatch executes a closure's compiled cases starting at entryPC. The first
-// instruction must be Case. On match success, the case body is executed and its
-// head + stack are returned. On failure, the match instructions jump to the next
-// Case instruction. If all cases fail, NoMatch raises an error.
-func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value.Value, noMatch source.SourcePos, stack []StackFrame) (value.Value, []StackFrame) {
-	operands := m.opstack[:0]
-	var subjects []value.Value
-	pc := entryPC
+// runFrom starts a fresh thunk body. A thunk body never matches, so it has no
+// subject stack, argument, or no-match span.
+func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFrame) (value.Value, []StackFrame, bool) {
+	return m.runCode(pc, locals, upvalues, m.opstack[:0], nil, value.Value{}, source.SourcePos{}, stack)
+}
 
+// resume continues a suspended activation: it restores the snapshot operands into the
+// shared scratch buffer (free at this point — no other activation is running) and
+// re-enters runCode at the suspending instruction, whose strict slot is now in WHNF.
+func (m *Machine) resume(cs *contState, stack []StackFrame) (value.Value, []StackFrame, bool) {
+	operands := append(m.opstack[:0], cs.operands...)
+	return m.runCode(cs.pc, cs.locals, cs.upvalues, operands, cs.subjects, cs.arg, cs.noMatch, stack)
+}
+
+// runCode executes a contiguous body span — the match instructions of a closure case
+// (if any), then its build instructions — over the given frames and operand buffer.
+// It returns one of:
+//   - (head, stack, false): the body reached Enter; head is its head value.
+//   - (toForce, stack, true): the body hit a strict point and suspended; it pushed a
+//     runFrame and returns the value the reduce loop must force. On resume the forced
+//     value is in the recorded slot and execution re-runs the suspending instruction.
+//
+// Building never forces; only the Prim and Match instructions do, and they do so by
+// suspending rather than calling the reducer recursively.
+func (m *Machine) runCode(pc PC, locals, upvalues, operands, subjects []value.Value, arg value.Value, noMatch source.SourcePos, stack []StackFrame) (value.Value, []StackFrame, bool) {
 	for {
 		in := m.Prog.Code[pc]
 		pc++
@@ -404,27 +424,41 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 		case MatchNumber:
 			n := len(subjects)
 			subject := subjects[n-1]
+			fv, ok := shallowWHNF(subject)
+			if !ok {
+				cs := &contState{pc: pc - 1, locals: locals, upvalues: upvalues,
+					operands: snapshotOperands(operands), subjects: subjects, arg: arg, noMatch: noMatch,
+					injectSubjects: true, injectIdx: n - 1}
+				stack = append(stack, StackFrame{Kind: runFrame, Cont: cs})
+				return subject, stack, true
+			}
 			subjects = subjects[:n-1]
-			forced := WHNF(subject)
-			if forced.Tag != value.NumberTag || forced.Num != m.Prog.Consts[in.A].Num {
+			if fv.Tag != value.NumberTag || fv.Num != m.Prog.Consts[in.A].Num {
 				pc = PC(in.B) // jump to fail target
 			}
 
 		case MatchTuple:
 			n := len(subjects)
 			subject := subjects[n-1]
+			fv, ok := shallowWHNF(subject)
+			if !ok {
+				cs := &contState{pc: pc - 1, locals: locals, upvalues: upvalues,
+					operands: snapshotOperands(operands), subjects: subjects, arg: arg, noMatch: noMatch,
+					injectSubjects: true, injectIdx: n - 1}
+				stack = append(stack, StackFrame{Kind: runFrame, Cont: cs})
+				return subject, stack, true
+			}
 			subjects = subjects[:n-1]
-			forced := WHNF(subject)
 			arity := int(in.A)
 			if arity == 2 {
-				if forced.Tag == value.ConsTag {
-					c := forced.Cons()
+				if fv.Tag == value.ConsTag {
+					c := fv.Cons()
 					subjects = append(subjects, c.Tail, c.Head) // Head on top → matched first
 				} else {
 					pc = PC(in.B)
 				}
-			} else if forced.Tag == value.TupleTag {
-				t := forced.Tuple()
+			} else if fv.Tag == value.TupleTag {
+				t := fv.Tuple()
 				if len(t.Fields) == arity {
 					for j := len(t.Fields) - 1; j >= 0; j-- {
 						subjects = append(subjects, t.Fields[j])
@@ -440,7 +474,8 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			n := len(subjects)
 			subject := subjects[n-1]
 			subjects = subjects[:n-1]
-			// The const is a pre-built string list. We need to match the spine.
+			// matchStringSpine forces the subject's spine through WHNF; the reducer it
+			// re-enters is itself iterative, so a deep subject does not recurse in Go.
 			target := m.Prog.Consts[in.A]
 			if !matchStringSpine(subject, target) {
 				pc = PC(in.B)
@@ -467,7 +502,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 				"no pattern matched value "+value.StringifyValue(arg),
 				noMatch, stack)
 
-		// --- Build instructions (body of the matched case) ---
+		// --- Build instructions ---
 		case PushConst:
 			operands = append(operands, m.Prog.Consts[in.A])
 
@@ -553,20 +588,38 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 		case Prim:
 			op := value.PrimOp(in.A)
 			arity := value.PrimArity[op]
-			n := len(operands)
+			base := len(operands) - arity
+			// Force each operand to WHNF, suspending on any that needs reduction.
+			// Re-execution resumes here with that operand forced in place, so the scan
+			// advances rather than repeating work. Forcing the operands here — for
+			// structural builtins too — keeps a deep argument chain off the Go stack;
+			// the kernel then runs in finishBuiltin with its top-level arguments in WHNF.
+			for j := base; j < len(operands); j++ {
+				fv, ok := shallowWHNF(operands[j])
+				if !ok {
+					cs := &contState{pc: pc - 1, locals: locals, upvalues: upvalues,
+						operands: snapshotOperands(operands), subjects: subjects, arg: arg, noMatch: noMatch,
+						injectSubjects: false, injectIdx: j}
+					stack = append(stack, StackFrame{Kind: runFrame, Cont: cs})
+					return operands[j], stack, true
+				}
+				operands[j] = fv
+			}
+			// Copy the (now forced) arguments out and pop them before running the
+			// kernel: a structural kernel may re-enter the reducer, which reuses the
+			// shared operand buffer this slice aliases.
 			args := make([]value.Value, arity)
-			copy(args, operands[n-arity:])
-			operands = operands[:n-arity]
-			result := m.runBuiltin(op, args, m.Prog.Posns[in.B], stack)
-			operands = append(operands, result)
+			copy(args, operands[base:])
+			operands = operands[:base]
+			operands = append(operands, m.finishBuiltin(op, args, m.Prog.Posns[in.B], stack))
 
 		case Enter:
 			head := operands[len(operands)-1]
-			m.opstack = operands[:0]
-			return head, stack
+			m.opstack = operands[:0] // keep the backing array
+			return head, stack, false
 
 		default:
-			panic(fmt.Sprintf("machine: unexpected opcode %d in runMatch", in.Op))
+			panic(fmt.Sprintf("machine: unexpected opcode %d in runCode", in.Op))
 		}
 	}
 }

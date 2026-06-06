@@ -17,8 +17,9 @@ import (
 // case compiles to its match instructions —
 // each tag test jumping to the next case on failure — followed immediately by its
 // body instructions; there is no separate matcher IR. Building never forces; the
-// match and Prim instructions are the only ones that force, and they do so through
-// the machine's re-entrant WHNF.
+// match and Prim instructions are the only ones that force, and they do so by
+// suspending the activation onto the machine's explicit stack rather than recursing
+// (see runCode in machine.go).
 
 // PC is re-exported from the value package, where Thunk and Closure store entry
 // points; the two definitions are the same int32 alias.
