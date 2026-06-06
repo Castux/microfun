@@ -53,6 +53,7 @@ var knownBuiltins = []string{
 	"add", "sub", "mul", "div", "fdiv", "mod", "fmod", "pow", "sqrt",
 	"eq", "lt", "lte", "gte", "gt", "neq",
 	"eval", "peek", "show", "write", "bwrite", "equal", "string", "hash", "stdin", "bstdin",
+	"seq",
 }
 
 func (r *Resolver) pushScope(node Node) {

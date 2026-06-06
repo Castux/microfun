@@ -35,6 +35,10 @@ const (
 	PrimString
 	PrimHash
 
+	PrimSeq // seq a b: force a to WHNF, return b unforced (the only non-numeric,
+	// non-structural prim — handled directly by the machine, never by EvalPrim or
+	// EvalStructuralBuiltin)
+
 	primOpCount // sentinel for array sizing
 )
 
@@ -48,6 +52,7 @@ var PrimNames = [primOpCount]string{
 	PrimEqual: "equal",
 	PrimEval:  "eval", PrimPeek: "peek", PrimShow: "show", PrimWrite: "write", PrimBwrite: "bwrite", PrimString: "string",
 	PrimHash: "hash",
+	PrimSeq:  "seq",
 }
 
 // PrimName returns the source-level name of a primitive operation.
@@ -66,6 +71,7 @@ var PrimArity = [primOpCount]int{
 	PrimEqual: 2,
 	PrimEval:  1, PrimPeek: 1, PrimShow: 1, PrimWrite: 1, PrimBwrite: 1, PrimString: 1,
 	PrimHash: 1,
+	PrimSeq:  2,
 }
 
 // EvalPrim executes the saturated primitive operation.

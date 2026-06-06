@@ -1,0 +1,7 @@
+-- seq forces its first argument to WHNF and returns the second unevaluated:
+-- the second may be an infinite stream of which only a prefix is ever demanded.
+import core, list in
+show [
+  seq (add 1 2) 99;
+  seq "forced" (take 4 (upFrom 1))
+]

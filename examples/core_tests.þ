@@ -132,6 +132,10 @@ runTests [
 	assert "list.foldr-empty" (list.foldr add 7 []) 7;
 	assert "list.foldl" (list.foldl add 10 [1; 2; 3]) 16;
 	assert "list.foldl-empty" (list.foldl add 7 []) 7;
+	assert "list.foldlStrict" (list.foldlStrict add 10 [1; 2; 3]) 16;
+	assert "list.foldlStrict-empty" (list.foldlStrict add 7 []) 7;
+	assert "list.foldlStrict-eq-foldl" (list.foldlStrict sub 100 [1; 2; 3; 4]) (list.foldl sub 100 [1; 2; 3; 4]);
+	assert "seq" (seq (add 1 2) 99) 99;
 	assert "list.sum" (list.sum [1; 2; 3; 4]) 10;
 	assert "list.sum-empty" (list.sum []) 0;
 	assert "list.product" (list.product [1; 2; 3; 4]) 24;

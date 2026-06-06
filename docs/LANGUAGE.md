@@ -522,6 +522,7 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `gt a b` | 2 | `1` if `b > a` else `0` | `gt 0 x = x > 0` |
 | `neq a b` | 2 | `1` if `a ≠ b` else `0` | numbers only |
 | `equal a b` | 2 | `1` if `a` and `b` are structurally equal else `0` | works on any values; forces as needed; functions compare equal only by identity |
+| `seq a b` | 2 | `b` | forces `a` to weak head normal form first; the tool for strictness (see `list.foldlStrict`) |
 | `eval a` | 1 | `a`, forced to full normal form | identity otherwise; breaks laziness |
 | `peek a` | 1 | `a` | prints `a` (width/depth-bounded), then returns it |
 | `show a` | 1 | `a` | prints `a` (unbounded), then returns it |
@@ -542,6 +543,14 @@ instead of printing it, useful for building formatted output. `add`, `mul`, and
 
 Passing a non-number to an arithmetic builtin, or anything `write` cannot read as
 a code-point list, is a run-time error.
+
+`seq a b` is the strictness primitive: it forces `a` to weak head normal form and
+returns `b` (unevaluated). It is the building block for strict accumulation — a
+left fold that builds its accumulator lazily (`foldl`, `foldr`) holds the whole
+chain unforced until the end, which for a long list is an *O(n)*-deep, *O(n)*-live
+computation; `list.foldlStrict` uses `seq` to force the accumulator at each step and
+so runs in constant depth and live space. Unlike `eval`, `seq` forces only to weak
+head normal form (the outermost constructor), not all the way down.
 
 ### Comparator convention
 

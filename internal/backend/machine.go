@@ -34,7 +34,7 @@ type Machine struct {
 	builtinStack []StackFrame
 }
 
-// StackFrameKind distinguishes the four entries the reduction stack can hold.
+// StackFrameKind distinguishes the five entries the reduction stack can hold.
 type StackFrameKind uint8
 
 const (
@@ -42,6 +42,7 @@ const (
 	updateFrame                         // memoise the WHNF result back into a thunk
 	runFrame                            // resume a suspended body activation (see contState)
 	primArgsFrame                       // force a saturated builtin's args, then run its kernel
+	seqFrame                            // seq: once its first arg is WHNF, continue with Arg (its second)
 )
 
 // StackFrame is one entry of the reduction stack.
@@ -265,6 +266,12 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				control = m.finishBuiltin(pa.op, pa.args, pa.pos, stack)
 			}
 
+		case seqFrame:
+			// seq's first argument is now in WHNF; its result is the second argument
+			// (held in Arg), continued unforced.
+			stack = stack[:len(stack)-1]
+			control = frame.Arg
+
 		case argFrame:
 			// Apply control to the argument.
 			switch control.Tag {
@@ -284,13 +291,20 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				copy(newArgs, b.Args)
 				newArgs[len(b.Args)] = frame.Arg
 				if len(newArgs) == b.Arity {
-					// Saturated: force every argument to WHNF through the loop via a
-					// primArgsFrame, then run the kernel (finishBuiltin). Forcing the
-					// arguments here — rather than letting a structural kernel force them
-					// inline through Go-recursive WHNF — is what keeps a deep argument
-					// chain (e.g. iterated hash) off the Go stack.
-					stack = append(stack, StackFrame{Kind: primArgsFrame, Prim: &primArgs{op: b.Prim, args: newArgs, pos: frame.Pos}})
-					control = newArgs[0]
+					if b.Prim == value.PrimSeq {
+						// seq a b: force a to WHNF (continue with it as control), then
+						// resume with b via a seqFrame. seq must not force b.
+						stack = append(stack, StackFrame{Kind: seqFrame, Arg: newArgs[1]})
+						control = newArgs[0]
+					} else {
+						// Saturated: force every argument to WHNF through the loop via a
+						// primArgsFrame, then run the kernel (finishBuiltin). Forcing the
+						// arguments here — rather than letting a structural kernel force them
+						// inline through Go-recursive WHNF — is what keeps a deep argument
+						// chain (e.g. iterated hash) off the Go stack.
+						stack = append(stack, StackFrame{Kind: primArgsFrame, Prim: &primArgs{op: b.Prim, args: newArgs, pos: frame.Pos}})
+						control = newArgs[0]
+					}
 				} else {
 					// Partial application: return a new Builtin with one more arg.
 					control = value.BuiltinValue(&value.Builtin{
@@ -589,6 +603,23 @@ func (m *Machine) runCode(pc PC, locals, upvalues, operands, subjects []value.Va
 			op := value.PrimOp(in.A)
 			arity := value.PrimArity[op]
 			base := len(operands) - arity
+			if op == value.PrimSeq {
+				// seq a b: force only a (operands[base]); the result is b, unforced.
+				a := operands[base]
+				if fv, ok := shallowWHNF(a); ok {
+					operands[base] = fv
+				} else {
+					cs := &contState{pc: pc - 1, locals: locals, upvalues: upvalues,
+						operands: snapshotOperands(operands), subjects: subjects, arg: arg, noMatch: noMatch,
+						injectSubjects: false, injectIdx: base}
+					stack = append(stack, StackFrame{Kind: runFrame, Cont: cs})
+					return a, stack, true
+				}
+				b := operands[base+1]
+				operands = operands[:base]
+				operands = append(operands, b)
+				break
+			}
 			// Force each operand to WHNF, suspending on any that needs reduction.
 			// Re-execution resumes here with that operand forced in place, so the scan
 			// advances rather than repeating work. Forcing the operands here — for

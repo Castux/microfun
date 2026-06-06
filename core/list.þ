@@ -185,6 +185,22 @@ foldl = f -> acc -> {
 	[h,t] -> foldl f (f acc h) t
 },
 
+-- foldlStrict f acc l: like foldl, but forces the accumulator to WHNF at each step
+-- (via seq) instead of building it lazily. foldl and foldr both build an accumulator
+-- chain only forced at the end — O(n) deep — so a large list with a strict combiner
+-- (e.g. building a hashmap of counts) forces a deep chain on the explicit stack and
+-- holds every frame live at once. foldlStrict keeps the accumulator in WHNF as it
+-- goes, so depth and live frames stay O(1). The `seq acc` wraps the case lambda so
+-- the incoming accumulator is forced before the next step, while the recursive call
+-- stays in tail position (had it been seq's second argument it would be a thunk, and
+-- forcing each such thunk would stack an update frame per element — no better than
+-- foldl). Use it whenever the combiner is strict in the accumulator and the list is
+-- long.
+foldlStrict = f -> acc -> seq acc {
+	[] -> acc,
+	[h,t] -> foldlStrict f (f acc h) t
+},
+
 -- scanl f acc l: list of successive left-fold results, starting with acc.
 -- scanl f z [a;b;c] = [z; f z a; f (f z a) b; f (f (f z a) b) c]
 scanl = f -> acc -> {
