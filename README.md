@@ -100,6 +100,7 @@ Key things illustrated:
 
 | Document | Contents |
 |----------|----------|
+| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 9 chapters from first program to modules, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/0.Overview.md](docs/0.Overview.md) | Implementation pipeline and source positions |
 | [docs/1.Lexer.md](docs/1.Lexer.md) | Lexer |

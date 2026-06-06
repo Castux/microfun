@@ -1,0 +1,719 @@
+# Chapter 8: The Standard Library
+
+Thunky ships with a standard library embedded in the binary — no installation needed. This chapter walks through each module with enough detail to use it effectively.
+
+Import modules explicitly:
+
+```
+import core, list, math in
+  ...
+```
+
+Names from imported modules are available unqualified (just `map`, `sort`, etc.) and also qualified (`list.map`, `list.sort`). When two modules export the same name, the later import wins for unqualified access; use qualified names to disambiguate.
+
+---
+
+## `core` — combinators, booleans, and control flow
+
+`core` is the foundational module. You will use it in nearly every program of any size.
+
+### Identity and composition
+
+```
+import core in
+show [
+  core.id 42,                -- 42 (identity function)
+  (core.compose (mul 2) (add 1)) 5,  -- mul 2 (add 1 5) = 12
+  (core.flip sub) 10 3       -- sub 3 10 = 10 - 3 = 7
+]
+```
+
+- `id x = x` — useful as a no-op placeholder in pipelines.
+- `compose f g` — right-to-left composition; same as `<*`.
+- `flip f x y = f y x` — reverses the first two arguments.
+
+### `const` and `on`
+
+```
+import core in
+let
+  alwaysFive = core.const 5,
+  compareByAbs = core.on lt core.abs    -- compare by absolute value
+in
+  show [alwaysFive 100, alwaysFive "anything", compareByAbs (negate 3) 2]
+```
+
+- `const c x = c` — ignores its second argument.
+- `on f g x y = f (g x) (g y)` — applies `g` to both arguments before comparing with `f`.
+
+### Conditionals
+
+```
+import core in
+show [
+  core.if 1 "yes" "no",             -- "yes"
+  core.if 0 "yes" "no",             -- "no"
+  core.case 0 10 0 20 1 30 else 99  -- 30 (first true condition)
+]
+```
+
+`core.if cond t f` — selects `t` if `cond = 1`, `f` if `cond = 0`. Runtime error for any other value.
+
+`core.case` is a chained conditional:
+
+```
+core.case cond1 val1 cond2 val2 ... else default
+```
+
+Evaluates each `condN`; returns `valN` for the first condition equal to `1`. The keyword `else` is a builtin constant that marks the final default value. (Technically, `else` in `core` is just a constant that breaks the chaining — it is not special syntax.)
+
+### Boolean logic
+
+```
+import core in
+show [
+  core.and 1 1,    -- 1
+  core.and 1 0,    -- 0
+  core.or  0 1,    -- 1
+  core.not 1       -- 0
+]
+```
+
+`and` and `or` are short-circuiting: if the first argument determines the result, the second is not evaluated. This is pure laziness — not a special instruction.
+
+### Tuple accessors
+
+```
+import core in
+show [core.first [10, 20], core.second [10, 20]]    -- [10, 20]
+```
+
+### `curry` and `uncurry`
+
+```
+import core in
+let
+  sumPair = core.uncurry add,    -- takes a 2-tuple instead of two args
+  addCurried = core.curry ([x, y] -> add x y)
+in
+  show [sumPair [3, 4], addCurried 3 4]    -- [7, 7]
+```
+
+- `uncurry f [x, y] = f x y` — adapt a curried function to take a pair.
+- `curry f x y = f [x, y]` — adapt a pair-taking function to be curried.
+
+---
+
+## `math` — numeric operations
+
+`math` extends the arithmetic builtins with useful derived functions.
+
+```
+import math in
+show [
+  math.succ 5,        -- 6  (add 1)
+  math.pred 5,        -- 4  (sub 1)
+  math.abs (negate 7),-- 7
+  math.max 3 7,       -- 7
+  math.min 3 7,       -- 3
+  math.clamp 0 10 15, -- 10 (clamped to upper bound)
+  math.even 4,        -- 1
+  math.odd 7,         -- 1
+  math.gcd 18 48,     -- 6
+  math.factorial 6    -- 720
+]
+```
+
+`math.digits n` breaks a non-negative integer into its decimal digits as a list:
+
+```
+import math in show (math.digits 12345)    -- [1; 2; 3; 4; 5]
+```
+
+Rounding functions: `math.floor`, `math.ceil`, `math.trunc`, `math.round`.
+
+---
+
+## `maybe` — optional values
+
+`maybe` gives you a type-safe way to represent "a value that might not be there", avoiding the need for sentinel values like `-1` or `null`.
+
+A maybe value is either:
+- `maybe.none` — absent (`[]`, the empty tuple)
+- `maybe.some x` — present (`[x]`, a one-element tuple)
+
+Since these are just tuples, you can pattern match on them directly:
+
+```
+import maybe in
+let
+  result = maybe.some 42
+in
+  show < { [] -> "nothing", [x] -> add x 1 } result    -- 43
+```
+
+### Constructors and predicates
+
+```
+import maybe in
+show [
+  maybe.none,             -- []
+  maybe.some 99,          -- [99]
+  maybe.isSome (maybe.some 1),  -- 1
+  maybe.isNone maybe.none       -- 1
+]
+```
+
+### Transforming maybe values
+
+```
+import maybe in
+show [
+  maybe.fmap (mul 2) (maybe.some 5),   -- [10]  (applied inside)
+  maybe.fmap (mul 2) maybe.none,       -- []    (propagated)
+  maybe.default 0 (maybe.some 42),     -- 42    (extract or default)
+  maybe.default 0 maybe.none           -- 0
+]
+```
+
+`fmap f m` — applies `f` to the value inside `some`, propagates `none`.
+
+`default def m` — extracts the value from `some`, or returns `def` if `none`.
+
+### Chaining: `andThen`
+
+`andThen f m` applies `f` to the value in `some`, or propagates `none`:
+
+```
+import maybe in
+let
+  safeHead = { [] -> maybe.none, [h, t] -> maybe.some h },
+  safeDiv = x -> y -> { 0 -> maybe.none, n -> maybe.some (fdiv x n) } y
+in
+  show [
+    safeHead [10; 20; 30] > maybe.andThen (safeDiv 100),  -- [10.0]
+    safeHead []           > maybe.andThen (safeDiv 100)   -- []
+  ]
+```
+
+`andThen` is the maybe equivalent of "and then, if that succeeded, do this". It chains operations that might fail without nested if-checks.
+
+### Where maybe values come from
+
+Many standard library functions return maybes:
+
+- `list.find p xs` — `some x` for the first match, or `none`
+- `list.headSafe xs`, `list.tailSafe xs`, etc.
+- `list.lookup key assoc` — `some value` or `none`
+- `table.get key t` — `some value` or `none`
+
+---
+
+## `list` — comprehensive list processing
+
+You have already seen most of `list` in Chapter 6. Here are the parts not yet covered.
+
+### `flatMap`
+
+`flatMap f xs` maps `f` over `xs` and concatenates the results:
+
+```
+import list in
+show (list.flatMap (x -> [x; mul x 10]) [1; 2; 3])
+```
+
+Output: `[1; 10; 2; 20; 3; 30]`
+
+Useful when each element produces a variable-length output.
+
+### `mapFilter`
+
+`mapFilter f xs` maps `f` over `xs`; `f` returns a `maybe`. Elements where `f` returns `none` are dropped; `some x` contributes `x`:
+
+```
+import list, maybe in
+let safeRecip = { 0 -> maybe.none, x -> maybe.some (fdiv 1 x) } in
+  show (list.mapFilter safeRecip [1; 0; 2; 0; 4])
+```
+
+Output: `[1; 0.5; 0.25]` — zeros are dropped automatically.
+
+### `scanl` and `scanr`
+
+Running totals:
+
+```
+import list in
+show [
+  list.scanl add 0 [1; 2; 3; 4],    -- [0; 1; 3; 6; 10] (running sum)
+  list.scanr add 0 [1; 2; 3; 4]     -- [10; 9; 7; 4; 0]
+]
+```
+
+`scanl f z xs` produces the list of all intermediate `foldl` results. The first element is always `z`.
+
+### `groupBy`
+
+Groups consecutive elements with the same classifier:
+
+```
+import list in
+show (list.groupBy equal [1; 1; 2; 2; 3; 1; 1])
+```
+
+Output: `[[1; 1]; [2; 2]; [3;]; [1; 1]]`
+
+`groupBy f xs` groups consecutive runs where `f head element = 1`.
+
+### `spans`, `tails`, `inits`
+
+```
+import list in
+show [
+  list.tails [1; 2; 3],    -- [[1; 2; 3]; [2; 3]; [3;]; []]
+  list.inits [1; 2; 3]     -- [[]; [1;]; [1; 2]; [1; 2; 3]]
+]
+```
+
+`tails xs` is all successive suffixes; `inits xs` is all successive prefixes.
+
+### `partition`
+
+`partition p xs` returns `[matching, rest]`:
+
+```
+import list in
+show (list.partition (gt 3) [1; 2; 3; 4; 5])    -- [[4; 5], [1; 2; 3]]
+```
+
+Both halves are lists. This is more efficient than calling `filter` twice.
+
+### Infinite lists
+
+All the lazy list generators:
+
+```
+import list in
+show [
+  list.take 5 (list.upFrom 1),       -- [1; 2; 3; 4; 5]
+  list.take 5 (list.downFrom 10),    -- [10; 9; 8; 7; 6]
+  list.take 6 (list.cycle [1; 2; 3]),-- [1; 2; 3; 1; 2; 3]
+  list.take 4 (list.repeat "x")      -- ["x"; "x"; "x"; "x"]
+]
+```
+
+---
+
+## `text` — string operations
+
+Strings are lists of code points. `text` adds higher-level operations.
+
+### Character literals
+
+There are no escape sequences in Thunky strings. Use `text.char` and named constants:
+
+```
+import text in
+show [
+  text.char "A",    -- 65
+  text.lf,          -- 10 (line feed)
+  text.tab,         -- 9
+  text.space        -- 32
+]
+```
+
+`text.char "X"` extracts the code point of the first character — idiomatic for single character values.
+
+### Formatting
+
+```
+import text in
+write (text.join ", " ["one"; "two"; "three"])    -- one, two, three
+```
+
+`join sep strings` concatenates a list of strings with `sep` between them.
+
+```
+import text in
+show [
+  text.padLeft 5 (text.char "0") "42",    -- "00042"
+  text.padRight 5 (text.char " ") "hi",   -- "hi   "
+  text.trim "  hello  "                    -- "hello"
+]
+```
+
+### Character classification
+
+```
+import text in
+show [
+  text.isDigit (text.char "5"),    -- 1
+  text.isAlpha (text.char "a"),    -- 1
+  text.isSpace (text.char " "),    -- 1
+  text.toUpper (text.char "a")     -- 65 (code point for 'A')
+]
+```
+
+### Parsing
+
+```
+import text in
+show [
+  text.stringToInt "123",         -- 123
+  text.stringToFloat "3.14",      -- 3.14
+  text.split "," "a,b,c",         -- ["a"; "b"; "c"]
+  text.startsWith "he" "hello"    -- 1
+]
+```
+
+`split sep s` splits `s` on all occurrences of `sep`. `splitOne sep s` splits on the first occurrence only, returning a 2-element list.
+
+### A practical example: CSV row parser
+
+```
+import text, list in
+let parseCSV = row -> text.split "," row > list.map text.trim in
+  show (parseCSV "  Alice , 30 , engineer ")
+```
+
+Output: `["Alice"; "30"; "engineer"]`
+
+---
+
+## `table` — association lists
+
+A table is a list of `[key, value]` pairs. Keys are compared with structural equality.
+
+```
+import table in
+
+let
+  t = table.empty
+    > table.set "name" "Alice"
+    > table.set "age"  30
+    > table.set "role" "engineer"
+in
+  show [
+    table.get "name" t,              -- ["Alice"]
+    table.getOr "unknown" "city" t,  -- "unknown"
+    table.keys t,                    -- ["role"; "age"; "name"]
+    table.containsKey "age" t        -- 1
+  ]
+```
+
+`table.set k v t` upserts: removes all existing entries for `k`, then prepends `[k, v]`. Because tables are association lists (first match wins), prepending is the correct update strategy.
+
+### Updating values
+
+```
+import table in
+let t = table.fromList [["x", 10]; ["y", 20]] in
+  show (table.update "x" (mul 3) t)
+```
+
+Output: `[["x", 30]; ["y", 20]]`
+
+`update k f t` applies `f` to the value for key `k` if present; no-op if absent.
+
+---
+
+## `hashmap` — hash maps
+
+`hashmap` provides an O(log n) key-value store backed by a binary search tree keyed on hash codes. It is the right tool when your dataset is large enough that the O(n) lookup in `table` becomes a bottleneck.
+
+Under the hood, each key is reduced to a number by the builtin `hash` (which works on any value — numbers, strings, tuples). The BST is ordered by hash code; on a hash collision, `equal` resolves which key actually matches.
+
+```
+import hashmap in
+
+let
+  h = hashmap.empty
+    > hashmap.set "name" "Alice"
+    > hashmap.set "age"  30
+    > hashmap.set "role" "engineer"
+in
+  show [
+    hashmap.get "name" h,       -- ["Alice"]  (some)
+    hashmap.getOr 0 "age" h,    -- 30
+    hashmap.get "city" h        -- []          (none)
+  ]
+```
+
+Results from `get` are `maybe` values — the same `[x]` / `[]` convention as the rest of the library.
+
+### API
+
+| Function | Description |
+|----------|-------------|
+| `empty` | the empty hashmap |
+| `singleton k v` | single-entry hashmap |
+| `fromList pairs` | build from `[[k, v]; ...]` list |
+| `get k m` | `some v` if `k` is present, `none` otherwise |
+| `getOr def k m` | value for `k`, or `def` if absent |
+| `set k v m` | insert or replace the entry for `k` (O(log n)) |
+| `remove k m` | remove the entry for `k` (O(log n)) |
+| `update k f m` | apply `f` to the value at `k`; no-op if absent |
+| `updateOr k f def m` | apply `f` if present; insert `def` if absent |
+| `keys m` | all keys in hash order |
+| `values m` | all values in hash order |
+| `keyValues m` | all `[k, v]` pairs in hash order |
+
+### Counting with `updateOr`
+
+Tallying occurrences is the canonical hashmap pattern:
+
+```
+import hashmap, list, text in
+
+let
+  tally  = list.foldr (w -> m -> hashmap.updateOr w (add 1) 1 m) hashmap.empty,
+  words  = text.split " " "the cat sat on the mat the cat sat"
+in
+  words > tally > hashmap.keyValues > show
+```
+
+`updateOr w (add 1) 1 m` means: if `w` is already in the map, add 1 to its count; otherwise insert it with count 1. `foldr` threads the map through each word from right to left.
+
+### `hashmap` vs `table`
+
+| | `table` | `hashmap` |
+|-|---------|-----------|
+| Lookup | O(n) | O(log n) |
+| Key order | insertion order (last `set` wins) | hash order |
+| Readable as literal | yes — just a list | no |
+| Switch to when | small maps, ad-hoc data | many keys, performance matters |
+
+Both modules use `equal` for key comparison so they support the same key types. For maps you construct inline and read once, `table` is simpler. For maps you update repeatedly in a loop, reach for `hashmap`.
+
+---
+
+## `comb` — combinatorics
+
+```
+import list, comb in
+show [
+  comb.choose 2 [1; 2; 3; 4],         -- all 2-element subsets
+  comb.permutations [1; 2; 3],         -- all orderings
+  comb.crossPairs [1; 2] [10; 20]      -- Cartesian product
+]
+```
+
+`subsets l` — the power set (all subsets, shortest first).
+
+These operations can produce exponentially many results, so use `take` if you only need a few.
+
+---
+
+## `heap` — priority queues
+
+A leftist heap provides O(log n) insertion, merge, and pop.
+
+```
+import heap, list in
+
+let
+  h = [5; 2; 8; 1; 9; 3] > heap.fromList gt    -- min-heap (gt comparator)
+in
+  show [
+    heap.top h,                    -- 1 (minimum)
+    heap.toList gt h,              -- [1; 2; 3; 5; 8; 9]
+    heap.sortAsc [5; 2; 8; 1; 9]  -- [1; 2; 5; 8; 9]
+  ]
+```
+
+Comparator semantics: `cmp a b = 1` means `a` beats `b` (goes to root).
+- `lt` → max-heap (largest at root)
+- `gt` → min-heap (smallest at root)
+
+Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking about comparators.
+
+---
+
+## Summary
+
+| Module | What it provides |
+|--------|-----------------|
+| `core` | `id`, `flip`, `compose`, `const`, `on`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
+| `math` | `succ`, `pred`, `abs`, `max`, `min`, `clamp`, `even`, `odd`, `gcd`, `factorial`, `digits`, rounding |
+| `maybe` | Optional values: `none`, `some`, `fmap`, `andThen`, `default`, `value`, `orElse` |
+| `list` | Complete list library: construction, higher-order, folding, slicing, sorting, infinite lists |
+| `text` | Strings: `char`, constants, formatting, classification, parsing |
+| `table` | Association lists (O(n)): `get`, `set`, `update`, `keys`, `values`, `merge` |
+| `hashmap` | Hash maps (O(log n)): `get`, `set`, `remove`, `update`, `updateOr`, `keys`, `values`, `keyValues` |
+| `comb` | `choose`, `permutations`, `crossPairs`, `subsets` |
+| `heap` | Priority queues: `insert`, `top`, `pop`, `sortAsc`, `sortDesc` |
+
+---
+
+## Exercises
+
+### Exercise 8.1 — Maybe chaining
+
+Write a function `safeSqrt` that returns `maybe.some (sqrt x)` if `x ≥ 0`, `maybe.none` otherwise. Then chain it with a function that multiplies by 10, and test on `[4, -1, 9, -4]`.
+
+<details>
+<summary>Solution</summary>
+
+```
+import maybe, list, math, core in
+let
+  safeSqrt = x -> core.if (gte 0 x) (maybe.some (sqrt x)) maybe.none
+in
+  list.map (x -> safeSqrt x > maybe.fmap (mul 10)) [4; math.negate 1; 9; math.negate 4] > show
+```
+
+Output: `[[20]; []; [30]; []]`
+
+</details>
+
+---
+
+### Exercise 8.2 — Word frequency
+
+Using `text.split`, `list.sortWith`, and `table`, write a program that counts the frequency of each word in the string `"the cat sat on the mat the cat sat"`. Display the word-count pairs sorted by count (descending).
+
+<details>
+<summary>Solution</summary>
+
+```
+import text, list, table, core in
+
+let
+  words = text.split " " "the cat sat on the mat the cat sat",
+  count = list.foldr (w -> t -> table.updateOr w (add 1) 1 t) table.empty words,
+  pairs = table.keys count > list.map (w -> [w, table.getOr 0 w count])
+in
+  show (list.sortWith (core.on gt core.second) pairs)
+```
+
+Output: something like `[["the", 3]; ["cat", 2]; ["sat", 2]; ["on", 1]; ["mat", 1]]`
+
+Note: `core.on gt second` compares pairs by their second element (the count), descending.
+
+</details>
+
+---
+
+### Exercise 8.3 — Table operations
+
+Build a simple phonebook as a table and write functions to look up and update entries.
+
+<details>
+<summary>Solution</summary>
+
+```
+import table, maybe in
+
+let
+  phonebook = table.empty
+    > table.set "Alice" "555-1234"
+    > table.set "Bob"   "555-5678"
+    > table.set "Carol" "555-9012",
+
+  lookup = name -> table.get name phonebook > maybe.default "not found"
+in
+  show [
+    lookup "Alice",
+    lookup "Dave",
+    table.keys phonebook
+  ]
+```
+
+</details>
+
+---
+
+### Exercise 8.4 — Heap-based median finder
+
+Given a list of numbers, use two heaps (a max-heap for the lower half, a min-heap for the upper half) to find the median.
+
+This is a classic streaming algorithm. For simplicity: insert all elements first, then extract in order.
+
+<details>
+<summary>Solution</summary>
+
+For a simpler solution, just sort and take the middle:
+
+```
+import list, heap in
+let
+  median = xs ->
+    let
+      sorted = heap.sortAsc xs,
+      n = list.length sorted,
+      mid = div 2 n
+    in
+      list.nth mid sorted
+in
+  show [median [3; 1; 4; 1; 5; 9; 2; 6], median [3; 1; 4; 1; 5]]
+```
+
+For an odd-length list, this gives the exact median. For even-length, it gives the lower middle element.
+
+</details>
+
+---
+
+### Exercise 8.5 — Number formatting
+
+Using `text` and `list`, write a function `commaFormat` that takes a non-negative integer and formats it with commas every three digits: `1234567` → `"1,234,567"`.
+
+Hint: `string n` gives you the digit characters as a list of code points. Use `list.mapIndex` to decide, for each character, whether a comma should follow it.
+
+<details>
+<summary>Solution</summary>
+
+A comma follows position `i` when the number of characters remaining after it is non-zero and divisible by 3:
+
+```
+import list, text, core in
+
+let
+  commaFormat = n ->
+    let
+      s    = n > string,
+      sLen = s > list.length,
+      step = i -> c ->
+        let after = sub (add i 1) sLen in   -- sLen - i - 1  (digits remaining)
+          core.if (mul (gt 0 after) (eq 0 (mod 3 after)))
+            [c; text.char ","]
+            [c;]
+    in
+      s > list.mapIndex step > list.flatten
+in
+  commaFormat 1234567 > write
+```
+
+Output: `1,234,567`
+
+`sub a b = b - a`, so `sub (add i 1) sLen = sLen - (i + 1)` = digits to the right of position `i`. A comma is inserted after digit `i` when that count is positive and divisible by 3.
+
+</details>
+
+---
+
+### Exercise 8.6 — Word frequency with `hashmap`
+
+Rewrite the word-frequency counter from Exercise 8.2 using `hashmap` instead of `table`. Then display the five most frequent words, sorted by frequency descending.
+
+<details>
+<summary>Solution</summary>
+
+```
+import hashmap, list, text, core in
+
+let
+  sentence = "the cat sat on the mat the cat sat on the mat and the cat",
+  words    = sentence > text.split " ",
+  counts   = words > list.foldr (w -> m -> hashmap.updateOr w (add 1) 1 m) hashmap.empty,
+  pairs    = counts > hashmap.keyValues,
+  top5     = pairs > list.sortWith (core.on gt core.second) > list.take 5
+in
+  top5 > show
+```
+
+Output: `[["the", 5]; ["cat", 3]; ["mat", 2]; ["sat", 2]; ["on", 2]]`
+
+`hashmap.updateOr w (add 1) 1 m` increments `w`'s count if present, inserts 1 if not. `core.on gt core.second` compares pairs by their second element (the count) in descending order.
+
+</details>
