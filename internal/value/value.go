@@ -1,6 +1,6 @@
 package value
 
-import "microfun/internal/source"
+import "thunky/internal/source"
 
 // PC is a program counter: an index into the compiled instruction array. It lives
 // here because Thunk and Closure store entry points; the backend re-exports it.
@@ -75,7 +75,7 @@ type Thunk struct {
 	Read     func() Value
 }
 
-// A Cons is a head/tail pair. microfun draws no distinction between a 2-tuple and
+// A Cons is a head/tail pair. Thunky draws no distinction between a 2-tuple and
 // a list cons cell (see LANGUAGE.md §11), so every arity-2 tuple — list literals,
 // string code points, the stdin stream, a bare [a, b] pair — is a Cons. This packs
 // the pair into one allocation and lets list code destructure cons cells directly.

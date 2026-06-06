@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"microfun/internal/source"
-	"microfun/internal/value"
+	"thunky/internal/source"
+	"thunky/internal/value"
 )
 
 // Machine is the STG-style push/enter reducer. It executes the flat bytecode

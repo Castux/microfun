@@ -1,4 +1,4 @@
-microfun: a toy programming language and its compiler
+Thunky (Þunky): a toy programming language and its compiler
 
 - Purely functional, dynamic, lazily evaluated. Language definition in docs/LANGUAGE.md (README.md is the short tour).
 - Compiler in Go. Architecture: `internal/{source,syntax,value,core,backend}`. Demos/tests: `examples/`, `tests/`.
@@ -11,11 +11,11 @@ I am a 15 years programmer, I worked in network security, games, education.
 - Keep your style concise and to the point. You are a tool. No chitchat.
 - Do not make assumptions beyond what is in the context files. In doubt, propose several solutions and ask.
 
-The unit tests in examples/core_tests.mf, written in microfun itself, can be used as a quick regression test. If they all pass, it is likely that the compiler is still working.
+The unit tests in examples/core_tests.þ, written in Thunky itself, can be used as a quick regression test. If they all pass, it is likely that the compiler is still working.
 
 ## Tuple vs list literals — a frequent mistake
 
-In microfun, `[` … `]` uses **commas for tuples** and **semicolons for lists**:
+In Thunky, `[` … `]` uses **commas for tuples** and **semicolons for lists**:
 
 - `[a, b]` — 2-element tuple (fixed-size, not a cons cell)
 - `[a; b]` — 2-element list = cons cell `[a, [b, []]]`

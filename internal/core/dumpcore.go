@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"microfun/internal/value"
+	"thunky/internal/value"
 )
 
 // dumpcore.go renders the Core IR (core.go) as an indented tree, reached by the
@@ -22,7 +22,7 @@ import (
 // modules in sorted order for a stable result.
 func DumpCore(mainCore Expr, modCores map[string][]Bind) string {
 	var sb strings.Builder
-	sb.WriteString("; microfun Core IR\n\n")
+	sb.WriteString("; thunky Core IR\n\n")
 
 	main := mainCore.(Thunk)
 	fmt.Fprintf(&sb, "program (frame %d)\n", main.Frame)

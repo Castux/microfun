@@ -168,7 +168,7 @@ and avoid hashing `Value` interfaces by keying on the `Ref` pointers. Same shape
 of fix applies to `FullNormalForm`'s `seen`.
 
 Impact: medium–high for any program leaning on `equal`/`eval` (including the
-`core_tests.mf` regression suite, which is equality-driven).
+`core_tests.þ` regression suite, which is equality-driven).
 
 ---
 

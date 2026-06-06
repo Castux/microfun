@@ -6,7 +6,7 @@ import (
 	"os"
 	"unicode"
 
-	"microfun/internal/source"
+	"thunky/internal/source"
 )
 
 var (

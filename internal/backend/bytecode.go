@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"microfun/internal/source"
-	"microfun/internal/value"
+	"thunky/internal/source"
+	"thunky/internal/value"
 )
 
 // The bytecode is flat: one Instr slice for the whole program (see Program.Code),

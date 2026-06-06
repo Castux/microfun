@@ -1,3 +1,3 @@
-tests/cases/errors/apply-non-function.mf:4:1: cannot apply 5, it is not a function
+tests/cases/errors/apply-non-function.þ:4:1: cannot apply 5, it is not a function
 x 3 > eval
 ^^^

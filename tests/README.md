@@ -7,7 +7,7 @@ code must be **byte-identical**. Any divergence is a compiler bug.
 
 They test *compiler correctness* and are deliberately separate from the
 in-language standard-library unit tests in
-[`examples/core_tests.mf`](../examples/core_tests.mf), which check what the
+[./examples/core_tests.þ](../examples/core_tests.þ), which check what the
 library computes rather than whether the two backends agree.
 
 ## Running
@@ -29,7 +29,7 @@ invalid-UTF-8 case works.
 ## Layout
 
 ```
-tests/cases/<category>/<name>.mf   one test program
+tests/cases/<category>/<name>.þ   one test program
 tests/cases/<category>/<name>.in   optional: fed to that program as stdin
 ```
 
@@ -45,7 +45,7 @@ fail the same way with the same exit code.
 
 ## Adding a test
 
-Drop a `.mf` program into the right category (add a sibling `.in` if it reads
+Drop a `.þ` program into the right category (add a sibling `.in` if it reads
 standard input) and re-run a harness. The program must produce **deterministic**
 output — use `show`, `peek`, `write`, or `eval` to force and print a result so
 the comparison has something to diff. There is nothing else to register; the

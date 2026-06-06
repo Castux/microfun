@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 #
-# Performance harness for the microfun G-machine.
+# Performance harness for the Thunky G-machine.
 #
-# For every bench/cases/*.mf this times the engine and prints a table. microfun
+# For every bench/cases/*.þ this times the engine and prints a table. Thunky
 # now has a single execution engine, so there is no cross-backend comparison; the
 # headline number is wall-clock per case. If a frozen oracle binary
-# (microfun.oracle.exe) is present it is timed alongside as a baseline and its
+# (thunky.oracle.exe) is present it is timed alongside as a baseline and its
 # output is checked to still match — a perf number is meaningless if the engine
 # disagrees with the oracle.
 #
 # These are deliberately SLOW and are NOT part of the regression suite in tests/;
 # run them by hand when evaluating performance. They are also distinct from the
-# in-language stdlib unit tests in examples/core_tests.mf.
+# in-language stdlib unit tests in examples/core_tests.þ.
 #
 # Usage:
-#   bench/run.sh [name]        run all cases (or only bench/cases/<name>.mf)
+#   bench/run.sh [name]        run all cases (or only bench/cases/<name>.þ)
 #   bench/run.sh --reps N ...  run each case N times and keep the best (default 1)
 #
 # Timing uses wall-clock; close other load for stable numbers. Paths are passed
@@ -32,7 +32,7 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-BIN=./microfun.bench.exe
+BIN=./thunky.bench.exe
 echo "building $BIN ..."
 if ! go build -o "$BIN" .; then
 	echo "build failed"
@@ -40,7 +40,7 @@ if ! go build -o "$BIN" .; then
 fi
 trap 'rm -f "$BIN"' EXIT
 
-ORACLE=./microfun.oracle.exe
+ORACLE=./thunky.oracle.exe
 have_oracle=0
 [ -x "$ORACLE" ] && have_oracle=1
 
@@ -77,8 +77,8 @@ total_o=0
 fail=0
 
 while IFS= read -r mf; do
-	name=$(basename "$mf" .mf)
-	rel="bench/cases/$name.mf"
+	name=$(basename "$mf" .þ)
+	rel="bench/cases/$name.þ"
 	if [ -n "$filter" ] && [ "$name" != "$filter" ]; then
 		continue
 	fi
@@ -95,7 +95,7 @@ while IFS= read -r mf; do
 	else
 		printf '%-16s %11s\n' "$name" "$e_time"
 	fi
-done < <(find bench/cases -name '*.mf' | sort)
+done < <(find bench/cases -name '*.þ' | sort)
 
 if [ "$have_oracle" -eq 1 ]; then
 	printf '%s\n' "----------------------------------------------------------------------"

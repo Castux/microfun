@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"microfun/internal/source"
+	"thunky/internal/source"
 )
 
 type PrimOp uint8

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sort"
 
-	"microfun/internal/core"
-	"microfun/internal/source"
-	"microfun/internal/syntax"
-	"microfun/internal/value"
+	"thunky/internal/core"
+	"thunky/internal/source"
+	"thunky/internal/syntax"
+	"thunky/internal/value"
 )
 
 // compile.go translates the Core IR (core.go) into the flat bytecode of

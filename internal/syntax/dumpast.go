@@ -24,7 +24,7 @@ func formatNumber(num float64) string {
 // modules in sorted order for a stable result.
 func DumpAST(program *Program, modules map[string]*Module) string {
 	var sb strings.Builder
-	sb.WriteString("; microfun AST\n\n")
+	sb.WriteString("; thunky AST\n\n")
 
 	if len(program.Imports) > 0 {
 		sb.WriteString("imports ")

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"regexp"
 
-	"microfun/internal/source"
+	"thunky/internal/source"
 )
 
 type Node interface {

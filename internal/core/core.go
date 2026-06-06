@@ -1,8 +1,8 @@
 package core
 
 import (
-	"microfun/internal/source"
-	"microfun/internal/value"
+	"thunky/internal/source"
+	"thunky/internal/value"
 )
 
 type Expr interface{ coreExpr() }

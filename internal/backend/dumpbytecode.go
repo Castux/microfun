@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"microfun/internal/source"
-	"microfun/internal/value"
+	"thunky/internal/source"
+	"thunky/internal/value"
 )
 
 // dumpbytecode.go disassembles the flat bytecode (bytecode.go) to text, reached by
@@ -32,7 +32,7 @@ import (
 // DumpBytecode renders the whole Program.
 func DumpBytecode(p *Program) string {
 	var sb strings.Builder
-	sb.WriteString("; microfun bytecode\n")
+	sb.WriteString("; thunky bytecode\n")
 	fmt.Fprintf(&sb, "; %d instructions, %d consts, %d closures, %d thunks\n",
 		len(p.Code), len(p.Consts), len(p.Closures), len(p.Thunks))
 

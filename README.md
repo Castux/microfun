@@ -1,6 +1,6 @@
-# microfun
+# Thunky (Þunky)
 
-*microfun* is a toy programming language built to explore compiler construction,
+Thunky (also written Þunky) is a toy programming language built to explore compiler construction,
 pure functional programming, and lazy evaluation. It is minimalistic ("micro")
 and functional ("fun"): a program is a single expression, there is one primitive
 type (number) and one compound type (tuple), functions are pure, and evaluation
@@ -20,7 +20,7 @@ is lazy throughout.
   via the `show`, `write`, and `peek` builtins.
 - **Four operators** — `>` (pipe), `<` (reverse-pipe), `*>` and `<*` (forward
   and backward composition) — cover the common function-chaining idioms.
-- **Standard library in microfun** — `list`, `math`, `text`, `comb`, `heap`,
+- **Standard library in Thunky** — `list`, `math`, `text`, `comb`, `heap`,
   and `core` are written in the language itself and embedded in the binary.
 
 For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
@@ -28,20 +28,20 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 ## Usage
 
 ```
-microfun <path>
+thunky <path>
 ```
 
 Runs the program at `<path>` on the G-machine. Modules are searched first in the
-current directory (`./name.mf`), then in the embedded standard library. Errors are
+current directory (`./name.th` (or `./name.þ`)), then in the embedded standard library. Errors are
 reported with source locations; runtime errors include a reduction trace.
 
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:
 
 ```
-microfun --dump-ast       <path>   # the parsed AST
-microfun --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
-microfun --dump-bytecode  <path>   # the compiled flat bytecode
+thunky --dump-ast       <path>   # the parsed AST
+thunky --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
+thunky --dump-bytecode  <path>   # the compiled flat bytecode
 ```
 
 Any dump flag emits the requested stage(s) to stdout and skips execution. Add

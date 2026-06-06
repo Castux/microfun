@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"microfun/internal/backend"
-	"microfun/internal/core"
-	"microfun/internal/source"
-	"microfun/internal/syntax"
+	"thunky/internal/backend"
+	"thunky/internal/core"
+	"thunky/internal/source"
+	"thunky/internal/syntax"
 )
 
 //go:embed core
@@ -32,26 +32,31 @@ func LoadProgram(path string) *syntax.Program {
 	return prog
 }
 
-// LexModule tries to load a module by name: first from the working directory,
-// then from the embedded core/ library. Returns nil if not found in either place.
+// LexModule tries to load a module by name: first from the working directory
+// (trying .th then .þ), then from the embedded core/ library. Returns nil if
+// not found in any location.
 func LexModule(name string) []syntax.Token {
-	path := name + ".mf"
-	text, err := os.ReadFile(path)
-	if err == nil {
-		return syntax.LexContent(path, string(text))
-	}
-	if !errors.Is(err, fs.ErrNotExist) {
-		fmt.Printf("Could not read %s: %v\n", path, err)
-		return nil
-	}
-
-	corePath := "core/" + name + ".mf"
-	text, err = coreFS.ReadFile(corePath)
-	if err == nil {
-		return syntax.LexContent(corePath, string(text))
+	for _, ext := range []string{".th", ".þ"} {
+		path := name + ext
+		text, err := os.ReadFile(path)
+		if err == nil {
+			return syntax.LexContent(path, string(text))
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			fmt.Printf("Could not read %s: %v\n", path, err)
+			return nil
+		}
 	}
 
-	fmt.Printf("Module not found: %s (looked for %s and %s)\n", name, path, corePath)
+	for _, ext := range []string{".th", ".þ"} {
+		corePath := "core/" + name + ext
+		text, err := coreFS.ReadFile(corePath)
+		if err == nil {
+			return syntax.LexContent(corePath, string(text))
+		}
+	}
+
+	fmt.Printf("Module not found: %s (looked for %s.th and core/%s.th)\n", name, name, name)
 	return nil
 }
 
@@ -123,7 +128,7 @@ func main() {
 	}
 
 	if path == "" {
-		fmt.Println("Usage: microfun [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
+		fmt.Println("Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
 		os.Exit(1)
 	}
 

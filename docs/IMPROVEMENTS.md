@@ -1,6 +1,6 @@
 # Future improvements
 
-Proposals for further optimization of the microfun implementation, building on
+Proposals for further optimization of the Thunky implementation, building on
 the current single engine: the flat bytecode
 ([5.Bytecode and Compiler](5.Bytecode%20and%20Compiler.md)) run by the
 spineless-tagless G-machine ([6.The G-machine](6.The%20G-machine.md)).

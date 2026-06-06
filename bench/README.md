@@ -1,15 +1,15 @@
-# microfun — performance benchmarks
+# Thunky — performance benchmarks
 
-A small set of heavy programs used to measure the microfun engine: the flat
+A small set of heavy programs used to measure the Thunky engine: the flat
 bytecode ([5.Bytecode and Compiler](../docs/5.Bytecode%20and%20Compiler.md)) run
 by the spineless-tagless G-machine
-([6.The G-machine](../docs/6.The%20G-machine.md)). microfun has a **single
+([6.The G-machine](../docs/6.The%20G-machine.md)). Thunky has a **single
 execution engine**, so there is no cross-backend comparison — the headline number
 is wall-clock per case.
 
 These are **not** regression tests. The correctness suite lives in
 [tests/](../tests/) (fast, byte-exact, differential + golden) and the in-language
-standard-library unit tests in [examples/core_tests.mf](../examples/core_tests.mf).
+standard-library unit tests in [examples/core_tests.þ](../examples/core_tests.þ).
 The programs here are deliberately slow — each runs roughly **10–30 s** — so they
 are run by hand, not in CI.
 
@@ -17,21 +17,21 @@ are run by hand, not in CI.
 
 ```
 bench/run.sh                 # all cases, one run each
-bench/run.sh fib             # only bench/cases/fib.mf
+bench/run.sh fib             # only bench/cases/fib.þ
 bench/run.sh --reps 3        # run each case 3× and keep the fastest
 pwsh bench/run.ps1 [name]    # PowerShell equivalent (-Reps N)
 ```
 
-Each runner builds `microfun.bench.exe`, runs every `bench/cases/*.mf`, times each,
+Each runner builds `thunky.bench.exe`, runs every `bench/cases/*.þ`, times each,
 and prints a table of per-case and total wall-clock.
 
-**Optional oracle baseline.** If a frozen binary `microfun.oracle.exe` is present
+**Optional oracle baseline.** If a frozen binary `thunky.oracle.exe` is present
 in the repo root, each case is also timed against it and the engine's output is
 checked to still match the oracle's (a perf number is meaningless if the engine
 has changed behaviour). The table then gains `oracle(s)`, `speedup`
 (`oracle / engine`), and `match` columns; a non-`ok` `match` is a correctness
 regression to fix before trusting any timing. To create one, build at a known-good
-commit: `go build -o microfun.oracle.exe .`.
+commit: `go build -o thunky.oracle.exe .`.
 
 Timings are wall-clock; close other load for stable numbers, and prefer
 `--reps`/`-Reps` to discount one-off noise.
@@ -55,7 +55,7 @@ work lands.
 ## Sizing
 
 Each program is sized to land in the 10–30 s window on the development machine. To
-retarget, edit the single size constant near the top of each `.mf` (the `take`
+retarget, edit the single size constant near the top of each `.þ` (the `take`
 count, the `range` bound, or the argument to `fib`/`go`). Two constraints worth
 knowing:
 

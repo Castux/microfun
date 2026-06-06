@@ -1,6 +1,6 @@
 package syntax
 
-import "microfun/internal/source"
+import "thunky/internal/source"
 
 // The AST is the parser's output and nothing more: it is a faithful, immutable
 // picture of the source. No pass writes resolution, slot, or capture information

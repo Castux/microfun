@@ -1,4 +1,4 @@
-tests/cases/errors/unbound-name.mf:3:6: no definition for undefined_name
+tests/cases/errors/unbound-name.þ:3:6: no definition for undefined_name
 show undefined_name
      ^^^^^^^^^^^^^^
 Analyzer found 1 errors

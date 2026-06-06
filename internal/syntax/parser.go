@@ -3,7 +3,7 @@ package syntax
 import (
 	"fmt"
 
-	"microfun/internal/source"
+	"thunky/internal/source"
 )
 
 type Parser struct {

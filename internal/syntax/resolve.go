@@ -1,6 +1,6 @@
 package syntax
 
-import "microfun/internal/source"
+import "thunky/internal/source"
 
 type ResolveKind uint8
 

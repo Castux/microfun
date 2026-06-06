@@ -3,9 +3,9 @@ package core
 import (
 	"fmt"
 
-	"microfun/internal/source"
-	"microfun/internal/syntax"
-	"microfun/internal/value"
+	"thunky/internal/source"
+	"thunky/internal/syntax"
+	"thunky/internal/value"
 )
 
 // lower.go translates the resolved AST into the Core IR (core.go). It is where

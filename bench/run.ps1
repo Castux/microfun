@@ -1,15 +1,15 @@
-# Performance harness for the microfun G-machine. PowerShell counterpart of
+# Performance harness for the Thunky G-machine. PowerShell counterpart of
 # bench/run.sh.
 #
-# For every bench/cases/*.mf this times the engine and prints a table. microfun
+# For every bench/cases/*.þ this times the engine and prints a table. Thunky
 # now has a single execution engine, so there is no cross-backend comparison; the
 # headline number is wall-clock per case. If a frozen oracle binary
-# (microfun.oracle.exe) is present it is timed alongside as a baseline and its
+# (thunky.oracle.exe) is present it is timed alongside as a baseline and its
 # output is checked to still match -- a perf number is meaningless if the engine
 # disagrees with the oracle.
 #
 # These are deliberately SLOW and are NOT part of the regression suite in tests/,
-# nor the stdlib unit tests in examples/core_tests.mf. Run them by hand when
+# nor the stdlib unit tests in examples/core_tests.þ. Run them by hand when
 # evaluating performance.
 #
 # Usage:
@@ -24,8 +24,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $root
-$bin = Join-Path $root 'microfun.bench.exe'
-$oracle = Join-Path $root 'microfun.oracle.exe'
+$bin = Join-Path $root 'thunky.bench.exe'
+$oracle = Join-Path $root 'thunky.oracle.exe'
 $haveOracle = Test-Path $oracle
 
 Write-Host "building $bin ..."
@@ -64,10 +64,10 @@ $totalE = 0.0
 $totalO = 0.0
 $fail = 0
 
-Get-ChildItem -Path 'bench/cases' -Filter '*.mf' | Sort-Object Name | ForEach-Object {
+Get-ChildItem -Path 'bench/cases' -Filter '*.þ' | Sort-Object Name | ForEach-Object {
     $caseName = $_.BaseName
     if ($Name -ne '' -and $caseName -ne $Name) { return }
-    $rel = "bench/cases/$caseName.mf"
+    $rel = "bench/cases/$caseName.þ"
 
     $e = Run-Bin $bin $rel
     $script:totalE += $e.Seconds

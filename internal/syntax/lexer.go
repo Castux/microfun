@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"microfun/internal/source"
+	"thunky/internal/source"
 )
 
 var (

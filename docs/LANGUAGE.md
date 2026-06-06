@@ -1,6 +1,6 @@
-# microfun — Language Reference
+# Thunky — Language Reference
 
-*microfun* is a minimalistic, purely functional language with lazy evaluation. A
+Thunky (also written Þunky) is a minimalistic, purely functional language with lazy evaluation. A
 whole program is a single expression, there is one primitive type and one
 constructed type, functions are pure, and evaluation is lazy throughout.
 
@@ -49,7 +49,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 ## 2. Running a program
 
 ```
-microfun <path>
+thunky <path>
 ```
 
 Loads the file at `<path>`, loads any modules it imports, resolves and lowers
@@ -60,7 +60,7 @@ and the program does not run; a run-time error is reported with a source locatio
 and a reduction trace.
 
 **Module search order.** For each import `name`, the runtime first looks for
-`./name.mf` in the current working directory. If that file does not exist, it
+`./name.th` (or `./name.þ`) in the current working directory. If that file does not exist, it
 falls back to the standard library embedded in the binary (see
 [§14](#14-standard-library)). A file in the working directory therefore always
 shadows the built-in module of the same name.
@@ -82,7 +82,7 @@ import math, list, mymodule in
   <expression>
 ```
 
-A *module* is a file named `<name>.mf` that begins with an optional import clause,
+A *module* is a file named `<name>.th` (or `<name>.þ`) that begins with an optional import clause,
 then the keyword `module`, then a comma-separated list of bindings. Every binding
 in a module is public:
 
@@ -245,7 +245,7 @@ let addFive = add 5 in addFive 10   -- 15  (partial application)
 
 ## 8. Operators
 
-microfun has four binary operators, all concerning function application or
+Thunky has four binary operators, all concerning function application or
 composition. They come in two symmetrical pairs — *pipe* (which applies to a
 value present in the chain) and *compose* (which builds a new function) — each
 pair pointing in either direction.
@@ -494,7 +494,7 @@ import list in
 ## 13. Built-in functions
 
 Builtins are the primitive operations available without importing anything;
-everything else is defined in the standard library modules in microfun itself.
+everything else is defined in the standard library modules in Thunky itself.
 
 The binary arithmetic and comparison builtins take their arguments in an order
 chosen for **partial application and piping**: the *first* argument is the
@@ -590,13 +590,13 @@ import list in
 
 ## 14. Standard library
 
-The standard library is a collection of microfun modules **embedded in the
-microfun binary** — no separate installation is needed. Modules are written in
-microfun itself and are split by concern across seven files in `core/`.
+The standard library is a collection of Thunky modules **embedded in the
+Thunky binary** — no separate installation is needed. Modules are written in
+Thunky itself and are split by concern across seven files in `core/`.
 
 **Module search order.** For every `import name`, the runtime first checks
-`./name.mf` in the working directory, then falls back to the embedded library.
-Placing your own `list.mf` (or any other core module name) next to your program
+`./name.th` (or `./name.þ`) in the working directory, then falls back to the embedded library.
+Placing your own `list.þ` (or any other core module name) next to your program
 **shadows** the built-in one for that run.
 
 ### Core modules
@@ -937,7 +937,7 @@ character of a string, and is the idiomatic way to write character literals:
 
 **Character classification and conversion**
 
-All functions below take a Unicode code point (an integer, as found in a microfun string).
+All functions below take a Unicode code point (an integer, as found in a Thunky string).
 
 | Name | Description |
 |------|-------------|

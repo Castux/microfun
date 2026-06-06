@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Regression harness for the microfun front-end and the G-machine backend.
+# Regression harness for the Thunky front-end and the G-machine backend.
 #
-# microfun now has a single execution engine, so this is a GOLDEN harness: for
-# every tests/cases/<category>/<name>.mf it runs the engine and checks that the
+# Thunky now has a single execution engine, so this is a GOLDEN harness: for
+# every tests/cases/<category>/<name>.þ it runs the engine and checks that the
 # combined stdout+stderr and the exit code match the recorded expectation in
 # <name>.expected (and <name>.exit, when the exit code is non-zero). The golden
 # files were produced by the pre-rewrite tree-walking interpreter (the frozen
@@ -12,7 +12,7 @@
 # A sibling <name>.in, if present, is fed as standard input (raw bytes).
 #
 # These are distinct from the in-language standard-library unit tests in
-# examples/core_tests.mf.
+# examples/core_tests.þ.
 #
 # Usage:
 #   tests/run.sh [category]      run all cases (or only one category)
@@ -36,7 +36,7 @@ for arg in "$@"; do
 	esac
 done
 
-BIN=./microfun.test.exe
+BIN=./thunky.test.exe
 echo "building $BIN ..."
 if ! go build -o "$BIN" .; then
 	echo "build failed"
@@ -55,8 +55,8 @@ while IFS= read -r mf; do
 	if [ -n "$filter" ] && [ "$cat_dir" != "$filter" ]; then
 		continue
 	fi
-	name=$(basename "$mf" .mf)
-	base="${mf%.mf}"
+	name=$(basename "$mf" .þ)
+	base="${mf%.þ}"
 
 	if [ "$cat_dir" != "$current_cat" ]; then
 		current_cat="$cat_dir"
@@ -94,7 +94,7 @@ while IFS= read -r mf; do
 		printf '  FAIL  %s --%s\n' "$name" "$reasons"
 		diff "$base.expected" "$tmp" 2>/dev/null | sed 's/^/        | /' | head -20
 	fi
-done < <(find tests/cases -name '*.mf' | sort)
+done < <(find tests/cases -name '*.þ' | sort)
 
 if [ "$bless" -eq 1 ]; then
 	printf '\n=== blessed expectations ===\n'

@@ -1,7 +1,7 @@
-# Regression harness for the microfun front-end and the G-machine backend (PowerShell).
+# Regression harness for the Thunky front-end and the G-machine backend (PowerShell).
 #
-# microfun now has a single execution engine, so this is a GOLDEN harness: for
-# every tests/cases/<category>/<name>.mf it runs the engine and checks that the
+# Thunky now has a single execution engine, so this is a GOLDEN harness: for
+# every tests/cases/<category>/<name>.þ it runs the engine and checks that the
 # combined stdout+stderr and the exit code match the recorded <name>.expected
 # (and <name>.exit, when non-zero). The golden files were produced by the
 # pre-rewrite tree-walking interpreter (the frozen oracle).
@@ -15,7 +15,7 @@
 #   pwsh tests/run.ps1 [category]
 #   pwsh tests/run.ps1 -Bless [category]   # (re)generate .expected / .exit
 #
-# These are distinct from the stdlib unit tests in examples/core_tests.mf.
+# These are distinct from the stdlib unit tests in examples/core_tests.þ.
 
 param(
     [switch]$Bless,
@@ -25,7 +25,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $root
-$bin = Join-Path $root 'microfun.test.exe'
+$bin = Join-Path $root 'thunky.test.exe'
 
 Write-Host "building $bin ..."
 & go build -o $bin .
@@ -64,7 +64,7 @@ $pass = 0
 $fail = 0
 $cur = ''
 
-Get-ChildItem -Path 'tests/cases' -Recurse -Filter '*.mf' | Sort-Object FullName | ForEach-Object {
+Get-ChildItem -Path 'tests/cases' -Recurse -Filter '*.þ' | Sort-Object FullName | ForEach-Object {
     $catd = Split-Path (Split-Path $_.FullName -Parent) -Leaf
     if ($Category -ne '' -and $catd -ne $Category) { return }
     if ($catd -ne $cur) { $cur = $catd; Write-Host ''; Write-Host "[$cur]" }
