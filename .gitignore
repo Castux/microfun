@@ -1,9 +1,7 @@
 test.mf
-out.lua
 .DS_Store
-microfun.exe
-microfun.test.exe
-microfun.bench.exe
-microfun.oracle.exe
-/microfun
-etc/experiment/*.exe
+thunky.exe
+thunky.test.exe
+thunky.bench.exe
+thunky.oracle.exe
+thunky

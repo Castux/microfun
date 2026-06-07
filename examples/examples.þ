@@ -5,10 +5,10 @@ import core, list, math, text in
 let
 
 divides = n -> x -> n > mod x > eq 0,
-divisors = n -> range 1 n > filter (divides n),
+divisors = n -> rangeIncl 1 n > filter (divides n),
 digisdfts = reverse <* map (mod 10) <* takeWhile (gt 0) <* iterate (div 10),
 
-isPrime = n -> range 2 (sqrt n) > noneMatch (divides n) > and (gte 2 n),
+isPrime = n -> rangeIncl 2 (sqrt n) > noneMatch (divides n) > and (gte 2 n),
 primes = upFrom 1 > filter isPrime,
 primeDivisors = {
 	1 -> [],
@@ -63,7 +63,7 @@ in
 let
 
 numbers = take 10000 < map (mod 20) < randomFromSeed 1,
-counts =  map (flip countIf numbers <* eq) < range 0 19,
+counts =  map (flip countIf numbers <* eq) < rangeIncl 0 19,
 
 list = head -> tail -> [head,tail],
 

@@ -16,18 +16,17 @@ let
 		sameBox = j -> eq (boxOf i) (boxOf j),
 		isHot = j -> (sameRow j) > or (sameCol j) > or (sameBox j)
 	in
-		zip (rangeIncl 0 80) board > filter (first *> isHot) > map second,
-
-	isValid = board -> i -> d ->
-		hotCells board i > contains d > not,
+		zip (rangeIncl 0 80) board > filter (first *> isHot) > map second > nub,
 
 	-- Backtracking solver. Returns all solutions.
 	solutions = board -> board > findIndex (eq 0) > {
 		[] -> [board;],
-		[emptyIdx] -> (rangeIncl 1 9
-			> filter (isValid board emptyIdx)
-			> map (d -> solutions (replaceAt emptyIdx d board))
-			> flatten)
+		[emptyIdx] ->
+			let hot = hotCells board emptyIdx in
+			rangeIncl 1 9
+				> filter (d -> contains d hot > not)
+				> map (d -> solutions (replaceAt emptyIdx d board))
+				> flatten
 	},
 
 	-- Pretty-printing with box borders.
