@@ -16,7 +16,7 @@ let
 		sameBox = j -> eq (boxOf i) (boxOf j),
 		isHot = j -> (sameRow j) > or (sameCol j) > or (sameBox j)
 	in
-		zip (range 0 80) board > filter (first *> isHot) > map second,
+		zip (rangeIncl 0 80) board > filter (first *> isHot) > map second,
 
 	isValid = board -> i -> d ->
 		hotCells board i > contains d > not,
@@ -24,7 +24,7 @@ let
 	-- Backtracking solver. Returns all solutions.
 	solutions = board -> board > findIndex (eq 0) > {
 		[] -> [board;],
-		[emptyIdx] -> (range 1 9
+		[emptyIdx] -> (rangeIncl 1 9
 			> filter (isValid board emptyIdx)
 			> map (d -> solutions (replaceAt emptyIdx d board))
 			> flatten)
@@ -47,7 +47,7 @@ let
 	sepLine = prepend "------+-------+------" [text.lf;],
 
 	boardStr = board ->
-		range 0 8
+		rangeIncl 0 8
 		> map (r -> rowStr r board > prepend (if (or (eq r 3) (eq r 6)) sepLine []))
 		> flatten
 
