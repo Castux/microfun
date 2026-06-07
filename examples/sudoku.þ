@@ -1,35 +1,41 @@
-import core, maybe, list, math, text in
+import core, maybe, list, math, text, hashmap in
 
 let
 
-	-- Cell-index decomposition.
 	rowOf = div 9,
 	colOf = mod 9,
 	boxOf = i -> add (i > rowOf > div 3 > mul 3) (i > colOf > div 3),
 
-	-- All 9 values for a row / column / box.
 	rowCells = r -> drop (mul r 9) *> take 9,
 
-	hotCells = board -> i -> let
-		sameRow = j -> eq (rowOf i) (rowOf j),
-		sameCol = j -> eq (colOf i) (colOf j),
-		sameBox = j -> eq (boxOf i) (boxOf j),
-		isHot = j -> (sameRow j) > or (sameCol j) > or (sameBox j)
-	in
-		zip (rangeIncl 0 80) board > filter (first *> isHot) > map second > nub,
+	-- Peer-index lists for all 81 cells, precomputed once at startup.
+	peerList = i -> let r = rowOf i, c = colOf i, b = boxOf i in
+		rangeIncl 0 80 > filter (j ->
+			not (eq i j) > and
+			(eq r (rowOf j) > or (eq c (colOf j)) > or (eq b (boxOf j)))),
 
-	-- Backtracking solver. Returns all solutions.
-	solutions = board -> board > findIndex (eq 0) > {
-		[] -> [board;],
-		[emptyIdx] ->
-			let hot = hotCells board emptyIdx in
+	peersMap = rangeIncl 0 80 > map (i -> [i, peerList i]) > hashmap.fromList,
+
+	-- Non-zero values of all peer cells via O(log 81) index lookups.
+	peerValues = board -> i ->
+		hashmap.get i peersMap > maybe.value
+		> map (j -> hashmap.getOr 0 j board)
+		> filter (equal 0 *> not),
+
+	-- Solver state: [boardMap, emptiesList]
+	solutions = [board, empties] -> empties > {
+		[] -> [[board, empties];],
+		[emptyIdx, rest] ->let
+			invalid = peerValues board emptyIdx
+		in
 			rangeIncl 1 9
-				> filter (d -> contains d hot > not)
-				> map (d -> solutions (replaceAt emptyIdx d board))
-				> flatten
+			> filter (d -> contains d invalid > not)
+			> map (d -> solutions [hashmap.set emptyIdx d board, rest])
+			> flatten
 	},
 
-	-- Pretty-printing with box borders.
+	boardList = board -> rangeIncl 0 80 > map (i -> hashmap.getOr 0 i board),
+
 	cellStr = { 0 -> ".", n -> string n },
 
 	rowStr = r -> board ->
@@ -53,7 +59,7 @@ let
 in
 
 let puzzle = [
-	5; 3; 0; 0; 0; 0; 0; 0; 0;
+	5; 3; 0; 0; 7; 0; 0; 0; 0;
 	6; 0; 0; 1; 9; 5; 0; 0; 0;
 	0; 9; 8; 0; 0; 0; 0; 6; 0;
 	8; 0; 0; 0; 6; 0; 0; 0; 3;
@@ -62,10 +68,13 @@ let puzzle = [
 	0; 6; 0; 0; 0; 0; 2; 8; 0;
 	0; 0; 0; 4; 1; 9; 0; 0; 5;
 	0; 0; 0; 0; 8; 0; 0; 7; 9
-]
+] in
 
+let
+	initBoard   = zip (rangeIncl 0 80) puzzle > hashmap.fromList,
+	initEmpties = zip (rangeIncl 0 80) puzzle > filter (second *> eq 0) > map first
 in
 
 eval < map write < prepend
-	[ "Puzzle:"; boardStr puzzle; "Solutions:"]
-	(solutions puzzle > map boardStr)
+	["Puzzle:"; boardStr puzzle; "Solutions:"]
+	(solutions [initBoard, initEmpties] > map ([b, _] -> boardStr (boardList b)))
