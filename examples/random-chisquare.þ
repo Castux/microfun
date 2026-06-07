@@ -1,12 +1,21 @@
 import core, list, hashmap, math in
 
 let
-	N = 100000,
+	N = 1000000,
 	bins = 20,
 	seed = "the super seed",
-	incrCount = val -> updateOr val succ 1,
-	randomNums = hash seed > iterate hash > map (mod bins) > take N,
-	counts = randomNums > foldr incrCount hashmap.empty,
+
+	-- Tally bin counts with a STRICT left fold. A lazy fold (foldl/foldr) builds an
+	-- N-deep chain of pending updates that is forced only at the very end — O(N) deep
+	-- and O(N) live, which falls over as N grows. foldlStrict forces the accumulator
+	-- at each step; the eval additionally forces the counts *inside* it, since
+	-- hashmap.updateOr stores the incremented value lazily and the unforced succ-chains
+	-- would otherwise dominate memory. The random stream is folded inline (not bound to
+	-- a name) so its cells are collected as they are consumed rather than retained.
+	-- The result: this runs in constant space and scales to N in the millions.
+	incrCount = counts -> val -> eval (updateOr val succ 1 counts),
+	counts = hash seed > iterate hash > map (mod bins) > take N
+		> foldlStrict incrCount hashmap.empty,
 
 	expected = N > fdiv bins,
 	chiSquare = counts > values > map (sub expected *> pow 2 *> fdiv expected) > sum,

@@ -31,7 +31,7 @@ let
 	},
 
 	-- Pretty-printing with box borders.
-	cellStr = { 0 -> ".", n -> intToString n },
+	cellStr = { 0 -> ".", n -> string n },
 
 	rowStr = r -> board ->
 		let cells = map cellStr (rowCells r board) in
