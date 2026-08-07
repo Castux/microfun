@@ -1,4 +1,4 @@
-# Chapter 9: Modules
+# Chapter 13: Modules
 
 So far every program has been a single file. As programs grow, you want to split code into reusable units. Thunky's module system is simple: a module is a file of bindings, and importing it makes those bindings available.
 
@@ -159,7 +159,7 @@ module
 take = n -> xs -> ...     -- your custom version
 ```
 
-This replaces the built-in `list` module for that run — it does not extend it, so anything your file does not define is simply gone. Useful for experimentation, debugging, or providing an optimized version. Exercise 9.4 walks through what that looks like in practice.
+This replaces the built-in `list` module for that run — it does not extend it, so anything your file does not define is simply gone. Useful for experimentation, debugging, or providing an optimized version. Exercise 13.4 walks through what that looks like in practice.
 
 ---
 
@@ -292,7 +292,7 @@ in
 
 ## Exercises
 
-### Exercise 9.1 — Write a `geometry` module
+### Exercise 13.1 — Write a `geometry` module
 
 Write a module `geometry.þ` that provides:
 - `circleArea r` — area of a circle with radius `r`.
@@ -332,7 +332,7 @@ show [
 
 ---
 
-### Exercise 9.2 — Module with internal helpers
+### Exercise 13.2 — Module with internal helpers
 
 Write a `roman.þ` module that converts positive integers to Roman numerals. The module should export only `toRoman`; the mapping table and the conversion loop are internal implementation details (they can still be defined, just not expected to be used externally).
 
@@ -375,7 +375,7 @@ write (roman.toRoman 2024)    -- MMXXIV
 
 ---
 
-### Exercise 9.3 — Extend a library module
+### Exercise 13.3 — Extend a library module
 
 Write `listx.þ`, a module that imports `list` and adds three functions the standard library does not have:
 
@@ -439,7 +439,7 @@ Note `average`: `fdiv a b` is `b / a`, so `fdiv (list.length xs) (list.sum xs)` 
 
 ---
 
-### Exercise 9.4 — Shadow the standard library on purpose
+### Exercise 13.4 — Shadow the standard library on purpose
 
 The runtime searches the current directory before the embedded stdlib, so a local `list.þ` *replaces* the built-in `list` — it does not extend it. Demonstrate this: write a `list.þ` that exports a single, deliberately wrong `length`, then a program that calls `list.length [1; 2; 3]`. What happens if you then try to call `list.map`?
 
@@ -480,7 +480,7 @@ Shadowing is total: the local file *is* the `list` module for this run, and ever
 
 ---
 
-### Exercise 9.5 — Final project: mini interpreter
+### Exercise 13.5 — Final project: mini interpreter
 
 Write a `calc.þ` module that evaluates simple arithmetic expressions represented as tagged tuples:
 

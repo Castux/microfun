@@ -100,7 +100,7 @@ Key things illustrated:
 
 | Document | Contents |
 |----------|----------|
-| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 9 chapters from first program to modules, with exercises |
+| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 14 chapters from first program to a complete build, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
 | [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |

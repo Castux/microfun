@@ -1,4 +1,4 @@
-# Chapter 8: The Standard Library
+# Chapter 12: The Standard Library
 
 Thunky ships with a standard library embedded in the binary — no installation needed. This chapter walks through each module with enough detail to use it effectively.
 
@@ -211,7 +211,7 @@ Many standard library functions return maybes:
 
 ## `list` — comprehensive list processing
 
-You have already seen most of `list` in Chapter 6. Here are the parts not yet covered.
+You have already seen most of `list` in Chapters 4 and 8. Here are the parts not yet covered.
 
 ### `flatMap`
 
@@ -547,7 +547,7 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 
 ## Exercises
 
-### Exercise 8.1 — Maybe chaining
+### Exercise 12.1 — Maybe chaining
 
 Write a function `safeSqrt` that returns `maybe.some (sqrt x)` if `x ≥ 0`, `maybe.none` otherwise. Then chain it with a function that multiplies by 10, and test on `[4, -1, 9, -4]`.
 
@@ -568,7 +568,7 @@ Output: `[[20]; []; [30]; []]`
 
 ---
 
-### Exercise 8.2 — Word frequency
+### Exercise 12.2 — Word frequency
 
 Using `text.split`, `list.sortWith`, and `table`, write a program that counts the frequency of each word in the string `"the cat sat on the mat the cat sat"`. Display the word-count pairs sorted by count (descending).
 
@@ -594,7 +594,7 @@ Note: `core.on gt second` compares pairs by their second element (the count), de
 
 ---
 
-### Exercise 8.3 — Parse and filter in one pass
+### Exercise 12.3 — Parse and filter in one pass
 
 The string `"12,,7,abc,30,4x,0"` is a comma-separated field list in which some fields are not numbers: one is empty, one is letters, one is a number with a letter stuck to it. Split it, and in a single pass keep only the fields that are entirely digits, converted to numbers. Then sum them.
 
@@ -623,7 +623,7 @@ A field is valid when it is non-empty (`gt 0 (list.length s)`, i.e. `length s > 
 
 ---
 
-### Exercise 8.4 — Top-k without sorting
+### Exercise 12.4 — Top-k without sorting
 
 Write `topK k xs` returning the `k` largest elements of `xs` in descending order, using `heap` rather than `list.sort`. Test it with `topK 3 [5; 17; 2; 99; 4; 42; 8]`.
 
@@ -646,7 +646,7 @@ Output: `[99; 42; 17]`
 
 ---
 
-### Exercise 8.5 — Number formatting
+### Exercise 12.5 — Number formatting
 
 Using `text` and `list`, write a function `commaFormat` that takes a non-negative integer and formats it with commas every three digits: `1234567` → `"1,234,567"`.
 
@@ -684,7 +684,7 @@ Output: `1,234,567`
 
 ---
 
-### Exercise 8.6 — Aligned columns with `string`
+### Exercise 12.6 — Aligned columns with `string`
 
 `string n` renders a number as a string (a list of code points), which is what lets you feed numbers to the `text` formatting functions. Use it with `text.padRight` and `text.padLeft` to print `[["alice", 42]; ["bob", 7]; ["carolyn", 1234]]` as a two-column table: names left-aligned in a field of 8, scores right-aligned in a field of 5.
 
@@ -717,9 +717,9 @@ Since a string *is* a list of code points, concatenating two padded fields is ju
 
 ---
 
-### Exercise 8.7 — Word frequency with `hashmap`
+### Exercise 12.7 — Word frequency with `hashmap`
 
-Rewrite the word-frequency counter from Exercise 8.2 using `hashmap` instead of `table`. Then display the five most frequent words, sorted by frequency descending.
+Rewrite the word-frequency counter from Exercise 12.2 using `hashmap` instead of `table`. Then display the five most frequent words, sorted by frequency descending.
 
 <details>
 <summary>Solution</summary>
@@ -745,7 +745,7 @@ Output: `[["the", 5]; ["cat", 3]; ["mat", 2]; ["sat", 2]; ["on", 2]]`
 
 ---
 
-### Exercise 8.8 — Combinatorics: Pythagorean triples
+### Exercise 12.8 — Combinatorics: Pythagorean triples
 
 Use `comb.choose 3` to enumerate every 3-element subset of `[1 … 20]`, then keep the ones `[a; b; c]` satisfying `a² + b² = c²`. Display the triples and how many there are.
 

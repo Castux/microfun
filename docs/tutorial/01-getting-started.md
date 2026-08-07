@@ -46,7 +46,7 @@ show 42
 
 There is also `peek`, which prints the same way but stops after 100 elements —
 useful once your values get large, and the only safe choice for the infinite
-structures of Chapter 7. Everything below works with either.
+structures of Chapter 10. Everything below works with either.
 
 ---
 
@@ -167,7 +167,7 @@ show []              -- the empty tuple
 show [1, [2, 3]]     -- a tuple containing a tuple
 ```
 
-Tuples are the only compound type. Lists, the subject of Chapter 6, are built from tuples. For now, use them to group values you want to print together:
+Tuples are the only compound type. Lists, the subject of Chapter 4, are built from tuples. For now, use them to group values you want to print together:
 
 ```
 show [add 3 4, mul 6 7, sub 1 10]    -- [7, 42, 9]

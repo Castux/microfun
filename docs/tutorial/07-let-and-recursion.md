@@ -1,4 +1,4 @@
-# Chapter 5: Let and Recursion
+# Chapter 7: Let and Recursion
 
 So far you have used `let` informally to give names to expressions. This chapter covers how `let` actually works, why it enables recursion naturally, and how to write recursive programs.
 
@@ -72,7 +72,7 @@ in
 
 `fact` refers to `fact` in its own body. This is not a special syntax for recursion — it is a direct consequence of mutual visibility within a `let` group.
 
-In Thunky, this works because of lazy evaluation (Chapter 7): the right-hand side of a binding is not evaluated immediately. By the time `fact` is actually called, the name `fact` already refers to the correct function.
+In Thunky, this works because of lazy evaluation (Chapter 10): the right-hand side of a binding is not evaluated immediately. By the time `fact` is actually called, the name `fact` already refers to the correct function.
 
 ---
 
@@ -102,7 +102,7 @@ let x = 10 in
 
 The outer `x` is not modified. The inner `let` creates a new binding that shadows it within the inner scope.
 
-Shadowing covers the *body* of the inner `let`, and also its own right-hand sides — so `let x = ... x ...` refers to the new `x`, not the outer one. Exercise 5.6 shows why that matters.
+Shadowing covers the *body* of the inner `let`, and also its own right-hand sides — so `let x = ... x ...` refers to the new `x`, not the outer one. Exercise 7.6 shows why that matters.
 
 ---
 
@@ -115,7 +115,7 @@ let ones = [1, ones] in
   show ones
 ```
 
-`ones` is a cons cell whose tail is itself — an infinite list of `1`s. Thunky holds this as a suspended thunk and will not crash as long as you only force a finite prefix. Chapter 7 covers laziness in full.
+`ones` is a cons cell whose tail is itself — an infinite list of `1`s. Thunky holds this as a suspended thunk and will not crash as long as you only force a finite prefix. Chapter 10 covers laziness in full.
 
 ---
 
@@ -209,7 +209,7 @@ In practice you will always use `let`. `fix` is the theoretical underpinning and
 
 ## Exercises
 
-### Exercise 5.1 — Fibonacci
+### Exercise 7.1 — Fibonacci
 
 Write a recursive `fib` (1-indexed: `fib 1 = 1`, `fib 2 = 1`, `fib 3 = 2`, …). Display the first 10 values.
 
@@ -227,13 +227,13 @@ let fib = {
 
 Output: `[1, 1, 2, 3, 5, 8, 13, 21, 34, 55]`
 
-Warning: this naive version recomputes subproblems. Chapter 7 shows how to define Fibonacci as an efficient lazy stream instead.
+Warning: this naive version recomputes subproblems. Chapter 10 shows how to define Fibonacci as an efficient lazy stream instead.
 
 </details>
 
 ---
 
-### Exercise 5.2 — Power function
+### Exercise 7.2 — Power function
 
 Write `myPow exp n = n ^ exp` recursively. Base case: `myPow 0 n = 1`.
 
@@ -253,7 +253,7 @@ Output: `[1, 5, 8, 1024]`
 
 ---
 
-### Exercise 5.3 — Collatz sequence
+### Exercise 7.3 — Collatz sequence
 
 The Collatz sequence from `n`: if `n = 1`, stop; if `n` is even, `n / 2`; if odd, `3n + 1`. Return the full sequence as a list.
 
@@ -275,7 +275,7 @@ The Collatz sequence from 27 has 112 elements.
 
 ---
 
-### Exercise 5.4 — Two ways to carry state
+### Exercise 7.4 — Two ways to carry state
 
 Part 1. Write `scan depth s` that returns `1` if the string `s` has balanced parentheses and `0` otherwise. The current nesting depth is carried as an argument: `(` increases it, `)` decreases it, and a `)` at depth `0` is an immediate failure. At the end of the string the input is balanced exactly when the depth is back to `0`. Test it on `"(a(b)c)"`, `"(()"`, `")("` and `"abc"`.
 
@@ -319,7 +319,7 @@ There is no flag argument: `outside` copies characters and `inside` drops them, 
 
 ---
 
-### Exercise 5.5 — Accumulator
+### Exercise 7.5 — Accumulator
 
 Rewrite `sum` using the accumulator pattern.
 
@@ -343,7 +343,7 @@ Output: `15`
 
 ---
 
-### Exercise 5.6 — The shadowing that isn't
+### Exercise 7.6 — The shadowing that isn't
 
 Earlier in this chapter, `let x = 10 in let x = 20 in show x` printed `20`: the inner binding shadows the outer one. Now predict `let x = 1 in let x = add 1 x in show x`. Does it print `2`?
 
@@ -374,7 +374,7 @@ Output: `2`
 
 ---
 
-### Exercise 5.7 — Recursion off the list
+### Exercise 7.7 — Recursion off the list
 
 Recursion is not a list technique; it follows whatever shape the data has. Represent a binary tree as either `[]` (empty) or a 3-tuple `[value, left, right]`, and write `size` (number of nodes), `total` (sum of the values) and `depth` (longest path from the root). Run all three on the tree with root `5`, left subtree `3`, and right subtree `8` with children `1` and `9`.
 

@@ -1,4 +1,4 @@
-# Chapter 7: Lazy Evaluation
+# Chapter 10: Lazy Evaluation
 
 Thunky evaluates expressions **lazily**: an expression is not reduced until something actually needs its value — and then only to the depth required. This is the default, not a special mode. Understanding it is key to understanding why infinite lists work, why recursive data structures are fine, and how to reason about what actually gets evaluated.
 
@@ -254,7 +254,7 @@ As a rule: use `foldr` for building a list (it works on infinite lists when the 
 
 ## Exercises
 
-### Exercise 7.1 — How far does forcing go?
+### Exercise 10.1 — How far does forcing go?
 
 Let `xs = list.map show [1; 2; 3]` — a list whose every element, when forced, prints a number as a side effect. Nothing is printed yet, because nothing has been forced.
 
@@ -294,7 +294,7 @@ Output:
 
 ---
 
-### Exercise 7.2 — Sharing is per binding, not per call
+### Exercise 10.2 — Sharing is per binding, not per call
 
 Memoization caches the value of a *thunk*, and each occurrence of an expression in your source is its own thunk. Writing `slow 200000` twice therefore creates two independent thunks and does the work twice; binding it to a name once and using the name twice does the work once.
 
@@ -339,7 +339,7 @@ Memoization is not a cache keyed on `slow` and its argument — there is no such
 
 ---
 
-### Exercise 7.3 — Custom infinite stream
+### Exercise 10.3 — Custom infinite stream
 
 Write a function `powersOf` that takes a base `b` and returns the infinite list `[1; b; b²; b³; ...]`. Use `list.iterate` and partial application. Display the first 10 powers of 3.
 
@@ -358,7 +358,7 @@ Output: `[1; 3; 9; 27; 81; 243; 729; 2187; 6561; 19683]`
 
 ---
 
-### Exercise 7.4 — Triangular numbers
+### Exercise 10.4 — Triangular numbers
 
 The n-th triangular number is `1 + 2 + ... + n`. Define the infinite list of triangular numbers using `list.zipWith add` and cumulative sums.
 
@@ -395,7 +395,7 @@ in
 
 ---
 
-### Exercise 7.5 — Lazy filtering
+### Exercise 10.5 — Lazy filtering
 
 Without evaluating more than necessary, find the first number in the infinite list `[1; 2; 3; ...]` that is both divisible by 7 and divisible by 11.
 
@@ -419,7 +419,7 @@ Only the elements up to 77 are evaluated.
 
 ---
 
-### Exercise 7.6 — Collatz stream
+### Exercise 10.6 — Collatz stream
 
 In Exercise 5.3 you wrote `collatz` as a recursive function. Rewrite it as a lazy stream using `list.iterate` and a step function.
 
@@ -452,7 +452,7 @@ in
 
 ---
 
-### Exercise 7.7 — Memoization in action
+### Exercise 10.7 — Memoization in action
 
 Define the Fibonacci stream using the self-referential definition shown in this chapter. Then compute `list.nth 35 fibonacci` (the 36th Fibonacci number, zero-indexed). Compare the time to compute this vs. the naive recursive definition from Exercise 5.1.
 
@@ -486,7 +486,7 @@ The lazy version is vastly faster because each Fibonacci number is computed exac
 
 ---
 
-### Exercise 7.8 — Strict folds
+### Exercise 10.8 — Strict folds
 
 Sum `list.range 0 200000` two ways: with `list.foldl add 0` and with `list.foldlStrict add 0`. Both print the same number. Time them, and explain the difference — then say what you expect to happen as the list grows to millions of elements.
 

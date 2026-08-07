@@ -14,12 +14,17 @@ const PAGES = [
     { id: "tut1", title: "1. Getting started", file: "docs/tutorial/01-getting-started.md", group: "Tutorial" },
     { id: "tut2", title: "2. Functions", file: "docs/tutorial/02-functions-and-application.md", group: "Tutorial" },
     { id: "tut3", title: "3. Pipes & composition", file: "docs/tutorial/03-pipes-and-composition.md", group: "Tutorial" },
-    { id: "tut4", title: "4. Pattern matching", file: "docs/tutorial/04-pattern-matching.md", group: "Tutorial" },
-    { id: "tut5", title: "5. Let & recursion", file: "docs/tutorial/05-let-and-recursion.md", group: "Tutorial" },
-    { id: "tut6", title: "6. Lists", file: "docs/tutorial/06-lists.md", group: "Tutorial" },
-    { id: "tut7", title: "7. Lazy evaluation", file: "docs/tutorial/07-lazy-evaluation.md", group: "Tutorial" },
-    { id: "tut8", title: "8. Standard library", file: "docs/tutorial/08-standard-library.md", group: "Tutorial" },
-    { id: "tut9", title: "9. Modules", file: "docs/tutorial/09-modules.md", group: "Tutorial" },
+    { id: "tut4", title: "4. Data", file: "docs/tutorial/04-data.md", group: "Tutorial" },
+    { id: "tut5", title: "5. Pattern matching", file: "docs/tutorial/05-pattern-matching.md", group: "Tutorial" },
+    { id: "tut6", title: "6. Errors & debugging", file: "docs/tutorial/06-errors-and-debugging.md", group: "Tutorial" },
+    { id: "tut7", title: "7. Let & recursion", file: "docs/tutorial/07-let-and-recursion.md", group: "Tutorial" },
+    { id: "tut8", title: "8. The list library", file: "docs/tutorial/08-list-library.md", group: "Tutorial" },
+    { id: "tut9", title: "9. Thinking functionally", file: "docs/tutorial/09-thinking-functionally.md", group: "Tutorial" },
+    { id: "tut10", title: "10. Lazy evaluation", file: "docs/tutorial/10-lazy-evaluation.md", group: "Tutorial" },
+    { id: "tut11", title: "11. Performance & space", file: "docs/tutorial/11-performance-and-space.md", group: "Tutorial" },
+    { id: "tut12", title: "12. Standard library", file: "docs/tutorial/12-standard-library.md", group: "Tutorial" },
+    { id: "tut13", title: "13. Modules", file: "docs/tutorial/13-modules.md", group: "Tutorial" },
+    { id: "tut14", title: "14. A program end to end", file: "docs/tutorial/14-program-end-to-end.md", group: "Tutorial" },
 ];
 
 // The implementation notes (docs/implementation/) are deliberately not part of

@@ -1,113 +1,8 @@
-# Chapter 6: Lists
+# Chapter 8: The List Library
 
-Lists are the workhorse of functional programming. In Thunky, lists are not a separate type — they are a convention built on tuples. Understanding this representation is essential to writing list-processing code correctly.
-
----
-
-## Lists are cons cells
-
-A list is either:
-- **The empty list**: the empty tuple `[]`.
-- **A non-empty list**: a 2-tuple `[head, tail]`, called a **cons cell**, where `head` is the first element and `tail` is the rest of the list.
-
-A three-element list `a, b, c` is therefore:
-
-```thunky-static
-[a, [b, [c, []]]]
-```
-
-This is the complete, desugared representation. Writing that by hand for every list would be painful, so Thunky provides syntactic sugar.
-
----
-
-## List literals
-
-The semicolon-separated form `[a; b; c]` is sugar for nested cons cells:
-
-```thunky-static
-[a; b; c]   ≡   [a, [b, [c, []]]]
-[a; b]      ≡   [a, [b, []]]
-[a;]        ≡   [a, []]          -- single-element list
-[]          ≡   []               -- empty list (also empty tuple)
-```
-
-The separator — semicolon vs. comma — determines whether you get a list or a tuple:
-
-| Expression  | What it is             |
-|-------------|------------------------|
-| `[a, b]`    | 2-element **tuple**    |
-| `[a; b]`    | 2-element **list**     |
-| `[a]`       | 1-element **tuple**    |
-| `[a;]`      | 1-element **list**     |
-| `[]`        | empty tuple = empty list |
-
-**`[x;]` for a single-element list, always.** `[x]` is a tuple and will crash any function that tries to traverse it as a list.
-
----
-
-## Pattern matching on lists
-
-Since lists are 2-tuples, pattern matching uses tuple syntax:
-
-```
-let
-  myHead = [h, t] -> h,
-  myTail = [h, t] -> t
-in
-  show [myHead [1; 2; 3]; myTail [1; 2; 3]]    -- [1; [2; 3]]
-```
-
-The standard idiom: match `[]` for the empty case and `[h, t]` for the non-empty case.
-
-```
-let length = {
-  []     -> 0,
-  [h, t] -> length t > add 1
-} in
-  [1; 2; 3] > length > show    -- 3
-```
-
----
-
-## Strings are lists of code points
-
-A string literal like `"hello"` is sugar for the list of its Unicode code points: `[104; 101; 108; 108; 111]`. Every list function works on strings.
-
-To print text as characters (not as a list of numbers), use `write` instead of `show`:
-
-```
-write "hello"        -- prints: hello
-```
-
-```
-show "hello"         -- prints: [104; 101; 108; 108; 111]
-```
-
-To obtain the code point of a single character, use `text.char` from the `text` module:
-
-```
-import text in
-  text.char "A" > show    -- 65
-```
-
----
-
-## Comparing values: `eq` vs `equal`
-
-`eq` is arithmetic. It compares two **numbers** and returns `1` or `0`; handing it anything else — a string, a tuple, a list — is a runtime error (`argument to eq is not a number`), so `eq "ab" "ab"` does not work. `equal` is the structural comparison: it walks both values and returns `1` only if they have the same shape with the same numbers at every leaf. Because a string is a list, `equal` is what you compare text with, and because list literals are only sugar, `equal` sees straight through them.
-
-```
-show [
-  equal "cat" "cat",
-  equal "cat" "cot",
-  equal [1; 2; 3] [1, [2, [3, []]]],
-  eq 3 3
-]
-```
-
-Output: `[1, 0, 1, 1]`
-
-Use `eq` on numbers — it is the cheaper primitive — and `equal` on everything else.
+Chapter 4 covered how lists are built. This chapter covers what the `list`
+module does with them: the functions you will reach for constantly, and the
+fold that most of them are made of.
 
 ---
 
@@ -231,7 +126,7 @@ show [
 ]
 ```
 
-`find` returns a **maybe value**: `[x]` if found, `[]` if not. Chapter 8 covers `maybe`.
+`find` returns a **maybe value**: `[x]` if found, `[]` if not. Chapter 12 covers `maybe`.
 
 ### Sorting
 
@@ -319,60 +214,21 @@ let phonebook = [["Alice", "555-1234"]; ["Bob", "555-5678"]] in
   phonebook > list.lookup "Bob" > show    -- ["555-5678"]
 ```
 
-Returns a `maybe` value. The `table` module (Chapter 8) adds higher-level operations.
+Returns a `maybe` value. The `table` module (Chapter 12) adds higher-level operations.
 
 ---
 
 ## Summary
 
-- A list is `[]` (empty) or `[head, tail]` (cons cell).
-- `[a; b; c]` is sugar for `[a, [b, [c, []]]]`.
-- `[a;]` is a single-element list; `[a]` is a single-element tuple.
-- Strings are lists of Unicode code points; use `write` to print them as text.
-- `eq` compares numbers only; use `equal` for structural comparison, including strings.
-- Import `list` for the standard library.
+- Import `list` to use the standard library on lists.
+- `map`, `filter` and `foldr` are the three workhorses; most of the rest is built from `foldr`.
 - Pipelines with `>` let list transformations read in execution order.
 
 ---
 
 ## Exercises
 
-### Exercise 6.1 — The `[x;]` trap, diagnosed
-
-Write one program that calls `list.length` on a one-element list, `list.length` on a two-element list, and `list.sum` on `[1; 2]`. Then change the one-element list from `[5;]` to `[5]` and run it again. Read the error message carefully: where does it point, and why is that misleading?
-
-<details>
-<summary>Solution</summary>
-
-The working version — note the trailing semicolon in `[5;]`:
-
-```
-import list in
-  show [list.length [5;], list.length [5; 6], list.sum [1; 2]]
-```
-
-Output: `[1, 2, 3]`
-
-Written as `[5]`, that argument is a **1-tuple**, not a list, and the program fails at runtime:
-
-```thunky-static
-import list in
-  show (list.length [5])
-```
-
-```text
-core/list.þ:23:2: no pattern matched value [5]
-	[] -> 0,
-	^^^^^^^^
-```
-
-The lesson is in the location: `core/list.þ`. The blame lands on the standard library, inside `length`'s own `[] -> 0` case, because that is where the mismatch is actually detected — `[5]` is neither `[]` nor a cons cell `[h, t]`, so no case matches. Your code, which is where the mistake is, is not mentioned at all. Whenever an error points into `core/`, suspect the shape of the value you passed in, and check your one-element lists first.
-
-</details>
-
----
-
-### Exercise 6.2 — Everything from `foldr`
+### Exercise 8.1 — Everything from `foldr`
 
 `foldr` is not just another list function; it is the general shape of list recursion, and most of the rest of the module is a special case of it. Write `myFoldr` from scratch, then define `myMap`, `myFilter`, `myLength`, `mySum`, `myAppend` and `myReverse` in terms of it, with no explicit recursion of their own.
 
@@ -395,36 +251,13 @@ in
 
 Output: `[[2; 4; 6], [3; 4], 5, 15, [3; 2; 1]]`
 
-`myFoldr f z` replaces every cons cell `[h, t]` with `f h` applied to the folded tail, and the final `[]` with `z`. Rebuilding cons cells unchanged (`myAppend`) or transformed (`myMap`) gives back a list; collapsing them to a number (`myLength`, `mySum`) gives an aggregate. `myLength`'s function ignores its element with `h -> add 1`. Note that `myReverse` is quadratic — the accumulator version from Chapter 5 is the one to use in practice.
+`myFoldr f z` replaces every cons cell `[h, t]` with `f h` applied to the folded tail, and the final `[]` with `z`. Rebuilding cons cells unchanged (`myAppend`) or transformed (`myMap`) gives back a list; collapsing them to a number (`myLength`, `mySum`) gives an aggregate. `myLength`'s function ignores its element with `h -> add 1`. Note that `myReverse` is quadratic — the accumulator version from Chapter 7 is the one to use in practice.
 
 </details>
 
 ---
 
-### Exercise 6.3 — Palindrome check
-
-Write `isPalindrome` that returns `1` if a list reads the same forwards and backwards.
-
-<details>
-<summary>Solution</summary>
-
-```
-import list in
-let isPalindrome = xs -> equal xs (xs > list.reverse) in
-  show [
-    isPalindrome [1; 2; 3; 2; 1],
-    isPalindrome [1; 2; 3],
-    isPalindrome []
-  ]
-```
-
-Output: `[1, 0, 1]`
-
-</details>
-
----
-
-### Exercise 6.4 — Run-length encoding
+### Exercise 8.2 — Run-length encoding
 
 Write `rle` that converts a list to `[count, element]` pairs for consecutive runs. `rle [1; 1; 2; 3; 3; 3]` → `[[2, 1]; [1, 2]; [3, 3]]`.
 
@@ -454,7 +287,7 @@ Output: `[[2, 1]; [1, 2]; [3, 3]]`
 
 ---
 
-### Exercise 6.5 — Pipeline challenge
+### Exercise 8.3 — Pipeline challenge
 
 Using only `list` module functions and pipes (no explicit recursion), compute the sum of the squares of all odd numbers in `[1; 2; 3; 4; 5; 6; 7; 8; 9; 10]`.
 
@@ -478,7 +311,7 @@ Output: `165`
 
 ---
 
-### Exercise 6.6 — Split into words without `text.split`
+### Exercise 8.4 — Split into words without `text.split`
 
 `text.split " "` breaks on every single space, so runs of spaces produce empty words. Write `words` that splits a string on *runs* of whitespace and drops the empty pieces, using `list.groupBy` and `text.isSpace`. `groupBy p xs` cuts `xs` into runs of adjacent elements for which `p a b` holds. Test it on `"  the quick   brown fox "`, where naive splitting would yield several empty words.
 

@@ -1,4 +1,4 @@
-# Chapter 4: Pattern Matching
+# Chapter 5: Pattern Matching
 
 Pattern matching is the primary control-flow mechanism in Thunky. Where other languages use `if/else`, `switch`, or `instanceof` checks, Thunky uses patterns — structural descriptions of what a value looks like. If the value fits the pattern, the body executes; if not, the next case is tried.
 
@@ -109,7 +109,7 @@ let length = {
 
 `length t > add 1` pipes the recursive result into `add 1`. Same as `add 1 (length t)`, but reading left-to-right.
 
-Note: `length` refers to itself here. This is **recursion** — a name visible in its own definition because of how `let` works. Chapter 5 covers this in full.
+Note: `length` refers to itself here. This is **recursion** — a name visible in its own definition because of how `let` works. Chapter 7 covers this in full.
 
 ---
 
@@ -217,7 +217,7 @@ The standard library's `zip` and `zipWith` are written this way.
 
 ## Exercises
 
-### Exercise 4.1 — Safe reciprocal
+### Exercise 5.1 — Safe reciprocal
 
 Write a function `safeRecip` that returns `1/x` for non-zero input, `0` for zero. Use number patterns and `fdiv`.
 
@@ -237,7 +237,7 @@ Output: `[0, 0.25, 0.5]`
 
 ---
 
-### Exercise 4.2 — Tuple destructuring
+### Exercise 5.2 — Tuple destructuring
 
 Write `swap` that takes a 2-tuple `[a, b]` and returns `[b, a]`. Then write `swapBoth` that swaps both elements of a 2-tuple of 2-tuples.
 
@@ -258,7 +258,7 @@ Output: `[[2, 1], [[2, 1], [4, 3]]]`
 
 ---
 
-### Exercise 4.3 — FizzBuzz (partial)
+### Exercise 5.3 — FizzBuzz (partial)
 
 Write `fizzBuzz` that returns `0` if divisible by both 3 and 5, `1` for 3 only, `2` for 5 only, `3` otherwise. Pattern match on a tuple of two divisibility checks.
 
@@ -287,7 +287,7 @@ The pipe `[divBy 3 n, divBy 5 n] > { ... }` applies the multi-case lambda to the
 
 ---
 
-### Exercise 4.4 — Order matters
+### Exercise 5.4 — Order matters
 
 Consider `let bad = { n -> "any", 0 -> "zero" } in bad 0 > write`. Predict what it prints before running it. Then reorder the cases so that `0` reports `zero` and everything else reports `any`.
 
@@ -316,7 +316,7 @@ Rule: order cases from most specific to most general, and keep the catch-all nam
 
 ---
 
-### Exercise 4.5 — Deep patterns
+### Exercise 5.5 — Deep patterns
 
 Write `thirdElement` that returns the third element of a list, using nested patterns.
 
@@ -336,7 +336,7 @@ Output: `30`
 
 ---
 
-### Exercise 4.6 — String patterns as a dispatch table
+### Exercise 5.6 — String patterns as a dispatch table
 
 A string literal works as a pattern too: `"inc" -> ...` matches only that exact string. Since strings are lists of code points, this is really a nested list pattern, but you write it as a literal.
 
@@ -362,7 +362,7 @@ Each case returns a *function*, so `step c` is the operation to run and `step c 
 
 ---
 
-### Exercise 4.7 — List pattern vs tuple pattern
+### Exercise 5.7 — List pattern vs tuple pattern
 
 `[a; b]` and `[a, b]` look almost the same but constrain different things. Write a `shape` function that returns `1` for a 2-element list, `2` for a 2-tuple, and `0` for anything else, and use it to find out which of `[1; 2]`, `[1, 2]`, `7` and `[1; 2; 3]` fall into which case. Then swap the first two cases and explain the result.
 

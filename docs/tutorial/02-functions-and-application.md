@@ -35,7 +35,7 @@ let increment = x -> add x 1 in
 
 The structure is: `let name = expr in body`. The name is available only within `body`.
 
-You can bind multiple names at once (more on this in Chapter 5):
+You can bind multiple names at once (more on this in Chapter 7):
 
 ```
 let
@@ -116,7 +116,7 @@ The arithmetic builtins are ordered so that partial application produces useful 
 | `lt 0 x`  | `x < 0` → returns 1 or 0    | `lt 0` = "is negative"   |
 | `gte 18 x`| `x ≥ 18`                     | `gte 18` = "is adult"    |
 
-The comparison builtins (`lt`, `lte`, `gt`, `gte`, `eq`, `neq`) return `1` for true and `0` for false. There is no boolean type — `0` is false, `1` is true (Chapter 4 uses this for conditionals).
+The comparison builtins (`lt`, `lte`, `gt`, `gte`, `eq`, `neq`) return `1` for true and `0` for false. There is no boolean type — `0` is false, `1` is true (Chapter 5 uses this for conditionals).
 
 ---
 
@@ -136,7 +136,7 @@ let twice = f -> x -> f (f x) in
 
 `apply` takes a function `f` and a value `x`, and applies `f` to `x`. `twice f x` applies `f` to `x` twice.
 
-This is the basis of **higher-order functions**: functions that take or return other functions. The list library (Chapter 6) is full of them — `map`, `filter`, `foldr`, etc.
+This is the basis of **higher-order functions**: functions that take or return other functions. The list library (Chapter 8) is full of them — `map`, `filter`, `foldr`, etc.
 
 ---
 

@@ -186,7 +186,7 @@ import list in
 whole expression, both qualified as `list.sort` and unqualified as `sort`. You
 can import several modules at once: `import list, math in …`. The library
 modules are `core`, `list`, `math`, `text`, `maybe`, `table`, `hashmap`, `comb`
-and `heap`; Chapter 8 tours them, and Chapter 9 covers writing your own.
+and `heap`; Chapter 12 tours them, and Chapter 13 covers writing your own.
 
 That is all you need for now — an import clause at the top, and the names are
 in scope.
@@ -195,7 +195,7 @@ in scope.
 
 ## Looking ahead
 
-Once you reach the chapter on lists (Chapter 6), pipes become indispensable. A pipeline like:
+Once you reach the chapters on lists (Chapters 4 and 8), pipes become indispensable. A pipeline like:
 
 ```
 import list in
