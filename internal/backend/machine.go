@@ -14,7 +14,7 @@ import (
 // reducing a graph.
 type Machine struct {
 	Prog    *Program
-	ModEnvs map[string][]value.Value // module name → binding thunks
+	ModEnvs [][]value.Value // module binding thunks, aligned with Prog.ModuleNames
 
 	// The operand buffer runFrom builds values on. It is reused across calls
 	// because runFrom never forces, so two runFrom calls never overlap.
@@ -44,10 +44,7 @@ type StackFrame struct {
 }
 
 func NewMachine(prog *Program) *Machine {
-	m := &Machine{
-		Prog:    prog,
-		ModEnvs: make(map[string][]value.Value),
-	}
+	m := &Machine{Prog: prog}
 	// WHNF re-enters the machine through this package-level handle (show, equal,
 	// the prim kernels, and the stdin streams all force values without a Machine
 	// receiver). A program runs one Machine, so a single handle suffices.
@@ -63,7 +60,10 @@ func NewMachine(prog *Program) *Machine {
 
 // Run initialises module environments and reduces the main body to WHNF.
 func (m *Machine) Run() value.Value {
-	// Create module environments so modules can refer to each other.
+	// Create module environments so modules can refer to each other. PushModule
+	// indexes them by the same dense index as Prog.ModuleNames, so the hot path
+	// pays two slice loads instead of a string-keyed map lookup.
+	byName := make(map[string][]value.Value, len(m.Prog.ModuleOrder))
 	for _, modName := range m.Prog.ModuleOrder {
 		mbs := m.Prog.Modules[modName]
 		env := make([]value.Value, len(mbs))
@@ -75,7 +75,11 @@ func (m *Machine) Run() value.Value {
 				Update: true,
 			})
 		}
-		m.ModEnvs[modName] = env
+		byName[modName] = env
+	}
+	m.ModEnvs = make([][]value.Value, len(m.Prog.ModuleNames))
+	for i, name := range m.Prog.ModuleNames {
+		m.ModEnvs[i] = byName[name]
 	}
 
 	// Reduce the main body.
@@ -200,14 +204,16 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 			case value.BuiltinTag:
 				b := control.Builtin()
 				stack = stack[:len(stack)-1]
-				newArgs := make([]value.Value, len(b.Args)+1)
-				copy(newArgs, b.Args)
-				newArgs[len(b.Args)] = frame.Arg
-				if len(newArgs) == b.Arity {
-					// Saturated: run the primitive.
-					control = m.runBuiltin(b.Prim, newArgs, frame.Pos, stack)
+				if len(b.Args)+1 == b.Arity {
+					// Saturated: run the primitive on the stored args plus this one,
+					// without materialising the full argument slice.
+					control = m.saturateBuiltin(b, frame.Arg, frame.Pos, stack)
 				} else {
 					// Partial application: return a new Builtin with one more arg.
+					// The copy is required — the partial application may be shared.
+					newArgs := make([]value.Value, len(b.Args)+1)
+					copy(newArgs, b.Args)
+					newArgs[len(b.Args)] = frame.Arg
 					control = value.BuiltinValue(&value.Builtin{
 						Prim:  b.Prim,
 						Arity: b.Arity,
@@ -235,30 +241,80 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 	}
 }
 
-// runBuiltin dispatches a saturated builtin. Math prims force their arguments
-// and run the kernel; structural builtins are dispatched separately.
-func (m *Machine) runBuiltin(op value.PrimOp, args []value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
-	switch op {
-	case value.PrimEqual, value.PrimEval, value.PrimPeek, value.PrimShow, value.PrimWrite, value.PrimBwrite:
-		m.builtinPos = pos
-		m.builtinStack = stack
-		return value.EvalStructuralBuiltin(op, args)
-	default:
-		// Numeric/comparison prims force every operand left-to-right, then check
-		// that all are numbers — every operand is forced before any non-number is
-		// reported, so the error names the operation rather than the first bad arg.
-		allNumbers := true
-		for i := range args {
-			args[i] = WHNF(args[i])
-			if args[i].Tag != value.NumberTag {
-				allNumbers = false
+// saturateBuiltin runs builtin b applied to its final argument. Numeric prims
+// are forced into scalars and dispatched to the raw-float64 kernels; structural
+// builtins get a small argument slice. Operands are forced left-to-right and
+// all of them before any non-number is reported, so the error names the
+// operation rather than the first bad argument.
+func (m *Machine) saturateBuiltin(b *value.Builtin, last value.Value, pos source.SourcePos, stack []StackFrame) value.Value {
+	op := b.Prim
+	if op.Numeric() {
+		if b.Arity == 1 {
+			a := WHNF(last)
+			if a.Tag != value.NumberTag {
+				m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
 			}
+			return value.EvalPrim1(op, a.Num)
 		}
-		if !allNumbers {
+		a := WHNF(b.Args[0])
+		bb := WHNF(last)
+		if a.Tag != value.NumberTag || bb.Tag != value.NumberTag {
 			m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
 		}
-		return value.EvalPrim(op, args)
+		return value.EvalPrim2(op, a.Num, bb.Num)
 	}
+	args := make([]value.Value, 0, 2)
+	args = append(args, b.Args...)
+	args = append(args, last)
+	m.builtinPos = pos
+	m.builtinStack = stack
+	return value.EvalStructuralBuiltin(op, args)
+}
+
+// runPrimOp executes a Prim instruction: pop the operands, force them, run the
+// kernel, push the result. The operands are moved into locals and the buffer
+// truncated *before* forcing, because forcing re-enters the machine, which
+// reuses the operand buffer — safe only because the buffer holds exactly the
+// prim's operands when a Prim executes (arguments of an enclosing application
+// go to the reduction stack before the head is built; see compile.go), which
+// the empty-buffer check enforces.
+func (m *Machine) runPrimOp(in Instr, operands []value.Value, stack []StackFrame) []value.Value {
+	op := value.PrimOp(in.A)
+	arity := value.PrimArity[op]
+	n := len(operands)
+	pos := m.Prog.Posns[in.B]
+
+	if op.Numeric() {
+		a := operands[n-arity]
+		var b value.Value
+		if arity == 2 {
+			b = operands[n-1]
+		}
+		operands = operands[:n-arity]
+		if len(operands) != 0 {
+			panic("machine: operand buffer not empty under a Prim's operands")
+		}
+		a = WHNF(a)
+		numbers := a.Tag == value.NumberTag
+		if arity == 2 {
+			b = WHNF(b)
+			numbers = numbers && b.Tag == value.NumberTag
+		}
+		if !numbers {
+			m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
+		}
+		if arity == 1 {
+			return append(operands, value.EvalPrim1(op, a.Num))
+		}
+		return append(operands, value.EvalPrim2(op, a.Num, b.Num))
+	}
+
+	args := make([]value.Value, arity)
+	copy(args, operands[n-arity:])
+	operands = operands[:n-arity]
+	m.builtinPos = pos
+	m.builtinStack = stack
+	return append(operands, value.EvalStructuralBuiltin(op, args))
 }
 
 // --- runFrom: body execution (build phase, never forces) ---
@@ -284,8 +340,7 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFr
 			operands = append(operands, upvalues[in.A])
 
 		case PushModule:
-			modName := m.Prog.ModuleNames[in.A]
-			operands = append(operands, m.ModEnvs[modName][in.B])
+			operands = append(operands, m.ModEnvs[in.A][in.B])
 
 		case PushStdin:
 			operands = append(operands, value.StdinCodePoints())
@@ -360,15 +415,7 @@ func (m *Machine) runFrom(pc PC, locals, upvalues []value.Value, stack []StackFr
 			operands = operands[:n-1]
 
 		case Prim:
-			op := value.PrimOp(in.A)
-			arity := value.PrimArity[op]
-			n := len(operands)
-			args := make([]value.Value, arity)
-			copy(args, operands[n-arity:])
-			operands = operands[:n-arity]
-			// Force and evaluate the prim.
-			result := m.runBuiltin(op, args, m.Prog.Posns[in.B], stack)
-			operands = append(operands, result)
+			operands = m.runPrimOp(in, operands, stack)
 
 		case Enter:
 			head := operands[len(operands)-1]
@@ -481,8 +528,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			operands = append(operands, upvalues[in.A])
 
 		case PushModule:
-			modName := m.Prog.ModuleNames[in.A]
-			operands = append(operands, m.ModEnvs[modName][in.B])
+			operands = append(operands, m.ModEnvs[in.A][in.B])
 
 		case PushStdin:
 			operands = append(operands, value.StdinCodePoints())
@@ -557,14 +603,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			operands = operands[:n-1]
 
 		case Prim:
-			op := value.PrimOp(in.A)
-			arity := value.PrimArity[op]
-			n := len(operands)
-			args := make([]value.Value, arity)
-			copy(args, operands[n-arity:])
-			operands = operands[:n-arity]
-			result := m.runBuiltin(op, args, m.Prog.Posns[in.B], stack)
-			operands = append(operands, result)
+			operands = m.runPrimOp(in, operands, stack)
 
 		case Enter:
 			head := operands[len(operands)-1]
