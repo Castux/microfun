@@ -509,16 +509,8 @@ Output: `19999900000`
 
 `foldl add 0` never adds anything while it walks the list. It returns `add (add (add 0 0) 1) 2 …` — a chain of 200000 nested thunks — and only `show` at the very end collapses it. Every link in that chain is live at once, so the cost is not just time but memory and evaluation depth. `foldlStrict` forces the accumulator at each step (with `seq`), so exactly one number is live at any moment.
 
-Measured on the reference build:
+The gap widens rather than staying a constant factor: the thunk chain that `foldl` builds grows with the list, and the machine spends progressively more of its time managing it. At five million elements `foldlStrict` still finishes while `foldl` does not finish at all. Reach for `foldlStrict` whenever a left fold reduces a long list to a single strict value.
 
-```text
-elements    foldl     foldlStrict
-   200000     2.7 s        0.9 s
-  1000000     8.1 s        4.3 s
-  2000000    16.5 s        8.6 s
-  5000000    over 3 min   22.6 s
-```
-
-The gap widens rather than staying a constant factor: the thunk chain that `foldl` builds grows with the list, and the machine spends progressively more of its time managing it. Reach for `foldlStrict` whenever a left fold reduces a long list to a single strict value.
+Chapter 11 measures this properly and covers the rest of the strictness story.
 
 </details>

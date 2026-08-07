@@ -357,12 +357,12 @@ show [
 ### Parsing
 
 ```
-import text in
+import list, text in
 show [
-  text.stringToInt "123",         -- 123
-  text.stringToFloat "3.14",      -- 3.14
-  text.split "," "a,b,c",         -- ["a"; "b"; "c"]
-  text.startsWith "he" "hello"    -- 1
+  text.stringToInt "123",                 -- 123
+  text.stringToFloat "3.14",              -- 3.14
+  text.split "," "a,b,c" > list.length,   -- 3 (the pieces are strings)
+  text.startsWith "he" "hello"            -- 1
 ]
 ```
 
@@ -373,10 +373,19 @@ show [
 ```
 import text, list in
 let parseCSV = row -> text.split "," row > list.map text.trim in
-  show (parseCSV "  Alice , 30 , engineer ")
+  parseCSV "  Alice , 30 , engineer " > list.map write > eval
 ```
 
-Output: `["Alice"; "30"; "engineer"]`
+Output:
+
+```text
+Alice
+30
+engineer
+```
+
+Note the `list.map write`: the fields are strings, and `show` would render each
+as its list of code points. `write` prints them as text.
 
 ---
 

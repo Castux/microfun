@@ -269,7 +269,7 @@ Output: `[2, 2]`
 
 ### Exercise 1.4 — Digits without a loop
 
-The tens digit of `1234` is `3`. Extract it using nothing but `div` and `mod`. Thunky has no loops and no strings, so there is no other way in.
+The tens digit of `1234` is `3`. Extract it using nothing but `div` and `mod` — arithmetic is the only tool you have so far, and it is enough.
 
 <details>
 <summary>Solution</summary>
@@ -307,7 +307,7 @@ Output: `7`
 
 ---
 
-### Exercise 1.6 — There are no negative numbers
+### Exercise 1.6 — There are no negative literals
 
 There is no unary minus in Thunky, and `-` is not part of a number token, so this does not even lex:
 
