@@ -6,137 +6,157 @@ the current single engine: the flat bytecode
 spineless-tagless G-machine ([6.The G-machine](6.The%20G-machine.md)).
 
 Runtime performance is the optimization target; clarity comes first, so each of
-these is a deliberate trade and listed in roughly descending order of expected
-payoff.
+these is a deliberate trade and listed in recommended order of implementation.
+
+Profiling snapshot (2026-08, bench suite): the machine is **allocation/GC
+bound**, not dispatch bound — `mallocgc` + GC mark/scan account for 40–60% of
+samples; the dominant allocations are the 128-byte `Thunk` (argument wrapping,
+`MakeThunk`, `Bind`), the per-application closure frame, and the reduction
+stack regrowing from nil on every re-entrant `WHNF`. Items are judged against
+that profile.
 
 ---
 
-## 1. Eager strict-argument evaluation (the big one)
+## 1. Structural builtins should return their argument forced (the big one)
 
-**Problem:** The dominant remaining allocation in numeric workloads
-(`fib`, `ackermann`, `collatz`) is the thunk built for each argument of an
-arithmetic builtin. The builtin is strict, so the thunk is forced immediately —
-it is pure overhead.
+**Problem:** `show`, `peek`, `write`, `bwrite` force their argument to print it
+but return the *unforced* `args[0]`. A top-level `… > show` wraps the program
+result in a call-by-name pipe thunk (never memoised), so the machine's final
+`reduce` of the program result forces the whole workload a **second time**.
+Measured: `show (fib 28)` is 1.83× slower than `let r = fib 28 in show r`; every
+bench case ends in `> show`, so the whole suite pays ~2×.
 
-**Fix:** Force a strict prim's arguments on the *explicit* reduction stack instead
-of via a re-entrant `WHNF`, so the compiler can skip building thunks for
-arithmetic operands. This needs a continuation/return frame and an interleaved
-exec/reduce loop (an EVAL-style machine), which is harder to read than the current
-build-then-reduce split — hence deferred. A cheaper down payment:
+**Fix:** Return the forced value (or memoise what was forced) from the four
+structural output builtins. Semantic caveat: this reduces the number of
+observable re-runs of call-by-name thunks (visible via nested `peek`), so the
+golden tests need review and a re-bless.
 
-- **Saturated direct prim calls.** *(implemented)* The lowerer now detects when
-  a builtin name is applied to exactly its arity of arguments and emits `CorePrim`
-  / `Prim` directly, skipping the `Builtin` value and the spine saturation dance in
-  the reducer. `PrimArity` / `PrimNames` are arrays indexed by the dense `PrimOp`
-  enum. The operand buffer is always empty when a `Prim` is reached in body
-  position (surrounding `App` nodes PushArg their args to the reduction stack
-  before recursing into the head), so re-entrant `runFrom` calls from forcing never
-  overlap with live operand data.
+## 2. Force each match subject once per application
 
----
+**Problem:** `Case` resets the subject stack to the raw argument and each
+`MatchNumber`/`MatchTuple` re-forces it. A call-by-name thunk subject (e.g. a
+pipe result or an un-memoised argument) is re-evaluated **once per case
+tried**, plus once more through the `Bind` indirection when the body uses it:
+`fib`'s `sub k n` arguments evaluate 3× per call; `match-dispatch`'s subject up
+to 19× per leaf.
 
-## 2. Minimal free-variable capture for thunks
+**Fix:** After the first force, replace the local argument (and forced
+constructor fields, written back into the `Cons`/`Tuple` slot) with its WHNF so
+later cases and the body see the forced value. Same semantic caveat and
+re-bless as item 1.
 
-**Problem:** Thunks capture the whole enclosing activation frame by reference
-(simple, no slot renumbering, cheap `letrec`) at the cost of retaining the entire
-frame for as long as any thunk over it is live.
+## 3. Cheap allocation removals on the prim path
 
-**Fix:** Compute each thunk's exact free variables — as the lowerer already does
-for lambda upvalues — and capture only those. This cuts retention but conflicts
-with cheap `letrec` under by-value capture, so it needs care around mutually
-recursive `let` groups.
+**Problem:** Each saturated prim call allocates a `[]Value` for its operands;
+partial application of a `Builtin` copies its argument slice; `PushModule` does
+a string-keyed map lookup per execution.
 
----
+**Fix:** Force prim operands in place on the operand stack and pass scalars to
+the kernels; compile module references to a dense index (`ModEnvs` becomes
+`[][]value.Value`). Alongside, drop the redundant number re-check in the prim
+kernels: the machine already forces and verifies every operand is a
+`NumberTag` before `EvalPrim`, so the kernels can read `.Num` directly and
+`getNumber`'s tag test can go.
 
-## 3. Constructor-tag specialisation and field unboxing
+## 4. Persistent machine stacks with base pointers
 
-**Problem:** Every constructor field is a `Value` (tagged union); a list of
-numbers boxes each element's pointer indirection through `*Cons`.
+**Problem:** `runMatch` allocates a fresh subject slice per closure
+application, and every re-entrant `WHNF` starts a new reduction stack from nil
+(`growslice` on the reduction stack is ~1s of the collatz profile). The
+operand buffer itself is reused and cheap — per-body max sizing is not where
+the cost is.
 
-**Fix:** Specialise common constructor shapes (e.g. a cons whose head is known to
-be a number) and/or unbox constructor fields, reducing both allocation and
-indirection on list-heavy code.
+**Fix:** Machine-level operand/subject/reduction stacks shared across
+re-entrant calls, with saved base offsets per entry. This is also the
+prerequisite for evaluating nested strict-prim operands without thunks
+(item 5).
 
----
+## 5. Eager strict-argument evaluation, staged
 
-## 4. Pattern-bind without the indirection thunk
+**Problem:** The dominant remaining allocation in numeric workloads is the
+thunk built for each argument of an arithmetic builtin: the builtin is strict,
+so the thunk is forced immediately — pure overhead. The full fix (an
+interleaved exec/reduce EVAL-style machine with continuation frames) is a large
+readability trade.
+
+**Staging:** Saturated direct prim calls are *(implemented)* — the lowerer
+detects a builtin applied at exactly its arity and emits `CorePrim`/`Prim`
+directly, skipping the `Builtin` value and the spine saturation dance in the
+reducer. Next: with item 4's base-pointer stacks in place, compile a **nested
+prim operand of a strict prim inline** (strictness is already known at lower
+time; no thunk, no re-entrant `WHNF`) — most of the win without the EVAL
+rewrite. Reassess whether the full rewrite is still worth it afterwards.
+
+## 6. Slim the hot runtime structs
+
+**Problem:** `Thunk` is 128 bytes and is the single most-allocated object; its
+`Name string` costs a per-creation lookup and 16 bytes; `Value` is 32 bytes
+because `Ref any` is a 16-byte interface whose dynamic type duplicates what
+`Tag` already encodes (and every `v.Thunk()`/`v.Cons()` access pays a type
+assertion).
+
+**Fix:** `Name string` → index into `Prog.Names` (resolved only for traces and
+`show`); move the stdin `Read` closure out of the common `Thunk`; pack the
+bools. Separately, `Ref any` → `unsafe.Pointer` shrinks `Value` 32→24 bytes,
+`Cons` 64→48, and deletes the assertion checks — contained to the accessors in
+`value.go`, but it is `unsafe`: measure before keeping.
+
+## 7. Pattern-bind without the indirection thunk
 
 **Problem:** A pattern binding wraps the matched subject in a named, memoising
-indirection thunk so the bound name appears on traces and in `show`. When the
-subject is already a thunk, this is a redundant wrapper.
+indirection thunk so the bound name appears on traces and in `show`. One
+128-byte thunk per bound variable per application.
 
-**Fix:** Behind an analyzer flag (so trace/show parity stays the default), skip the
-wrapper when the subject is already a named thunk, or when the binding's name is
-never observed.
+**Fix:** Binding directly is always safe when the subject is already a
+non-thunk WHNF value (only trace labels change). Keep the wrapper for unforced
+thunks — it is what memoises a twice-used binding.
 
----
+## 8. Minimal free-variable capture for thunks
 
-## 5. Fail-fast matcher without frame allocation
+**Problem:** Thunks capture the whole enclosing activation frame by reference
+(simple, no slot renumbering, cheap `letrec`) at the cost of retaining the
+entire frame for as long as any thunk over it is live.
 
-**Problem:** A closure application allocates one frame (`make([]Value, Frame)`)
-reused across the cases tried; a case that binds slots before a later sub-pattern
-fails leaves partial writes (harmless, but wasted work).
+**Fix:** Compute each thunk's exact free variables — as the lowerer already
+does for lambda upvalues — and capture only those. Note: this addresses GC
+*retention*, not allocation rate, so it ranks below the items above on the
+current profile. It conflicts with cheap `letrec` under by-value capture, so it
+needs care around mutually recursive `let` groups.
 
-**Fix:** Hoist a constructor-tag test to the front of each case so most
-non-matching cases reject before any `Bind`, or defer binds to a scratch list and
-commit only on the winning case.
+## 9. Superinstructions / peephole fusion
 
----
-
-## 6. Operand and subject stacks as fixed arrays
-
-**Problem:** The operand buffer grows via `append`, paying a slice header and
-bounds checks.
-
-**Fix:** Compute a per-body maximum operand/subject depth in a single pass over
-the `Code` and size a fixed array from it, eliminating `append` and bounds checks
-on the hot path.
-
----
-
-## 7. Superinstructions / peephole fusion
+**Depends on:** post-allocation-work profiles showing dispatch as a bottleneck
+(today it is not: allocation + GC dominate).
 
 **Problem:** Common opcode pairs (`PushLocal; PushArg`, `PushConst; PushArg`,
 `MatchTuple; Bind`) each cost a dispatch iteration.
 
-**Fix:** Fuse frequent pairs into single opcodes to reduce dispatch overhead.
-Measure which pairs dominate first.
+**Fix:** Fuse frequent pairs into single opcodes. Measure which pairs dominate
+first.
 
----
+## 10. Serialized bytecode
 
-## 8. Threaded dispatch
+**Depends on:** the bytecode being stable. This is startup latency, not
+runtime performance — compile time is milliseconds against multi-second runs.
 
-**Depends on:** profiling showing the `switch` dispatch as a bottleneck.
-
-**Problem:** Go's `switch` over the opcode compiles to an indexed jump table that
-may show up in profiles for the tight `runFrom` loop.
-
-**Fix:** Computed-goto-style dispatch via a function table if measurements show it
-wins. Measure first.
-
----
-
-## 9. Serialized bytecode
-
-**Depends on:** the bytecode being stable.
-
-**Problem:** The bytecode is in-process only — programs re-compile from source on
-every run.
+**Problem:** The bytecode is in-process only — programs re-compile from source
+on every run.
 
 **Fix:** A versioned binary encoding of `Program`, keyed by a source digest, so
-compilation can be cached across runs. The `Posns` / `Names` pools already define
+compilation can be cached across runs. The `Posns`/`Names` pools already define
 the source-mapping shape to serialize.
 
 ---
 
-## 10. Drop the redundant number check in the prim kernel
+## Considered and dropped
 
-**Problem:** Before calling `evalPrim`, the machine already forces every operand of
-an arithmetic/comparison prim and verifies each is a `NumberTag`. `evalPrim` then
-reads each operand through `getNumber`, which re-checks the tag (and would panic on
-a non-number) — a dead branch on the arithmetic hot path, paid once per operand
-access, and several kernels read an operand twice.
-
-**Fix:** Since the machine guarantees all operands are numbers at the call, read
-`.Num` directly in the kernel and delete `getNumber`'s tag test. The check is pure
-defensive duplication of the machine's `allNumbers` pass.
+- **Constructor-tag specialisation / field unboxing.** Constructor fields are
+  already inline 32-byte `Value`s — a cons cell is one 64-byte allocation, a
+  number element is not separately boxed. The real list cost is the lazy field
+  thunks and churn, addressed by items 5–7 and the general `Value` shrink.
+- **Threaded dispatch.** Go has no computed goto; a function-value table
+  typically loses to the dense `switch` jump table, and profiles show dispatch
+  is not the bottleneck.
+- **GOGC tuning.** `GOGC=400` is ~−24% on collatz today, but it trades peak
+  RSS and the gain should shrink as the allocation fixes land. Re-measure
+  after items 1–6; keep only if still paying.
