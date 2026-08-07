@@ -631,6 +631,12 @@ Placing your own `list.þ` (or any other core module name) next to your program
 
 Each module can be imported directly when only part of the library is needed.
 
+The tables below list each module's public interface. Thunky has no privacy
+mechanism — every binding in a module is importable — so a few implementation
+helpers are reachable but deliberately undocumented and not covered by any
+stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
+`hashmap.removeMin`, and `text.parsePositive`.
+
 ---
 
 #### `core` — combinators, tuple accessors, and boolean logic
@@ -654,10 +660,13 @@ Each module can be imported directly when only part of the library is needed.
 
 | Name | Description |
 |------|-------------|
+| `true` | the constant `1` |
+| `false` | the constant `0` |
 | `if cond t f` | conditional; `cond` must be `0` or `1` |
-| `case cond1 val1 cond2 val2 ... else defval` | chained conditionals: (else is a constant required to break the chaining) | 
-| `and a b` | logical and (short-circuits: if `a` is 0, `b` is not evaluated) |
-| `or a b` | logical or (short-circuits: if `a` is 1, `b` is not evaluated) |
+| `case cond1 val1 cond2 val2 … else defval` | chained conditional: the value of the first condition equal to `1`, else `defval` |
+| `else` | the constant that terminates a `case` chain (an ordinary value, not syntax) |
+| `and a b` | logical and (short-circuits: if `a` is `0`, `b` is not evaluated) |
+| `or a b` | logical or (short-circuits: if `a` is `1`, `b` is not evaluated) |
 | `not b` | logical not |
 
 ---
@@ -666,19 +675,26 @@ Each module can be imported directly when only part of the library is needed.
 
 A *maybe* value is either `none` (absent) or `some x` (present). The representation is a 0- or 1-element tuple.
 
-| Name | Signature | Description |
-|------|-----------|-------------|
-| `none` | `[]` | the absent value |
-| `some x` | `[x]` | wrap `x` as a present value |
-| `isSome m` | `maybe → bool` | `1` if `m` is `some x`, `0` otherwise |
-| `isNone m` | `maybe → bool` | `1` if `m` is `none`, `0` otherwise |
-| `isMaybe m` | `any → bool` | `1` if `m` is a valid maybe value (`none` or `some x`) |
-| `fmap f m` | `maybe → maybe` | apply `f` to the wrapped value; propagate `none` |
-| `andThen f m` | `maybe → a` | if `m` is `some x`, apply `f` to `x` and return the result; propagate `none`. `f` may return a maybe (for chaining) or any other value (for extraction + mapping) |
-| `value m` | `maybe → a` | extract the wrapped value; runtime error on `none` |
-| `default def m` | `a → maybe → a` | extract the value, or return `def` if `none` |
-| `orElse other m` | `maybe → maybe` | return `m` if it is `some`, otherwise `other` |
-| `mapDefault def f m` | `a → (a → b) → maybe → b` | apply `f` to the wrapped value, or return `def` if `none` |
+**Construction and tests**
+
+| Name | Description |
+|------|-------------|
+| `none` | the absent value, `[]` |
+| `some x` | `x` wrapped as a present value, `[x]` |
+| `isSome m` | `1` if `m` is `some x` |
+| `isNone m` | `1` if `m` is `none` |
+| `isMaybe m` | `1` if `m` is a valid maybe value (`none` or `some x`) |
+
+**Transformation and extraction**
+
+| Name | Description |
+|------|-------------|
+| `fmap f m` | apply `f` to the wrapped value; propagate `none` |
+| `andThen f m` | apply `f` to the wrapped value and return its result; propagate `none`. `f` may return a maybe (chaining) or any other value (extract and map) |
+| `orElse other m` | `m` if it is `some`, otherwise `other` |
+| `value m` | the wrapped value; runtime error on `none` |
+| `default def m` | the wrapped value, or `def` if `none` |
+| `mapDefault def f m` | `f` applied to the wrapped value, or `def` if `none` |
 
 `some` and `none` are plain values — `some` is sugar for `x -> [x]` and `none`
 is `[]`. Because maybes are single-element tuples, tuple pattern matching works
@@ -703,8 +719,10 @@ show [
 
 #### `math` — numeric operations
 
-**Numbers** (builtins: `add`, `mul`, `sub`, `div`, `fdiv`, `mod`, `fmod`, `sqrt`,
-`eq`, `lt`, `lte`, `gte`, `gt`, `neq`)
+The arithmetic and comparison primitives (`add`, `mul`, `sub`, `div`, `fdiv`,
+`mod`, `fmod`, `pow`, `sqrt`, `eq`, `lt`, `lte`, `gte`, `gt`, `neq`) are
+builtins, always in scope without an import — see [§13](#13-built-in-functions).
+This module adds the derived operations.
 
 | Name | Description |
 |------|-------------|
@@ -732,27 +750,53 @@ show [
 
 #### `list` — list operations and infinite lists
 
-**Construction and inspection**
-`emptyList`, `cons`, `singleton`, `isList`, `isEmpty`, `length`, `head`, `tail`, `last`, `init`, `tails`, `inits`
+**Construction**
 
-The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. Safe counterparts return a `maybe` value instead:
+| Name | Description |
+|------|-------------|
+| `emptyList` | the empty list, `[]` |
+| `cons h t` | a new cons cell with head `h` and tail `t` |
+| `singleton x` | the one-element list `[x;]` |
+| `replicate n x` | a list of `n` copies of `x` |
+| `range a b` | `[a; a+1; …; b-1]` — half-open, `b` excluded |
+| `rangeIncl a b` | `[a; a+1; …; b]` — both endpoints inclusive; `range a (succ b)` |
 
-| Safe variant | Crashes as | Returns |
-|---|---|---|
-| `headSafe l` | `head []` | `some h` or `none` |
-| `tailSafe l` | `tail []` | `some t` or `none` |
-| `lastSafe l` | `last []` | `some x` or `none` |
-| `initSafe l` | `init []` | `some l'` or `none` |
+**Inspection**
+
+| Name | Description |
+|------|-------------|
+| `isList x` | `1` if `x` is a proper list |
+| `isEmpty l` | `1` if `l` is the empty list |
+| `length l` | number of elements |
+| `head l` | first element; crashes on `[]` |
+| `tail l` | everything but the first element; crashes on `[]` |
+| `last l` | last element; crashes on `[]` |
+| `init l` | everything but the last element; crashes on `[]` |
+| `nth n l` | element at zero-based index `n`; crashes if out of bounds |
+| `contains e l` | `1` if `e` occurs in `l` (structural equality) |
+| `maximum l` | largest element; crashes on `[]` |
+| `minimum l` | smallest element; crashes on `[]` |
+| `lookup key l` | search an association list `[[k1, v1]; …]`; `some v` for the first matching key, or `none` |
+
+`head`, `tail`, `last`, and `init` crash on the empty list. Each has a safe
+counterpart returning a `maybe` instead:
+
+| Name | Description |
+|------|-------------|
+| `headSafe l` | `some h`, or `none` if `l` is empty |
+| `tailSafe l` | `some t`, or `none` if `l` is empty |
+| `lastSafe l` | `some x`, or `none` if `l` is empty |
+| `initSafe l` | `some l'`, or `none` if `l` is empty |
 
 **Modification**
-`prepend`, `append`, `reverse`, `intersperse`, `intercalate`, `remove`, `removeAll`, `replace`, `replaceAll`, `replaceAt`, `insertAt`, `removeAt`
 
-| Function | Description |
-|---|---|
+| Name | Description |
+|------|-------------|
 | `prepend prefix xs` | `prefix` followed by `xs`; `prepend prefix` is a partial that prepends a fixed prefix |
 | `append suffix xs` | `xs` followed by `suffix`; natural in a pipe: `xs > append suffix` |
 | `reverse l` | reverse the order of elements |
 | `intersperse sep l` | insert `sep` between every pair of elements |
+| `intercalate sep ls` | flatten a list of lists with `sep` between each |
 | `remove e l` | remove the first occurrence of `e` |
 | `removeAll val l` | remove every occurrence of `val` |
 | `replace old new l` | replace the first occurrence of `old` with `new` |
@@ -760,70 +804,89 @@ The unsafe variants `head`, `tail`, `last`, and `init` crash on an empty list. S
 | `replaceAt idx val l` | overwrite the element at zero-based index `idx` |
 | `insertAt idx val l` | insert `val` before index `idx`, shifting the rest right |
 | `removeAt idx l` | remove the element at zero-based index `idx` |
+| `nub l` | remove duplicates, keeping the first occurrence of each value |
 
 **Higher-order**
-`map`, `mapIndex`, `filter`, `filterIndex`, `mapFilter`, `flatMap`, `foldr`, `foldl`, `scanl`, `scanr`
 
-`mapFilter f l` — applies `f` to each element; `f` must return a `maybe` value. Elements where `f` returns `none` are dropped; elements where it returns `some x` contribute `x` to the result. Combines a transformation and a filter in a single pass.
+| Name | Description |
+|------|-------------|
+| `map f l` | apply `f` to every element |
+| `mapIndex f l` | apply `f index element`, with zero-based indices |
+| `filter p l` | keep the elements for which `p` returns `1` |
+| `filterIndex p l` | keep the elements for which `p index element` returns `1` |
+| `mapFilter f l` | apply `f` (returning a `maybe`) to each element, dropping `none` and unwrapping `some` — a transformation and a filter in one pass |
+| `flatMap f l` | map `f` over `l`, then flatten the resulting list of lists |
+| `find p l` | `some x` for the first element satisfying `p`, or `none` |
+| `findIndex p l` | `some i` for the zero-based index of the first element satisfying `p`, or `none` |
+| `foldr f acc l` | right-associative reduction: `f l1 (f l2 (… (f ln acc)))` |
+| `foldl f acc l` | left-associative reduction: `f (… (f (f acc l1) l2) …) ln` |
+| `foldlStrict f acc l` | `foldl` that forces the accumulator at each step (via `seq`), so a long list runs in constant depth and live space — see [§13](#13-built-in-functions) |
+| `scanl f acc l` | successive left-fold results, starting with `acc`: `[z; f z a; f (f z a) b; …]` |
+| `scanr f acc l` | successive right-fold results, ending with `acc` |
 
-`flatMap f l` — maps `f` over `l` then flattens the resulting list of lists.
+**Aggregation**
 
-`scanl f z l` — list of successive left-fold results starting with `z`: `[z; f z l1; f (f z l1) l2; …]`.
+| Name | Description |
+|------|-------------|
+| `sum l` | sum of a list of numbers (`0` for `[]`) |
+| `product l` | product of a list of numbers (`1` for `[]`) |
+| `orList l` | logical OR over a list of booleans |
+| `andList l` | logical AND over a list of booleans |
+| `anyMatch p l` | `1` if `p` holds for at least one element |
+| `allMatch p l` | `1` if `p` holds for every element (`1` for `[]`) |
+| `noneMatch p l` | `1` if `p` holds for no element (`1` for `[]`) |
+| `count p l` | number of elements satisfying `p` |
 
-`scanr f z l` — list of successive right-fold results ending with `z`.
+**Slicing and splitting**
 
-`find p l` — returns `some x` (i.e. `[x]`) for the first element satisfying `p`, or `none` (`[]`) if none does. Composes directly with `maybe` functions.
+| Name | Description |
+|------|-------------|
+| `take n l` | the first `n` elements |
+| `drop n l` | everything after the first `n` elements |
+| `slice a b l` | the elements between indices `a` and `b`, `b` excluded |
+| `takeWhile p l` | the longest prefix for which `p` holds |
+| `dropWhile p l` | what remains after that prefix |
+| `span p l` | `[prefix for which p holds, rest]` |
+| `splitAt n l` | `[first n elements, rest]` — `span` by index |
+| `splitEqual n l` | split `l` into consecutive sublists of length `n` (the last may be shorter) |
+| `tails l` | all successive suffixes: `[l; tail l; …; []]` |
+| `inits l` | all successive prefixes: `[[]; …; init l; l]` |
+| `spans l` | `inits` zipped with `tails` — `[prefix, suffix]` at every split point; used to search for substrings |
+| `groupBy f l` | split into runs of consecutive elements where `f head elem = 1`; `groupBy equal` groups equal neighbours |
+| `partition p l` | `[matching, rest]` |
+| `flatten l` | concatenate a list of lists into one list |
 
-`findIndex p l` — returns `some i` for the zero-based index of the first element satisfying `p`, or `none` if none does.
+**Zipping and reshaping**
 
-`mapIndex f l` — apply `f index element` to each element with its zero-based index.
-
-`filterIndex f l` — keep elements where `f index element` returns 1, with zero-based indices.
-
-**Aggregations**
-`sum`, `product`, `orList`, `andList`, `anyMatch`, `allMatch`, `noneMatch`, `count`
-
-**Zipping**
-`zipWith`, `zip`, `zipWith3`, `zip3`
-
-**Slicing and grouping**
-`take`, `drop`, `slice`, `takeWhile`, `dropWhile`, `span`, `splitAt`, `tails`, `inits`, `spans`, `groupBy`, `flatten`, `range`, `rangeIncl`
-
-`span f l` returns `[[taken while f holds], [rest]]`.
-`splitAt n l` returns `[[first n elements], [rest]]` — like `span` but splits by index.
-`tails l` returns all successive suffixes: `[[l]; [tail l]; …; []]`.
-`inits l` returns all successive prefixes: `[[]; …; [init l]; [l]]`.
-`spans l` zips `inits` and `tails` — each element is `[prefix, suffix]` for every split point; used to search for substrings.
-`groupBy f l` splits `l` into runs of consecutive elements where `f head elem = 1` (head is the first element of the current group). `groupBy equal` groups consecutive equal elements.
-`range a b` produces `[a; a+1; …; b-1]` — half-open interval, `b` excluded.
-`rangeIncl a b` produces `[a; a+1; …; b]` — both endpoints inclusive; equivalent to `range a (succ b)`.
-
-**Search and set-like**
-`contains`, `maximum`, `minimum`, `nth`, `nub`, `lookup`
-
-`nth n l` — zero-based index; runtime error if out of bounds.
-`nub l` — remove duplicates, keeping first occurrences.
-`maximum` / `minimum` — crash on an empty list.
-`lookup key l` — search an association list `[[k1, v1]; [k2, v2]; …]`; returns `some v` for the first matching key, or `none`.
-
-**Replication and structure**
-`replicate`, `unzip`, `transpose`
-
-`replicate n x` — list of `n` copies of `x`.
-`unzip l` — converts `[[a1,b1]; …]` into `[[a1; …], [b1; …]]`.
-`transpose rows` — turns a list of rows into a list of columns; stops at the shortest row.
+| Name | Description |
+|------|-------------|
+| `zip a b` | pair up elements: `[[a1, b1]; [a2, b2]; …]`, stopping at the shorter |
+| `zipWith f a b` | combine two lists element-wise with `f` |
+| `zip3 a b c` | as `zip`, for three lists |
+| `zipWith3 f a b c` | as `zipWith`, for three lists |
+| `unzip l` | turn `[[a1, b1]; …]` into `[[a1; …], [b1; …]]` |
+| `transpose rows` | turn a list of rows into a list of columns; stops at the shortest row |
 
 **Sorting**
-`partition`, `sortWith`, `sort`
 
-`partition p l` — returns `[matching, rest]`; both halves are lists.
-`sortWith f l` — quicksort; `f pivot elem = 1` if `elem` belongs before `pivot`.
-`sort l` — ascending sort using the builtin `lt` comparator.
+| Name | Description |
+|------|-------------|
+| `sortWith f l` | quicksort; `f pivot elem = 1` if `elem` belongs before `pivot` |
+| `sort l` | ascending sort using the builtin `lt`; numbers only — for strings use `text.sortStrings` |
 
 **Infinite lists**
-`iterate`, `times`, `downFrom`, `upFrom`, `repeat`, `cycle`
 
-`times n f x` — apply `f` to `x` exactly `n` times: `f (f (… (f x) …))`.
+Each of these produces a lazy, unbounded list; consume it with `take`,
+`takeWhile`, or a pattern match.
+
+| Name | Description |
+|------|-------------|
+| `iterate f x` | `[x; f x; f (f x); …]` |
+| `upFrom n` | `[n; n+1; n+2; …]` |
+| `downFrom n` | `[n; n-1; n-2; …]` |
+| `repeat x` | `[x; x; x; …]` |
+| `cycle l` | `l` repeated end to end, forever |
+| `times n f x` | *not* a list: apply `f` to `x` exactly `n` times (the `n`th element of `iterate f x`) |
 
 ```
 import list in
@@ -965,14 +1028,16 @@ show [hashmap.get "x" m; hashmap.getOr 0 "z" m]   -- [[10]; 0]
 Strings are lists of Unicode code points, so all `list` functions work on them;
 this module adds higher-level formatting and parsing.
 
-**`char` and named code-point constants**
+**Characters**
 
-Microfun string literals have no escape sequences, so characters that would
+Thunky string literals have no escape sequences, so characters that would
 normally be written as `\t`, `\n`, etc. must be expressed as integers.
 
-`char s` is an alias for `head` — it extracts the code point of the first (or only)
-character of a string, and is the idiomatic way to write character literals:
-`char 'A'` = `65`, `char '0'` = `48`.
+| Name | Description |
+|------|-------------|
+| `char s` | the code point of the first character of `s` — an alias for `head`, and the idiomatic character literal: `char 'A'` = `65`, `char '0'` = `48` |
+
+The named constants cover the characters that cannot be written literally:
 
 | Constant | Value | Usual escape |
 |----------|-------|--------------|
@@ -1031,12 +1096,17 @@ All functions below take a Unicode code point (an integer, as found in a Thunky 
 | `splitWith f s` | split `s` on all runs satisfying `f`; returns a list of the non-matching sections (may include empty strings at the boundaries) |
 | `replaceOneWith f repl s` | replace the first run satisfying `f` with `repl match` (a function of the matched run); returns `s` unchanged if no run is found |
 | `replaceAllWith f repl s` | replace every run satisfying `f` with `repl match`; returns `s` unchanged if no run is found |
-| `ltString a b` | `1` if `b` sorts strictly before `a` lexicographically (threshold-first, like the numeric `lt`) |
-| `gtString a b` | `1` if `b` sorts strictly after `a` |
-| `sortStrings l` | the strings of `l` in ascending lexicographic order |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
 wrong results silently. `split "" s` splits `s` into individual single-character strings.
+
+**Ordering**
+
+| Name | Description |
+|------|-------------|
+| `ltString a b` | `1` if `b` sorts strictly before `a` lexicographically (threshold-first, like the numeric `lt`) |
+| `gtString a b` | `1` if `b` sorts strictly after `a` |
+| `sortStrings l` | the strings of `l` in ascending lexicographic order |
 
 The builtin comparators are numeric, so `list.sort` cannot order strings; use
 `text.sortStrings` (or `list.sortWith text.ltString`). Comparison is code point
