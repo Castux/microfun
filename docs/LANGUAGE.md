@@ -48,7 +48,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 
 ## 2. Running a program
 
-```
+```sh
 microfun <path>
 ```
 
@@ -77,7 +77,7 @@ import list in
 
 A *program* is an optional import clause followed by a single expression:
 
-```
+```mf-static
 import math, list, mymodule in
   <expression>
 ```
@@ -86,7 +86,7 @@ A *module* is a file named `<name>.mf` that begins with an optional import claus
 then the keyword `module`, then a comma-separated list of bindings. Every binding
 in a module is public:
 
-```
+```mf-static
 import math in
 
 module
@@ -104,7 +104,7 @@ import in the `import` clause shadows the earlier one's unqualified name; the
 qualified form `module.name` always reaches the intended binding and so
 disambiguates.
 
-```
+```mf-static
 import list, mod2 in
   show mod2.foo            -- qualified access; mod2 must be in the import clause
 ```
@@ -143,7 +143,7 @@ Terminals `Name`, `Number`, and `String` are as defined in [§4](#4-lexical-elem
 follow explain and illustrate it, but they introduce no syntax beyond what is
 written here — there are no hidden forms in the prose.
 
-```
+```ebnf
 Program := Import? Expr
 Module  := Import? 'module' ListBinding
 
@@ -239,7 +239,9 @@ function), this gives multi-argument functions and partial application:
 ```
 let add3 = x -> y -> z -> add x (add y z) in
   add3 10 20 30                     -- 60
+```
 
+```
 let addFive = add 5 in addFive 10   -- 15  (partial application)
 ```
 
@@ -269,10 +271,12 @@ that the value flows through the chain in the named direction; the compose
 operators associate to the right.
 
 ```
-show (5 > add 1 > mul 2)          -- 12 : mul 2 (add 1 5)
-show (mul 2 < add 1 < 5)          -- 12 : mul 2 (add 1 5)
-show ((add 1 *> mul 2) 5)         -- 12 : add 1 first, then mul 2
-show ((add 1 <* mul 2) 5)         -- 11 : mul 2 first, then add 1
+show [
+  5 > add 1 > mul 2;                -- 12 : mul 2 (add 1 5)
+  mul 2 < add 1 < 5;                -- 12 : mul 2 (add 1 5)
+  (add 1 *> mul 2) 5;               -- 12 : add 1 first, then mul 2
+  (add 1 <* mul 2) 5                -- 11 : mul 2 first, then add 1
+]
 ```
 
 ## 9. Lambdas and pattern matching
@@ -314,7 +318,7 @@ Tuple and list patterns are **recursive**: their sub-patterns are themselves
 patterns of any kind — names, numbers, or further tuple and list patterns — so
 patterns nest to arbitrary depth and may mix matching with binding at each level.
 
-```
+```mf-static
 [a, [b, c]] -> add a (add b c)         -- a tuple pattern nested inside a tuple pattern
 
 {
@@ -340,7 +344,7 @@ Applying a lambda to a value that does not match its pattern is a run-time error
 A lambda can be written with braces to give it multiple cases, each with its own
 pattern. The cases are comma-separated:
 
-```
+```mf-static
 { pattern1 -> body1, pattern2 -> body2, … }
 ```
 
@@ -361,7 +365,7 @@ This is how `if`, list functions, and most of the standard library are written.
 
 ## 10. Bindings: `let`
 
-```
+```mf-static
 let name1 = expr1, name2 = expr2, … in body
 ```
 
@@ -375,7 +379,9 @@ let
   b = 6
 in
   show (add a b)                       -- 11
+```
 
+```
 let
   fact = { 1 -> 1, n -> mul n (fact (sub 1 n)) }
 in
@@ -411,7 +417,7 @@ A list is a convention layered on tuples:
 So a list of three elements `a`, `b`, `c` is `[a, [b, [c, []]]]`. The list
 literal `[a; b; c]` is **syntactic sugar** for exactly that nesting:
 
-```
+```mf-static
 [a; b; c]   ≡   [a, [b, [c, []]]]
 [a;]        ≡   [a, []]
 []          ≡   []                     -- the empty list and empty tuple coincide
@@ -427,7 +433,7 @@ Because lists are just tuples, list patterns are sugar too: the list pattern
 to matching `[a, [b, []]]`. The standard library's list functions destructure
 cons cells directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
 
-```
+```mf-static
 length = {
   []      -> 0,
   [h, t]  -> succ (length t)
