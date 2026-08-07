@@ -141,4 +141,30 @@ replaceOneWith = f -> repl -> s ->
 replaceAllWith = f -> repl -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, right] -> flatten [left; repl match; replaceAllWith f repl right]) >
-	maybe.default s
+	maybe.default s,
+
+-- Lexicographic comparison
+--
+-- The builtin comparators only handle numbers, so ordering strings needs
+-- these. They keep the threshold-first convention: `ltStr a b` reads "does b
+-- sort before a", so `sortStr` is `sortWith ltStr`, mirroring `list.sort`.
+--
+-- The names carry the Str suffix deliberately. Unqualified imports let a later
+-- module shadow an earlier one, so calling these `lt`/`gt`/`sort` would hide
+-- the numeric builtins and `list.sort` for every program that imports text.
+
+-- ltStr a b: 1 when b sorts strictly before a, comparing code point by code
+-- point. A string sorts before any string that extends it, so "ab" < "abc".
+ltStr = a -> b -> [a, b] > {
+	[[], _]           -> 0,        -- a exhausted: b equals a or extends it, so b is not before a
+	[_, []]           -> 1,        -- b exhausted first: b is a proper prefix of a, so b is before a
+	[[ha,ta],[hb,tb]] -> core.case
+		(eq ha hb) (ltStr ta tb)   -- same code point: compare the rest
+		core.else (lte ha hb)      -- they differ, so hb <= ha means hb < ha
+},
+
+-- gtStr a b: 1 when b sorts strictly after a.
+gtStr = a -> b -> ltStr b a,
+
+-- sortStr l: the strings of l in ascending lexicographic order.
+sortStr = sortWith ltStr
