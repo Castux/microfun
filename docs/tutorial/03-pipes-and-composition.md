@@ -22,7 +22,7 @@ The operations apply in this order: `add 3`, then `mul 2`, then `sub 1`. But in 
 
 `>` threads a value through a sequence of functions, left to right. Each stage receives the result of the previous one:
 
-```
+```thunky-static
 a > f > g > h    ≡    h (g (f a))
 ```
 
@@ -54,7 +54,7 @@ show (5 > add 1 > mul 2)    -- (5 + 1) * 2 = 12
 
 `<` is the mirror: values flow right to left.
 
-```
+```thunky-static
 h < g < f < a    ≡    h (g (f a))
 ```
 
@@ -75,7 +75,7 @@ Use `>` for multi-step pipelines; use `<` when you want to drop one level of nes
 
 The four operators cannot be mixed in a single chain:
 
-```
+```thunky-static
 a > f < g      -- SYNTAX ERROR
 (a > f) < g    -- fine: parenthesise the sub-chain
 ```
@@ -88,7 +88,7 @@ The compiler will tell you if you forget. Use parentheses to combine different o
 
 `>` applies to a specific value. `*>` builds a **new function** by chaining two functions, without a value present yet:
 
-```
+```thunky-static
 (f *> g) x    ≡    g (f x)
 ```
 
@@ -107,7 +107,7 @@ let addThenDouble = add 1 *> mul 2 in
 
 `<*` is composition in the mathematical direction — rightmost runs first:
 
-```
+```thunky-static
 (f <* g) x    ≡    f (g x)
 ```
 
@@ -149,7 +149,7 @@ Output: `[32, 212, 98.6]`
 
 Three stages composed into one named function. Contrast with the nested version:
 
-```
+```thunky-static
 let celsiusToFahrenheit = c -> add 32 (fdiv 5 (mul 9 c)) in ...
 ```
 
@@ -170,7 +170,7 @@ Output: `2`
 
 Once you reach the chapters on lists (Chapter 6), pipes become indispensable. A pipeline like:
 
-```
+```thunky-static
 [3; 1; 4; 1; 5; 9]
   > filter (gt 2)
   > sort
@@ -180,7 +180,7 @@ Once you reach the chapters on lists (Chapter 6), pipes become indispensable. A 
 
 reads exactly as it executes. Without `>`:
 
-```
+```thunky-static
 show (take 4 (sort (filter (gt 2) [3; 1; 4; 1; 5; 9])))
 ```
 
@@ -292,7 +292,7 @@ show < add 100 (mul 6 7)
 
 The inner `(mul 6 7)` still needs parentheses in the second line since `add` takes two arguments. Or use `>` for that part too:
 
-```
+```thunky-static
 show < mul 6 7 > add 100    -- ERROR: can't mix < and >
 show (mul 6 7 > add 100)    -- OK
 ```

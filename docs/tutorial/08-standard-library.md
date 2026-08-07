@@ -4,7 +4,7 @@ Thunky ships with a standard library embedded in the binary — no installation 
 
 Import modules explicitly:
 
-```
+```thunky-static
 import core, list, math in
   ...
 ```
@@ -35,12 +35,12 @@ show [
 ### `const` and `on`
 
 ```
-import core in
+import core, math in
 let
   alwaysFive = core.const 5,
-  compareByAbs = core.on lt core.abs    -- compare by absolute value
+  compareByAbs = core.on lt math.abs    -- compare by absolute value
 in
-  show [alwaysFive 100, alwaysFive "anything", compareByAbs (negate 3) 2]
+  show [alwaysFive 100, alwaysFive "anything", compareByAbs (math.negate 3) 2]
 ```
 
 - `const c x = c` — ignores its second argument.
@@ -61,7 +61,7 @@ show [
 
 `core.case` is a chained conditional:
 
-```
+```thunky-static
 core.case cond1 val1 cond2 val2 ... else default
 ```
 

@@ -8,7 +8,7 @@ So far you have used `let` informally to give names to expressions. This chapter
 
 `let` is not an assignment statement. It is an expression:
 
-```
+```thunky-static
 let name = expr in body
 ```
 
@@ -180,7 +180,7 @@ The result accumulates in `acc` rather than on the call stack. In lazy Thunky th
 
 The standard library provides `fix` in `core`:
 
-```
+```thunky-static
 fix f = f (fix f)
 ```
 
@@ -262,7 +262,7 @@ The Collatz sequence from `n`: if `n = 1`, stop; if `n` is even, `n / 2`; if odd
 import core in
 let collatz = {
   1 -> [1;],
-  n -> [n, n > core.if (eq 0 (mod 2 n)) (div 2 n) (add 1 (mul 3 n)) > collatz]
+  n -> [n, core.if (eq 0 (mod 2 n)) (div 2 n) (add 1 (mul 3 n)) > collatz]
 } in
   collatz 27 > show
 ```

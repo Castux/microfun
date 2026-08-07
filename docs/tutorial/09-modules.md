@@ -8,7 +8,7 @@ So far every program has been a single file. As programs grow, you want to split
 
 A **module** is a `.þ` (or `.th`) file that begins with an optional import clause and then the `module` keyword, followed by a comma-separated list of bindings:
 
-```
+```thunky-static
 -- stats.þ
 import math, list in
 
@@ -36,7 +36,7 @@ Every binding in a module is automatically **public** — there is no concept of
 
 Create a file `vec2.þ` (a 2D vector library):
 
-```
+```thunky-static
 -- vec2.þ
 module
 
@@ -53,7 +53,7 @@ Watch out: the module-level binding `add` shadows the builtin `add` for every ot
 
 To avoid this, use a name that does not clash with any builtin:
 
-```
+```thunky-static
 -- vec2.þ
 module
 
@@ -76,7 +76,7 @@ Note: `length` here shadows the builtin `length` (there is none — `length` is 
 
 From a program file (or another module), import with `import`:
 
-```
+```thunky-static
 import vec2 in
 
 let
@@ -96,19 +96,19 @@ The runtime looks for `vec2.þ` (or `vec2.th`) in the **current working director
 
 After `import vec2`, all names from `vec2` are available both unqualified:
 
-```
+```thunky-static
 show (length [3, 4])    -- vec2.length, since vec2 is imported
 ```
 
 and qualified:
 
-```
+```thunky-static
 show (vec2.length [3, 4])
 ```
 
 Unqualified access uses the **last import's definition** when names clash. If you import `list` and then `vec2`, and both export `length`, the unqualified `length` refers to `vec2.length`. Use qualified names to be explicit:
 
-```
+```thunky-static
 import list, vec2 in
   show [list.length [1; 2; 3], vec2.length [3, 4]]
 ```
@@ -121,12 +121,12 @@ Modules can themselves import other modules. Those imported bindings are availab
 
 Transitive dependencies are loaded once and cached, but they are not in scope for the importer unless explicitly listed in their own `import` clause:
 
-```
+```thunky-static
 import vec2 in
   show (math.abs (negate 5))    -- ERROR: math is not in scope here
 ```
 
-```
+```thunky-static
 import math, vec2 in
   show (math.abs (negate 5))    -- OK
 ```
@@ -145,7 +145,7 @@ For example, if `a.þ` imports `b` and `b.þ` imports `a`, Thunky handles this w
 
 Because the runtime checks the current directory first, you can replace a standard library module by placing a file with the same name next to your program:
 
-```
+```thunky-static
 -- list.þ   (in your project directory)
 module
 
@@ -160,7 +160,7 @@ This replaces the built-in `list` module for that run. Useful for experimentatio
 
 Let us build a complete `stats.þ` module and use it.
 
-```
+```thunky-static
 -- stats.þ
 import math, list, core in
 
@@ -196,7 +196,7 @@ mode = xs ->
 
 And a program that uses it:
 
-```
+```thunky-static
 -- main.þ
 import stats in
 
@@ -228,7 +228,7 @@ A few guidelines:
 
 ## A larger example: matrix module
 
-```
+```thunky-static
 -- matrix.þ
 import list in
 
@@ -259,7 +259,7 @@ scalarMul = s -> list.map (list.map (mul s))
 
 Using it:
 
-```
+```thunky-static
 import matrix in
 
 let
@@ -300,7 +300,7 @@ Then write a program that imports and uses all four.
 
 `geometry.þ`:
 
-```
+```thunky-static
 module
 
 circleArea   = r -> mul (mul r r) 3.14159265,
@@ -311,7 +311,7 @@ hypot        = a -> b -> sqrt (add (mul a a) (mul b b))
 
 `main.þ`:
 
-```
+```thunky-static
 import geometry in
 show [
   geometry.circleArea 5,
@@ -334,7 +334,7 @@ Write a `roman.þ` module that converts positive integers to Roman numerals. The
 
 `roman.þ`:
 
-```
+```thunky-static
 import list, text in
 
 module
@@ -359,7 +359,7 @@ toRoman = n ->
 
 `main.þ`:
 
-```
+```thunky-static
 import roman in
 write (roman.toRoman 2024)    -- MMXXIV
 ```
@@ -382,7 +382,7 @@ Write a program that imports `classify` and tests it on several numbers.
 
 `even_odd.þ`:
 
-```
+```thunky-static
 module
 
 isEven = { 0 -> 1, n -> isOdd (sub 1 n) },
@@ -391,7 +391,7 @@ isOdd  = { 0 -> 0, n -> isEven (sub 1 n) }
 
 `classify.þ`:
 
-```
+```thunky-static
 import even_odd, core in
 
 module
@@ -404,7 +404,7 @@ classify = {
 
 `main.þ`:
 
-```
+```thunky-static
 import classify, list in
 
 list.map classify.classify [0; 1; 2; 3; 4; 7; 10] > list.map write > eval
@@ -433,7 +433,7 @@ Then write a program that constructs and evaluates a few expressions.
 
 `calc.þ`:
 
-```
+```thunky-static
 module
 
 eval = {
@@ -445,7 +445,7 @@ eval = {
 
 `main.þ`:
 
-```
+```thunky-static
 import calc in
 
 let

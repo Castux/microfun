@@ -117,7 +117,7 @@ Note: `length` refers to itself here. This is **recursion** — a name visible i
 
 A multi-case lambda is written with braces:
 
-```
+```thunky-static
 { pattern1 -> body1, pattern2 -> body2, … }
 ```
 
@@ -125,7 +125,7 @@ Cases are tried in order; the first match wins. If no case matches, it is a runt
 
 Single-case lambdas do not need braces:
 
-```
+```thunky-static
 x -> add x 1          -- no braces needed
 { x -> add x 1 }      -- same thing
 ```
@@ -316,7 +316,7 @@ Write `thirdElement` that returns the third element of a list, using nested patt
 A list `[a; b; c; ...]` desugars to `[a, [b, [c, rest]]]`:
 
 ```
-let thirdElement = [_, [_, [x, _]]] -> x in
+let thirdElement = [a, [b, [x, rest]]] -> x in
   show (thirdElement [10; 20; 30; 40])
 ```
 

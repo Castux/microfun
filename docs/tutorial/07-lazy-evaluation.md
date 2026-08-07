@@ -195,7 +195,7 @@ If you build a complex structure but only examine part of it, only the examined 
 
 ### Good news: short-circuiting is free
 
-```
+```thunky-static
 import core in
   core.and 0 (someLongComputation)    -- someLongComputation is never called
 ```
@@ -332,7 +332,7 @@ in
 
 `takeWhile (gt 1)` keeps elements greater than 1, stopping before reaching 1. To include the final 1:
 
-```
+```thunky-static
   collatzStream = n -> list.iterate collatzStep n > list.takeWhile (gt 1) > list.append [1;]
 ```
 

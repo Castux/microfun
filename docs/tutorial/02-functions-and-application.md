@@ -53,7 +53,7 @@ Names are separated by commas; the whole block ends with `in` and then the body 
 
 Applying a function to an argument is written by putting them next to each other:
 
-```
+```thunky-static
 f x
 ```
 
@@ -82,7 +82,7 @@ You may have noticed that `add`, `mul`, etc. take their arguments this way too. 
 
 Because every function takes one argument and returns a value, you can stop early and get a new function. This is **partial application**:
 
-```
+```thunky-static
 let addFive = add 5 in
   show (addFive 10)    -- 15
 
@@ -122,7 +122,7 @@ The comparison builtins (`lt`, `lte`, `gt`, `gte`, `eq`, `neq`) return `1` for t
 
 Since functions are just values, you can put them in tuples, pass them as arguments, and return them:
 
-```
+```thunky-static
 let apply = f -> x -> f x in
   show (apply (mul 2) 7)    -- 14
 
@@ -140,7 +140,7 @@ This is the basis of **higher-order functions**: functions that take or return o
 
 `add`, `mul`, `show`, `sqrt`, and all other builtins are just functions. They can be passed around like any user-defined function:
 
-```
+```thunky-static
 let applyToFive = f -> f 5 in
   show (applyToFive (mul 2))    -- 10
 

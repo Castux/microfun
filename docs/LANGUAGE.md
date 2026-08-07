@@ -48,7 +48,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 
 ## 2. Running a program
 
-```
+```sh
 thunky <path>
 ```
 
@@ -77,7 +77,7 @@ import list in
 
 A *program* is an optional import clause followed by a single expression:
 
-```
+```thunky-static
 import math, list, mymodule in
   <expression>
 ```
@@ -86,7 +86,7 @@ A *module* is a file named `<name>.th` (or `<name>.þ`) that begins with an opti
 then the keyword `module`, then a comma-separated list of bindings. Every binding
 in a module is public:
 
-```
+```thunky-static
 import math in
 
 module
@@ -104,7 +104,7 @@ import in the `import` clause shadows the earlier one's unqualified name; the
 qualified form `module.name` always reaches the intended binding and so
 disambiguates.
 
-```
+```thunky-static
 import list, mod2 in
   show mod2.foo            -- qualified access; mod2 must be in the import clause
 ```
@@ -143,7 +143,7 @@ Terminals `Name`, `Number`, and `String` are as defined in [§4](#4-lexical-elem
 follow explain and illustrate it, but they introduce no syntax beyond what is
 written here — there are no hidden forms in the prose.
 
-```
+```ebnf
 Program := Import? Expr
 Module  := Import? 'module' ListBinding
 
@@ -236,7 +236,7 @@ Functions are applied by juxtaposition: `f x`. Application is left-associative,
 so `f a b c` means `((f a) b) c`. Combined with currying (a function returning a
 function), this gives multi-argument functions and partial application:
 
-```
+```thunky-static
 let add3 = x -> y -> z -> add x (add y z) in
   add3 10 20 30                     -- 60
 
@@ -314,7 +314,7 @@ Tuple and list patterns are **recursive**: their sub-patterns are themselves
 patterns of any kind — names, numbers, or further tuple and list patterns — so
 patterns nest to arbitrary depth and may mix matching with binding at each level.
 
-```
+```thunky-static
 [a, [b, c]] -> add a (add b c)         -- a tuple pattern nested inside a tuple pattern
 
 {
@@ -340,7 +340,7 @@ Applying a lambda to a value that does not match its pattern is a run-time error
 A lambda can be written with braces to give it multiple cases, each with its own
 pattern. The cases are comma-separated:
 
-```
+```thunky-static
 { pattern1 -> body1, pattern2 -> body2, … }
 ```
 
@@ -361,7 +361,7 @@ This is how `if`, list functions, and most of the standard library are written.
 
 ## 10. Bindings: `let`
 
-```
+```thunky-static
 let name1 = expr1, name2 = expr2, … in body
 ```
 
@@ -369,7 +369,7 @@ let name1 = expr1, name2 = expr2, … in body
 each right-hand side may refer to any name in the group, including itself. Because
 of laziness this enables recursion, mutual recursion, and self-referential data:
 
-```
+```thunky-static
 let
   a = 5,
   b = 6
@@ -411,7 +411,7 @@ A list is a convention layered on tuples:
 So a list of three elements `a`, `b`, `c` is `[a, [b, [c, []]]]`. The list
 literal `[a; b; c]` is **syntactic sugar** for exactly that nesting:
 
-```
+```thunky-static
 [a; b; c]   ≡   [a, [b, [c, []]]]
 [a;]        ≡   [a, []]
 []          ≡   []                     -- the empty list and empty tuple coincide
@@ -427,7 +427,7 @@ Because lists are just tuples, list patterns are sugar too: the list pattern
 to matching `[a, [b, []]]`. The standard library's list functions destructure
 cons cells directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
 
-```
+```thunky-static
 length = {
   []      -> 0,
   [h, t]  -> succ (length t)
@@ -552,11 +552,29 @@ computation; `list.foldlStrict` uses `seq` to force the accumulator at each step
 so runs in constant depth and live space. Unlike `eval`, `seq` forces only to weak
 head normal form (the outermost constructor), not all the way down.
 
+`seq` is a builtin for speed, not for expressiveness: it can be written in Thunky
+itself. Matching a constructor or literal pattern forces the subject to weak head
+normal form in order to test it, and that happens even when a later catch-all case
+is the one that matches — so a two-case lambda forces its argument and then ignores
+what it found:
+
+```
+let
+	mySeq = a -> b -> a > { 0 -> b, anything -> b },
+	x = peek 42
+in
+	mySeq x 'forced x first' > write
+```
+
+This behaves exactly like `seq` for every value type, keeps `b` unforced, and makes
+a strict fold stack-safe. It is only about 20% slower than the builtin (one extra
+closure application and match per step), which is why `seq` stays a primitive.
+
 ### Comparator convention
 
 The binary comparison builtins follow a **threshold-first** convention: the first argument is the reference value (the threshold), and the second is the value being tested. `lt 4` is a predicate meaning "is less than 4". The natural reading is with the pipe operator:
 
-```
+```thunky-static
 x > lt 4      -- is x less than 4?
 x > gt 0      -- is x positive?
 x > gte 100   -- is x at least 100?
@@ -566,7 +584,7 @@ Written as a direct call `lt 4 x` the order looks reversed, but the meaning is t
 
 This convention makes partial application idiomatic:
 
-```
+```thunky-static
 filter (lt 10) xs        -- keep elements less than 10
 takeWhile (gt 0) xs      -- take while positive
 sortWith lt xs           -- ascending: elements lt pivot go before it
@@ -667,16 +685,16 @@ is `[]`. Because maybes are single-element tuples, tuple pattern matching works
 directly: `[x] -> …` matches `some x` and `[] -> …` matches `none`.
 
 ```
-import maybe in
+import core, maybe in
 
 let safeDivide = x -> y ->
   if (eq y 0)
     (maybe.none)
-    (maybe.some (fdiv x y))
+    (maybe.some (fdiv y x))       -- fdiv is threshold-first: fdiv y x is x / y
 in
 show [
-  maybe.fmap (mul 2) (safeDivide 10 5),   -- [4.0]  (some 4.0)
-  maybe.fmap (mul 2) (safeDivide 10 0),   -- []     (none)
+  maybe.fmap (mul 2) (safeDivide 10 5),   -- [4]  (some 4)
+  maybe.fmap (mul 2) (safeDivide 10 0),   -- []   (none)
   maybe.default 0 (safeDivide 10 0)       -- 0
 ]
 ```
@@ -1013,9 +1031,19 @@ All functions below take a Unicode code point (an integer, as found in a Thunky 
 | `splitWith f s` | split `s` on all runs satisfying `f`; returns a list of the non-matching sections (may include empty strings at the boundaries) |
 | `replaceOneWith f repl s` | replace the first run satisfying `f` with `repl match` (a function of the matched run); returns `s` unchanged if no run is found |
 | `replaceAllWith f repl s` | replace every run satisfying `f` with `repl match`; returns `s` unchanged if no run is found |
+| `ltStr a b` | `1` if `b` sorts strictly before `a` lexicographically (threshold-first, like the numeric `lt`) |
+| `gtStr a b` | `1` if `b` sorts strictly after `a` |
+| `sortStr l` | the strings of `l` in ascending lexicographic order |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
 wrong results silently. `split "" s` splits `s` into individual single-character strings.
+
+The builtin comparators are numeric, so `list.sort` cannot order strings; use
+`text.sortStr` (or `list.sortWith text.ltStr`). Comparison is code point by code
+point, so uppercase sorts before lowercase, and a string sorts before any string
+that extends it (`"ab"` before `"abc"`). The `Str` suffix is deliberate: an
+unqualified `import text` would otherwise shadow the numeric `lt`/`gt` builtins
+and `list.sort`.
 
 ```
 import text, list in

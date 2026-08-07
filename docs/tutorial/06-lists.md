@@ -12,7 +12,7 @@ A list is either:
 
 A three-element list `a, b, c` is therefore:
 
-```
+```thunky-static
 [a, [b, [c, []]]]
 ```
 
@@ -24,7 +24,7 @@ This is the complete, desugared representation. Writing that by hand for every l
 
 The semicolon-separated form `[a; b; c]` is sugar for nested cons cells:
 
-```
+```thunky-static
 [a; b; c]   ≡   [a, [b, [c, []]]]
 [a; b]      ≡   [a, [b, []]]
 [a;]        ≡   [a, []]          -- single-element list
@@ -49,7 +49,7 @@ The separator — semicolon vs. comma — determines whether you get a list or a
 
 Since lists are 2-tuples, pattern matching uses tuple syntax:
 
-```
+```thunky-static
 let
   myHead = [h, t] -> h,
   myTail = [h, t] -> t
@@ -73,7 +73,7 @@ A string literal like `"hello"` is sugar for the list of its Unicode code points
 
 To print text as characters (not as a list of numbers), use `write` instead of `show`:
 
-```
+```thunky-static
 write "hello"        -- prints: hello
 show "hello"         -- prints: [104; 101; 108; 108; 111]
 ```
@@ -150,7 +150,7 @@ Output: `[[3; 2; 1], [1; 2; 3; 4; 5], [0; 1; 2; 3]]`
 
 `foldl f z xs` reduces left-to-right: `f (f (f z x1) x2) x3`.
 
-```
+```thunky-static
 import list in
 [1; 2; 3; 4] > list.foldr add 0 > show    -- 10
 [1; 2; 3; 4] > list.foldl add 0 > show    -- 10
@@ -170,7 +170,7 @@ show [
 
 ### Slicing
 
-```
+```thunky-static
 import list in
 [1; 2; 3; 4; 5] > list.take 3 > show           -- [1; 2; 3]
 [1; 2; 3; 4; 5] > list.drop 3 > show           -- [4; 5]
@@ -249,7 +249,7 @@ import list, text in
 "the cat sat on the mat the cat sat"
   > text.split " "
   > list.nub
-  > list.sort
+  > text.sortStr        -- list.sort compares numbers; strings need text.sortStr
   > show
 ```
 
@@ -258,9 +258,9 @@ Output: `["cat"; "mat"; "on"; "sat"; "the"]`
 **Top-5 by absolute value:**
 
 ```
-import list, math in
-[3; negate 8; 1; negate 4; 7; negate 2; 9; 5]
-  > list.sortWith (math.on gt math.abs)
+import list, math, core in
+[3; math.negate 8; 1; math.negate 4; 7; math.negate 2; 9; 5]
+  > list.sortWith (core.on gt math.abs)
   > list.take 5
   > show
 ```

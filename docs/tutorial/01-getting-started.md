@@ -10,7 +10,7 @@ Thunky is deliberately minimal. There are two runtime types: **numbers** and **t
 
 Save your code to a file (`.þ` or `.th` both work) and run it:
 
-```
+```sh
 thunky myprogram.þ
 ```
 
@@ -38,7 +38,7 @@ show 42
 
 `show` prints its argument and returns it. That second file produces:
 
-```
+```text
 42
 ```
 
@@ -122,7 +122,7 @@ show (add (show 3) (show 4))
 
 This prints three lines:
 
-```
+```text
 3
 4
 7
