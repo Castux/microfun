@@ -77,8 +77,8 @@ const (
 	hashTagTuple  byte = 0x03
 )
 
-func fnvByte(h uint64, b byte) uint64        { return (h ^ uint64(b)) * fnvPrime64 }
-func fnvU64(h, v uint64) uint64              {
+func fnvByte(h uint64, b byte) uint64 { return (h ^ uint64(b)) * fnvPrime64 }
+func fnvU64(h, v uint64) uint64 {
 	for i := 0; i < 8; i++ {
 		h = fnvByte(h, byte(v>>(i*8)))
 	}

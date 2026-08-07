@@ -3,8 +3,6 @@ package value
 import (
 	"fmt"
 	"math"
-
-	"thunky/internal/source"
 )
 
 type PrimOp uint8
@@ -74,68 +72,72 @@ var PrimArity = [primOpCount]int{
 	PrimSeq:  2,
 }
 
-// EvalPrim executes the saturated primitive operation.
-// The arguments in args must already be evaluated to WHNF for math prims.
-func EvalPrim(op PrimOp, args []Value) Value {
-	// The caller (machine) will force arguments. For now we assume they are forced.
-	// Actually, the math prims expect float64 numbers.
-	getNumber := func(v Value) float64 {
-		if v.Tag != NumberTag {
-			panic(&source.RuntimeError{Message: "argument to math primitive is not a number"})
-		}
-		return v.Num
+// boolValue encodes a comparison result in the language's 0/1 convention.
+func boolValue(b bool) Value {
+	if b {
+		return NumberValue(1)
 	}
+	return NumberValue(0)
+}
 
+// EvalPrim executes a saturated numeric primitive. The machine forces every
+// operand and verifies it is a number before calling (see finishBuiltin), so
+// the kernels read .Num directly — re-checking the tag here would be pure
+// duplication on the hot path.
+//
+// Note the argument order: the comparison and subtraction builtins are
+// threshold-first (`sub a b` is b - a, `lt a b` is b < a), so args[1] is the
+// left operand of the arithmetic.
+func EvalPrim(op PrimOp, args []Value) Value {
+	if len(args) == 1 {
+		return EvalPrim1(op, args[0].Num)
+	}
+	return EvalPrim2(op, args[0].Num, args[1].Num)
+}
+
+// EvalPrim1 runs a unary numeric kernel on an already-forced operand.
+func EvalPrim1(op PrimOp, a float64) Value {
+	switch op {
+	case PrimSqrt:
+		return NumberValue(math.Sqrt(a))
+	default:
+		panic("EvalPrim1: not a unary numeric primitive")
+	}
+}
+
+// EvalPrim2 runs a binary numeric kernel on already-forced operands, where a
+// is the first source-level argument and b the second.
+func EvalPrim2(op PrimOp, a, b float64) Value {
 	switch op {
 	case PrimAdd:
-		return NumberValue(getNumber(args[1]) + getNumber(args[0]))
+		return NumberValue(b + a)
 	case PrimSub:
-		return NumberValue(getNumber(args[1]) - getNumber(args[0]))
+		return NumberValue(b - a)
 	case PrimMul:
-		return NumberValue(getNumber(args[1]) * getNumber(args[0]))
+		return NumberValue(b * a)
 	case PrimDiv:
-		return NumberValue(float64(int(getNumber(args[1])) / int(getNumber(args[0]))))
+		return NumberValue(float64(int(b) / int(a)))
 	case PrimFdiv:
-		return NumberValue(getNumber(args[1]) / getNumber(args[0]))
+		return NumberValue(b / a)
 	case PrimMod:
-		return NumberValue(float64(int(getNumber(args[1])) % int(getNumber(args[0]))))
+		return NumberValue(float64(int(b) % int(a)))
 	case PrimFmod:
-		return NumberValue(math.Mod(getNumber(args[1]), getNumber(args[0])))
+		return NumberValue(math.Mod(b, a))
 	case PrimPow:
-		return NumberValue(math.Pow(getNumber(args[1]), getNumber(args[0])))
-	case PrimSqrt:
-		return NumberValue(math.Sqrt(getNumber(args[0])))
+		return NumberValue(math.Pow(b, a))
 	case PrimEq:
-		if getNumber(args[0]) == getNumber(args[1]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
-	case PrimLt:
-		if getNumber(args[1]) < getNumber(args[0]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
-	case PrimLte:
-		if getNumber(args[1]) <= getNumber(args[0]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
-	case PrimGte:
-		if getNumber(args[1]) >= getNumber(args[0]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
-	case PrimGt:
-		if getNumber(args[1]) > getNumber(args[0]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
+		return boolValue(a == b)
 	case PrimNeq:
-		if getNumber(args[0]) != getNumber(args[1]) {
-			return NumberValue(1)
-		}
-		return NumberValue(0)
+		return boolValue(a != b)
+	case PrimLt:
+		return boolValue(b < a)
+	case PrimLte:
+		return boolValue(b <= a)
+	case PrimGte:
+		return boolValue(b >= a)
+	case PrimGt:
+		return boolValue(b > a)
 	default:
-		panic("EvalPrim: structural builtin should be handled in builtins.go or machine")
+		panic("EvalPrim2: not a binary numeric primitive")
 	}
 }
