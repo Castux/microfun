@@ -12,7 +12,10 @@ import (
 
 var (
 	reWhitespace = regexp.MustCompile(`^\s+`)
-	reComment    = regexp.MustCompile(`^--[^\n\r]*\r?\n`)
+	// A comment runs to the end of the line, or to the end of the file when the
+	// last line has no terminator (a file — or an editor buffer — may end on a
+	// comment with no trailing newline).
+	reComment = regexp.MustCompile(`^--[^\n\r]*(\r?\n|$)`)
 	reIdentifier = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	reString     = regexp.MustCompile(`^('[^']*'|"[^"]*")`)
 	reNumber     = regexp.MustCompile(`^\d+(\.\d+)?`)
