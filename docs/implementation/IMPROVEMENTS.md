@@ -136,14 +136,39 @@ the source-mapping shape to serialize.
 
 ---
 
-## 10. Drop the redundant number check in the prim kernel
+## 10. Drop the redundant number check in the prim kernel *(done)*
 
-**Problem:** Before calling `evalPrim`, the machine already forces every operand of
-an arithmetic/comparison prim and verifies each is a `NumberTag`. `evalPrim` then
-reads each operand through `getNumber`, which re-checks the tag (and would panic on
-a non-number) — a dead branch on the arithmetic hot path, paid once per operand
-access, and several kernels read an operand twice.
+**Problem:** Before calling `EvalPrim`, `finishBuiltin` already forces every operand
+of an arithmetic/comparison prim and verifies each is a `NumberTag`. `EvalPrim` then
+read each operand through a `getNumber` closure that re-checked the tag — a branch
+that could only fire on a machine bug.
 
-**Fix:** Since the machine guarantees all operands are numbers at the call, read
-`.Num` directly in the kernel and delete `getNumber`'s tag test. The check is pure
-defensive duplication of the machine's `allNumbers` pass.
+**Fix:** *(implemented)* The kernels are now `EvalPrim1`/`EvalPrim2`, taking raw
+`float64`. Measured effect across the bench suite: **within noise** (fib 6.36 s →
+6.30 s, collatz 7.45 s → 7.31 s, match-dispatch 5.92 s → 6.00 s) — Go was inlining
+the closure and the tag branch predicted perfectly. Kept as a clarity change, not a
+speedup; do not expect a win from removing similar defensive checks elsewhere
+without measuring first.
+
+---
+
+## Measured and rejected
+
+Two items proposed after an earlier profiling pass turned out to be **already
+solved** by "Memoize all thunks: drop the call-by-name Update flag". Both are
+recorded here so they are not re-proposed:
+
+- **Structural builtins returning their argument unforced.** The claim was that a
+  top-level `… > show` re-runs the whole program, because `show` returns the raw
+  pipe thunk and the machine's final `reduce` forces it a second time. That was
+  worth ~1.8× when pipe thunks were call-by-name. Now every thunk memoises, so the
+  second force is a memo hit: `fib 29 > show` and `let r = fib 29 in show r` are
+  1.56 s and 1.52 s — no difference.
+- **Forcing each match subject once per application.** `Case` still resets the
+  subject stack to the raw argument and each `MatchNumber`/`MatchTuple` re-forces
+  it, but re-forcing a memoised thunk just follows the memo. Verified directly:
+  `{ 0 -> …, 1 -> …, 2 -> …, n -> … } (peek 9)` prints `9` exactly once, not once
+  per case tried.
+
+The general lesson: memoising every thunk subsumed both, so the remaining wins are
+in *allocation*, not in repeated evaluation.
