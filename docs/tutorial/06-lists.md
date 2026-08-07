@@ -249,7 +249,7 @@ import list, text in
 "the cat sat on the mat the cat sat"
   > text.split " "
   > list.nub
-  > text.sortStr        -- list.sort compares numbers; strings need text.sortStr
+  > text.sortStrings    -- list.sort only compares numbers
   > show
 ```
 

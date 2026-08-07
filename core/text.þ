@@ -146,25 +146,25 @@ replaceAllWith = f -> repl -> s ->
 -- Lexicographic comparison
 --
 -- The builtin comparators only handle numbers, so ordering strings needs
--- these. They keep the threshold-first convention: `ltStr a b` reads "does b
--- sort before a", so `sortStr` is `sortWith ltStr`, mirroring `list.sort`.
+-- these. They keep the threshold-first convention: `ltString a b` reads "does b
+-- sort before a", so `sortStrings` is `sortWith ltString`, mirroring `list.sort`.
 --
--- The names carry the Str suffix deliberately. Unqualified imports let a later
--- module shadow an earlier one, so calling these `lt`/`gt`/`sort` would hide
--- the numeric builtins and `list.sort` for every program that imports text.
+-- The String suffix is deliberate. Unqualified imports let a later module
+-- shadow an earlier one, so calling these `lt`/`gt`/`sort` would hide the
+-- numeric builtins and `list.sort` for every program that imports text.
 
--- ltStr a b: 1 when b sorts strictly before a, comparing code point by code
+-- ltString a b: 1 when b sorts strictly before a, comparing code point by code
 -- point. A string sorts before any string that extends it, so "ab" < "abc".
-ltStr = a -> b -> [a, b] > {
-	[[], _]           -> 0,        -- a exhausted: b equals a or extends it, so b is not before a
-	[_, []]           -> 1,        -- b exhausted first: b is a proper prefix of a, so b is before a
+ltString = a -> b -> [a, b] > {
+	[[], _]           -> 0,          -- a exhausted: b equals a or extends it, so b is not before a
+	[_, []]           -> 1,          -- b exhausted first: b is a proper prefix of a, so b is before a
 	[[ha,ta],[hb,tb]] -> core.case
-		(eq ha hb) (ltStr ta tb)   -- same code point: compare the rest
-		core.else (lte ha hb)      -- they differ, so hb <= ha means hb < ha
+		(eq ha hb) (ltString ta tb)  -- same code point: compare the rest
+		core.else (lte ha hb)        -- they differ, so hb <= ha means hb < ha
 },
 
--- gtStr a b: 1 when b sorts strictly after a.
-gtStr = a -> b -> ltStr b a,
+-- gtString a b: 1 when b sorts strictly after a.
+gtString = a -> b -> ltString b a,
 
--- sortStr l: the strings of l in ascending lexicographic order.
-sortStr = sortWith ltStr
+-- sortStrings l: the strings of l in ascending lexicographic order.
+sortStrings = sortWith ltString

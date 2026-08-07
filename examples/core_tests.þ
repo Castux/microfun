@@ -293,19 +293,19 @@ runTests [
 	assert "text.replaceAllWith" (text.replaceAllWith text.isSpace (length *> string) "hello    world   foo") "hello4world3foo";
 	assert "text.replaceAllWith-none" (text.replaceAllWith text.isSpace (x -> "X") "hello") "hello";
 
-	assert "text.ltStr-before" (text.ltStr "b" "a") 1;
-	assert "text.ltStr-after" (text.ltStr "a" "b") 0;
-	assert "text.ltStr-prefix" (text.ltStr "abc" "ab") 1;
-	assert "text.ltStr-extends" (text.ltStr "ab" "abc") 0;
-	assert "text.ltStr-equal" (text.ltStr "aa" "aa") 0;
-	assert "text.ltStr-empty-b" (text.ltStr "a" "") 1;
-	assert "text.ltStr-empty-a" (text.ltStr "" "a") 0;
-	assert "text.ltStr-both-empty" (text.ltStr "" "") 0;
-	assert "text.gtStr" (text.gtStr "a" "b") 1;
-	assert "text.sortStr" (text.sortStr ["pear"; "apple"; "fig"; "apple pie"; ""])
+	assert "text.ltString-before" (text.ltString "b" "a") 1;
+	assert "text.ltString-after" (text.ltString "a" "b") 0;
+	assert "text.ltString-prefix" (text.ltString "abc" "ab") 1;
+	assert "text.ltString-extends" (text.ltString "ab" "abc") 0;
+	assert "text.ltString-equal" (text.ltString "aa" "aa") 0;
+	assert "text.ltString-empty-b" (text.ltString "a" "") 1;
+	assert "text.ltString-empty-a" (text.ltString "" "a") 0;
+	assert "text.ltString-both-empty" (text.ltString "" "") 0;
+	assert "text.gtString" (text.gtString "a" "b") 1;
+	assert "text.sortStrings" (text.sortStrings ["pear"; "apple"; "fig"; "apple pie"; ""])
 		[""; "apple"; "apple pie"; "fig"; "pear"];
-	assert "text.sortStr-empty" (text.sortStr []) [];
-	assert "text.sortStr-case" (text.sortStr ["fig"; "Fig"]) ["Fig"; "fig"];
+	assert "text.sortStrings-empty" (text.sortStrings []) [];
+	assert "text.sortStrings-case" (text.sortStrings ["fig"; "Fig"]) ["Fig"; "fig"];
 
 	-- heap.mf
 	assert "heap.emptyHeap" (heap.isEmpty heap.emptyHeap) 1;

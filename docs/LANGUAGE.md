@@ -1031,19 +1031,19 @@ All functions below take a Unicode code point (an integer, as found in a Thunky 
 | `splitWith f s` | split `s` on all runs satisfying `f`; returns a list of the non-matching sections (may include empty strings at the boundaries) |
 | `replaceOneWith f repl s` | replace the first run satisfying `f` with `repl match` (a function of the matched run); returns `s` unchanged if no run is found |
 | `replaceAllWith f repl s` | replace every run satisfying `f` with `repl match`; returns `s` unchanged if no run is found |
-| `ltStr a b` | `1` if `b` sorts strictly before `a` lexicographically (threshold-first, like the numeric `lt`) |
-| `gtStr a b` | `1` if `b` sorts strictly after `a` |
-| `sortStr l` | the strings of `l` in ascending lexicographic order |
+| `ltString a b` | `1` if `b` sorts strictly before `a` lexicographically (threshold-first, like the numeric `lt`) |
+| `gtString a b` | `1` if `b` sorts strictly after `a` |
+| `sortStrings l` | the strings of `l` in ascending lexicographic order |
 
 `stringToInt` and `stringToFloat` do no validation — non-digit characters produce
 wrong results silently. `split "" s` splits `s` into individual single-character strings.
 
 The builtin comparators are numeric, so `list.sort` cannot order strings; use
-`text.sortStr` (or `list.sortWith text.ltStr`). Comparison is code point by code
-point, so uppercase sorts before lowercase, and a string sorts before any string
-that extends it (`"ab"` before `"abc"`). The `Str` suffix is deliberate: an
-unqualified `import text` would otherwise shadow the numeric `lt`/`gt` builtins
-and `list.sort`.
+`text.sortStrings` (or `list.sortWith text.ltString`). Comparison is code point
+by code point, so uppercase sorts before lowercase, and a string sorts before
+any string that extends it (`"ab"` before `"abc"`). The `String` suffix is
+deliberate: an unqualified `import text` would otherwise shadow the numeric
+`lt`/`gt` builtins and `list.sort`.
 
 ```
 import text, list in
