@@ -216,7 +216,16 @@ import list in
   list.foldl add 0 (list.upFrom 1)
 ```
 
-This doesn't terminate: `foldl` on an infinite list never reaches the end to return the accumulator. On large finite lists a similar problem arises — the accumulated thunks build up without being evaluated, consuming memory before the fold ever returns. The solution is to use `foldr` for list-building operations and reach for `foldl` only when you need left-associative reduction on a known-finite list.
+This doesn't terminate: `foldl` on an infinite list never reaches the end to return the accumulator.
+
+On large *finite* lists a subtler problem arises. `foldl add 0` does not add as it goes — it builds a chain of a million unevaluated `add` thunks and only collapses it at the very end, so the whole chain is live at once. The fix is `list.foldlStrict`, which forces the accumulator at each step (using `seq`, see the reference) and so runs in constant depth and live space:
+
+```
+import list in
+  list.range 0 200000 > list.foldlStrict add 0 > show    -- 19999900000
+```
+
+As a rule: use `foldr` for building a list (it works on infinite lists when the combining function is lazy), `foldlStrict` for reducing a long list to a single strict value, and plain `foldl` only for short lists.
 
 ---
 
