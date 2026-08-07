@@ -1,4 +1,4 @@
--- text.mf: string formatting, parsing, and value rendering.
+-- text.þ: string formatting, parsing, and value rendering.
 -- Strings in microfun are lists of Unicode code points, so all list operations
 -- work on them directly. This module adds higher-level formatting utilities.
 import list, math, core, maybe in

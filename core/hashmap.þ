@@ -1,4 +1,4 @@
--- hashmap.mf: binary search tree keyed by hash codes.
+-- hashmap.þ: binary search tree keyed by hash codes.
 -- Node structure: [hash, key, value, left, right]; empty tree and leaves are [].
 -- Hashes are numbers compared with the builtin lt.
 -- On hash collision (same hash, different key), the new entry is placed in the

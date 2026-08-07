@@ -1,7 +1,5 @@
--- core.mf: foundational combinators, tuple accessors, and boolean logic.
--- Imports list for `ifs` (which uses list.foldr).
--- Circular with list (list imports core for `if`, `not`, etc.) — permitted by the language.
-import list in
+-- core.þ: foundational combinators, tuple accessors, and boolean logic.
+-- Depends on nothing: every other module may import it freely.
 
 module
 -- Combinators

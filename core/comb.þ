@@ -1,4 +1,4 @@
--- comb.mf: combinatorics — subsets, permutations, and selections.
+-- comb.þ: combinatorics — subsets, permutations, and selections.
 import list, math, core in
 
 module

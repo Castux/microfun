@@ -1,5 +1,5 @@
--- math.mf: numeric operations.
--- Imports core for `if`, which is used throughout.
+-- math.þ: numeric operations.
+-- Imports core for `if`, and list for the stream plumbing behind `digits`.
 import core, list in
 
 module

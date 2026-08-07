@@ -1,4 +1,4 @@
--- table.mf: association lists — lists of [key, value] pairs.
+-- table.þ: association lists — lists of [key, value] pairs.
 -- Keys are compared with `equal` (structural equality).
 -- All key-based operations use the first match, so prepending a new entry
 -- naturally shadows any existing entry for the same key.

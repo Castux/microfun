@@ -1,5 +1,4 @@
--- list.mf: list operations and infinite lists.
--- Circular with core (core imports list for `ifs`) — permitted by the language.
+-- list.þ: list operations and infinite lists.
 import math, core, maybe in
 
 module

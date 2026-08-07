@@ -1,3 +1,6 @@
+-- maybe.þ: optional values, represented as a 1-tuple [x] or the empty tuple [].
+-- Depends on nothing, so any module may import it.
+
 module
 
 some = x -> [x],
