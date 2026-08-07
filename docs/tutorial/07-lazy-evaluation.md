@@ -195,9 +195,10 @@ If you build a complex structure but only examine part of it, only the examined 
 
 ### Good news: short-circuiting is free
 
-```thunky-static
+```
 import core in
-  core.and 0 (someLongComputation)    -- someLongComputation is never called
+let someLongComputation = peek "never printed" in
+  core.and 0 (someLongComputation) > show    -- 0; someLongComputation is never forced
 ```
 
 `and` is defined so that if the first argument is `0` (false), the second is never forced. This is a property of lazy evaluation, not a special "short-circuit" instruction.
@@ -210,7 +211,7 @@ Calling `eval x` or `show x` on an infinite structure will loop forever (or exha
 
 In some patterns — particularly left folds over large lists — you can build up a large chain of unevaluated thunks. For example:
 
-```
+```thunky-static
 import list in
   list.foldl add 0 (list.upFrom 1)
 ```
@@ -280,7 +281,7 @@ Or the self-referential version:
 import list in
 let
   nats    = list.upFrom 1,
-  triNums = list.prepend [1;] (list.zipWith add nats triNums)
+  triNums = list.prepend [1;] (list.zipWith add (list.tail nats) triNums)
 in
   triNums > list.take 10 > show
 ```
@@ -332,8 +333,14 @@ in
 
 `takeWhile (gt 1)` keeps elements greater than 1, stopping before reaching 1. To include the final 1:
 
-```thunky-static
+```
+import list, core, math in
+
+let
+  collatzStep   = n -> core.if (math.even n) (div 2 n) (add 1 (mul 3 n)),
   collatzStream = n -> list.iterate collatzStep n > list.takeWhile (gt 1) > list.append [1;]
+in
+  collatzStream 27 > show
 ```
 
 </details>
@@ -357,12 +364,16 @@ let fibonacci = list.prepend [1;1] (list.zipWith add fibonacci (list.tail fibona
 
 Output: `14930352`
 
-Naive recursion (slow — exponential recomputation):
+Naive recursion (slow — exponential recomputation). Note the smaller input:
+`fib 36` takes about half a minute, so this one stops at 30 to stay runnable
+here. The stream above computed the 36th number instantly.
 
 ```
 let fib = { 1 -> 1, 2 -> 1, n -> add (fib (sub 1 n)) (fib (sub 2 n)) } in
-  show (fib 36)
+  show (fib 30)
 ```
+
+Output: `832040`
 
 The lazy version is vastly faster because each Fibonacci number is computed exactly once and memoized. The naive version recomputes every sub-problem many times.
 

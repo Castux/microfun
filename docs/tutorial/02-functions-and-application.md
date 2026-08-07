@@ -82,10 +82,12 @@ You may have noticed that `add`, `mul`, etc. take their arguments this way too. 
 
 Because every function takes one argument and returns a value, you can stop early and get a new function. This is **partial application**:
 
-```thunky-static
+```
 let addFive = add 5 in
   show (addFive 10)    -- 15
+```
 
+```
 let double = mul 2 in
   show (double 7)      -- 14
 ```
@@ -122,10 +124,12 @@ The comparison builtins (`lt`, `lte`, `gt`, `gte`, `eq`, `neq`) return `1` for t
 
 Since functions are just values, you can put them in tuples, pass them as arguments, and return them:
 
-```thunky-static
+```
 let apply = f -> x -> f x in
   show (apply (mul 2) 7)    -- 14
+```
 
+```
 let twice = f -> x -> f (f x) in
   show (twice (add 3) 10)   -- 16
 ```
@@ -140,10 +144,12 @@ This is the basis of **higher-order functions**: functions that take or return o
 
 `add`, `mul`, `show`, `sqrt`, and all other builtins are just functions. They can be passed around like any user-defined function:
 
-```thunky-static
+```
 let applyToFive = f -> f 5 in
   show (applyToFive (mul 2))    -- 10
+```
 
+```
 let
   ops = [add 1, mul 2, sub 1]    -- a tuple of three functions
 in

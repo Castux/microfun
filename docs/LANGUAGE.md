@@ -236,10 +236,12 @@ Functions are applied by juxtaposition: `f x`. Application is left-associative,
 so `f a b c` means `((f a) b) c`. Combined with currying (a function returning a
 function), this gives multi-argument functions and partial application:
 
-```thunky-static
+```
 let add3 = x -> y -> z -> add x (add y z) in
   add3 10 20 30                     -- 60
+```
 
+```
 let addFive = add 5 in addFive 10   -- 15  (partial application)
 ```
 
@@ -270,8 +272,17 @@ operators associate to the right.
 
 ```
 show (5 > add 1 > mul 2)          -- 12 : mul 2 (add 1 5)
+```
+
+```
 show (mul 2 < add 1 < 5)          -- 12 : mul 2 (add 1 5)
+```
+
+```
 show ((add 1 *> mul 2) 5)         -- 12 : add 1 first, then mul 2
+```
+
+```
 show ((add 1 <* mul 2) 5)         -- 11 : mul 2 first, then add 1
 ```
 
@@ -314,15 +325,19 @@ Tuple and list patterns are **recursive**: their sub-patterns are themselves
 patterns of any kind — names, numbers, or further tuple and list patterns — so
 patterns nest to arbitrary depth and may mix matching with binding at each level.
 
-```thunky-static
-[a, [b, c]] -> add a (add b c)         -- a tuple pattern nested inside a tuple pattern
+```
+([a, [b, c]] -> add a (add b c)) [1, [2, 3]]   -- 6; a tuple pattern nested inside a tuple pattern
+```
 
+```
 {
   [0, n] -> n,                         -- a number pattern nested in a tuple pattern
   [m, n] -> add m n
-}
+} [0, 7]                               -- 7
+```
 
-[[p; q]; [r; s]] -> add p s            -- list patterns nested inside a list pattern
+```
+([[p; q]; [r; s]] -> add p s) [[1; 2]; [3; 4]]   -- 5; list patterns nested inside a list pattern
 ```
 
 (Recall that a list pattern matches the cons-cell structure of a proper list of
@@ -349,12 +364,14 @@ first case that matches is chosen and its body returned. If no case matches,
 it is a run-time error.
 
 ```
-{ 0 -> 1, 1 -> 0, n -> add n 100 }      -- 0↦1, 1↦0, otherwise +100
+{ 0 -> 1, 1 -> 0, n -> add n 100 } 7    -- 107; 0↦1, 1↦0, otherwise +100
+```
 
+```
 {
   []     -> 0,                          -- empty tuple
   [a, b] -> add a b                     -- 2-tuple → sum
-}
+} [3, 4]                                -- 7
 ```
 
 This is how `if`, list functions, and most of the standard library are written.
@@ -369,13 +386,15 @@ let name1 = expr1, name2 = expr2, … in body
 each right-hand side may refer to any name in the group, including itself. Because
 of laziness this enables recursion, mutual recursion, and self-referential data:
 
-```thunky-static
+```
 let
   a = 5,
   b = 6
 in
   show (add a b)                       -- 11
+```
 
+```
 let
   fact = { 1 -> 1, n -> mul n (fact (sub 1 n)) }
 in
@@ -427,11 +446,13 @@ Because lists are just tuples, list patterns are sugar too: the list pattern
 to matching `[a, [b, []]]`. The standard library's list functions destructure
 cons cells directly with 2-tuple patterns `[h, t]` and the empty pattern `[]`:
 
-```thunky-static
-length = {
+```
+import math in
+let length = {
   []      -> 0,
   [h, t]  -> succ (length t)
-}
+} in
+  show (length [1; 2; 3])              -- 3
 ```
 
 When a tuple has the shape of a list, output routines render it with list syntax
@@ -574,20 +595,27 @@ closure application and match per step), which is why `seq` stays a primitive.
 
 The binary comparison builtins follow a **threshold-first** convention: the first argument is the reference value (the threshold), and the second is the value being tested. `lt 4` is a predicate meaning "is less than 4". The natural reading is with the pipe operator:
 
-```thunky-static
-x > lt 4      -- is x less than 4?
-x > gt 0      -- is x positive?
-x > gte 100   -- is x at least 100?
+```
+let x = 3 in
+show [
+  x > lt 4,      -- 1 : is x less than 4?
+  x > gt 0,      -- 1 : is x positive?
+  x > gte 100    -- 0 : is x at least 100?
+]
 ```
 
 Written as a direct call `lt 4 x` the order looks reversed, but the meaning is the same: `x < 4`. Think of the first argument as *fixing the threshold* and producing a predicate.
 
 This convention makes partial application idiomatic:
 
-```thunky-static
-filter (lt 10) xs        -- keep elements less than 10
-takeWhile (gt 0) xs      -- take while positive
-sortWith lt xs           -- ascending: elements lt pivot go before it
+```
+import list in
+let xs = [3; 8; 0; 12; 1] in
+show [
+  filter (lt 10) xs,        -- [3; 8; 0; 1]  : keep elements less than 10
+  takeWhile (gt 0) xs,      -- [3; 8]        : take while positive
+  sortWith lt xs            -- [0; 1; 3; 8; 12] : ascending, elements lt pivot go before it
+]
 ```
 
 The entire standard library is built around this convention. Functions that accept a comparator (like `heap.merge`, `heap.insert`) follow the same rule: `cmp a b = 1` means `a` beats `b`. With `cmp = lt`, larger values win (max-heap); with `cmp = gt`, smaller values win (min-heap).

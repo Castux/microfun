@@ -49,10 +49,12 @@ The separator — semicolon vs. comma — determines whether you get a list or a
 
 Since lists are 2-tuples, pattern matching uses tuple syntax:
 
-```thunky-static
+```
 let
   myHead = [h, t] -> h,
   myTail = [h, t] -> t
+in
+  show [myHead [1; 2; 3]; myTail [1; 2; 3]]    -- [1; [2; 3]]
 ```
 
 The standard idiom: match `[]` for the empty case and `[h, t]` for the non-empty case.
@@ -73,8 +75,11 @@ A string literal like `"hello"` is sugar for the list of its Unicode code points
 
 To print text as characters (not as a list of numbers), use `write` instead of `show`:
 
-```thunky-static
+```
 write "hello"        -- prints: hello
+```
+
+```
 show "hello"         -- prints: [104; 101; 108; 108; 111]
 ```
 
@@ -150,9 +155,13 @@ Output: `[[3; 2; 1], [1; 2; 3; 4; 5], [0; 1; 2; 3]]`
 
 `foldl f z xs` reduces left-to-right: `f (f (f z x1) x2) x3`.
 
-```thunky-static
+```
 import list in
 [1; 2; 3; 4] > list.foldr add 0 > show    -- 10
+```
+
+```
+import list in
 [1; 2; 3; 4] > list.foldl add 0 > show    -- 10
 ```
 
@@ -170,11 +179,23 @@ show [
 
 ### Slicing
 
-```thunky-static
+```
 import list in
 [1; 2; 3; 4; 5] > list.take 3 > show           -- [1; 2; 3]
+```
+
+```
+import list in
 [1; 2; 3; 4; 5] > list.drop 3 > show           -- [4; 5]
+```
+
+```
+import list in
 [1; 2; 3; 4; 5] > list.takeWhile (lt 4) > show -- [1; 2; 3]
+```
+
+```
+import list in
 [10; 20; 30; 40; 50] > list.slice 1 4 > show   -- [20; 30; 40]
 ```
 

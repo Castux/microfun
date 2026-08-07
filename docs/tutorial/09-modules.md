@@ -2,6 +2,13 @@
 
 So far every program has been a single file. As programs grow, you want to split code into reusable units. Thunky's module system is simple: a module is a file of bindings, and importing it makes those bindings available.
 
+> **Running this chapter's examples.** Every example here spans two files — a
+> module and the program that imports it — so, unlike the rest of the tutorial,
+> these blocks have no Run button: the browser has no filesystem to put
+> `vec2.þ` in. Save them next to each other and run them with the `thunky`
+> command line. Examples that import only standard-library modules (`list`,
+> `math`, `text`, …) still run in place, since those are embedded in the binary.
+
 ---
 
 ## What a module is

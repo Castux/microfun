@@ -52,6 +52,9 @@ The only primitive type is the number. Both integers and fractions are the same 
 
 ```
 show 3.14
+```
+
+```
 show 100
 ```
 
@@ -71,7 +74,13 @@ Function application in Thunky is just juxtaposition — put the function and it
 
 ```
 show (add 3 4)     -- 7
+```
+
+```
 show (mul 6 7)     -- 42
+```
+
+```
 show (sub 1 10)    -- 9  (10 - 1)
 ```
 
@@ -140,8 +149,17 @@ A **tuple** is a fixed-size collection of values written with square brackets an
 
 ```
 show [1, 2, 3]       -- a 3-element tuple
+```
+
+```
 show [42]            -- a 1-element tuple
+```
+
+```
 show []              -- the empty tuple
+```
+
+```
 show [1, [2, 3]]     -- a tuple containing a tuple
 ```
 
@@ -209,10 +227,19 @@ show [mul 1 1, mul 2 2, mul 3 3]
 
 Output: `[1, 4, 9]`
 
-To print each on its own line, chain `show` calls. The `>` pipe operator (Chapter 3) makes this readable:
+To print each on its own line instead, put the three `show` calls in a list and
+force it with `eval`, which evaluates every element:
 
 ```
-show (mul 3 3) > show (mul 2 2) > show (mul 1 1)
+eval [show (mul 1 1); show (mul 2 2); show (mul 3 3)]
+```
+
+Output:
+
+```text
+1
+4
+9
 ```
 
 </details>

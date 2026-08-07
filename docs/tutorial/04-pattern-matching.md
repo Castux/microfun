@@ -125,9 +125,12 @@ Cases are tried in order; the first match wins. If no case matches, it is a runt
 
 Single-case lambdas do not need braces:
 
-```thunky-static
-x -> add x 1          -- no braces needed
-{ x -> add x 1 }      -- same thing
+```
+show ((x -> add x 1) 10)      -- no braces needed
+```
+
+```
+show ({ x -> add x 1 } 10)    -- same thing
 ```
 
 Braces are necessary when there are multiple cases.

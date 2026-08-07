@@ -62,6 +62,9 @@ Its main use is eliminating a single pair of outer parentheses:
 
 ```
 show (add 3 4)     -- with parens
+```
+
+```
 show < add 3 4     -- same thing, no parens
 ```
 
@@ -149,8 +152,9 @@ Output: `[32, 212, 98.6]`
 
 Three stages composed into one named function. Contrast with the nested version:
 
-```thunky-static
-let celsiusToFahrenheit = c -> add 32 (fdiv 5 (mul 9 c)) in ...
+```
+let celsiusToFahrenheit = c -> add 32 (fdiv 5 (mul 9 c)) in
+  show [celsiusToFahrenheit 0, celsiusToFahrenheit 100, celsiusToFahrenheit 37]
 ```
 
 ### Building step-by-step
@@ -170,7 +174,8 @@ Output: `2`
 
 Once you reach the chapters on lists (Chapter 6), pipes become indispensable. A pipeline like:
 
-```thunky-static
+```
+import list in
 [3; 1; 4; 1; 5; 9]
   > filter (gt 2)
   > sort
@@ -180,7 +185,8 @@ Once you reach the chapters on lists (Chapter 6), pipes become indispensable. A 
 
 reads exactly as it executes. Without `>`:
 
-```thunky-static
+```
+import list in
 show (take 4 (sort (filter (gt 2) [3; 1; 4; 1; 5; 9])))
 ```
 
@@ -254,7 +260,13 @@ Predict the output of each, then verify:
 
 ```
 show ((mul 2 *> add 10) 5)
+```
+
+```
 show ((mul 2 <* add 10) 5)
+```
+
+```
 show (5 > mul 2 > add 10)
 ```
 
@@ -279,6 +291,9 @@ Rewrite using `<` to eliminate the outermost parentheses:
 
 ```
 show (mul 6 7)
+```
+
+```
 show (add 100 (mul 6 7))
 ```
 
@@ -287,6 +302,9 @@ show (add 100 (mul 6 7))
 
 ```
 show < mul 6 7
+```
+
+```
 show < add 100 (mul 6 7)
 ```
 

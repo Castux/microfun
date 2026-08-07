@@ -188,10 +188,10 @@ show [
 import maybe in
 let
   safeHead = { [] -> maybe.none, [h, t] -> maybe.some h },
-  safeDiv = x -> y -> { 0 -> maybe.none, n -> maybe.some (fdiv x n) } y
+  safeDiv = x -> y -> { 0 -> maybe.none, n -> maybe.some (fdiv n x) } y
 in
   show [
-    safeHead [10; 20; 30] > maybe.andThen (safeDiv 100),  -- [10.0]
+    safeHead [10; 20; 30] > maybe.andThen (safeDiv 100),  -- [10]
     safeHead []           > maybe.andThen (safeDiv 100)   -- []
   ]
 ```
@@ -232,7 +232,7 @@ Useful when each element produces a variable-length output.
 
 ```
 import list, maybe in
-let safeRecip = { 0 -> maybe.none, x -> maybe.some (fdiv 1 x) } in
+let safeRecip = { 0 -> maybe.none, x -> maybe.some (fdiv x 1) } in
   show (list.mapFilter safeRecip [1; 0; 2; 0; 4])
 ```
 
