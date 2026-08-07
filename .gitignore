@@ -1,7 +1,10 @@
 test.mf
+test.th
 .DS_Store
 thunky.exe
 thunky.test.exe
 thunky.bench.exe
 thunky.oracle.exe
 thunky
+etc/experiment/*.exe
+_site/

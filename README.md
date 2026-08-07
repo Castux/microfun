@@ -27,7 +27,7 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 
 ## Usage
 
-```
+```sh
 thunky <path>
 ```
 
@@ -38,7 +38,7 @@ reported with source locations; runtime errors include a reduction trace.
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:
 
-```
+```sh
 thunky --dump-ast       <path>   # the parsed AST
 thunky --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
 thunky --dump-bytecode  <path>   # the compiled flat bytecode
@@ -102,14 +102,35 @@ Key things illustrated:
 |----------|----------|
 | [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 9 chapters from first program to modules, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
-| [docs/0.Overview.md](docs/0.Overview.md) | Implementation pipeline and source positions |
-| [docs/1.Lexer.md](docs/1.Lexer.md) | Lexer |
-| [docs/2.Parser.md](docs/2.Parser.md) | Parser and the (pure) AST |
-| [docs/3.Resolver.md](docs/3.Resolver.md) | Name resolution and compile-time checks |
-| [docs/4.Core IR and Lowering.md](docs/4.Core%20IR%20and%20Lowering.md) | Core IR, explicit laziness, slot/upvalue assignment, desugaring |
-| [docs/5.Bytecode and Compiler.md](docs/5.Bytecode%20and%20Compiler.md) | Flat bytecode and the syntax-directed compiler |
-| [docs/6.The G-machine.md](docs/6.The%20G-machine.md) | Runtime values, the push/enter reducer, builtins, errors |
-| [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Proposals for future optimization |
+| [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
+| [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |
+
+## Try it in the browser
+
+The compiler and runtime also build to WebAssembly (`main_wasm.go`), powering a
+static documentation site with a playground: every Thunky code snippet in the
+language reference and tutorial is editable and runnable in place, and the
+playground offers a full editor with example programs, stdin, stage dumps
+(AST / Core IR / bytecode), and shareable URLs.
+
+The site is deployed to GitHub Pages by `.github/workflows/pages.yml`. One-time
+setup on the GitHub repository:
+
+1. **Settings → Pages → Build and deployment → Source: "GitHub Actions"**
+   (not "Deploy from a branch").
+2. The workflow deploys on pushes to `v1` (the current main development
+   branch); adjust the `branches:` trigger if that changes. The *Run workflow*
+   button (workflow_dispatch) deploys manually from any state.
+
+The workflow builds the wasm binary with the pinned Go version, assembles the
+site, smoke-tests the wasm build under Node against `examples/core_tests.þ`,
+and publishes. To build and preview locally:
+
+```sh
+web/build.sh            # assembles the site (incl. the wasm build) into _site/
+python -m http.server -d _site
+node web/smoke.mjs _site examples/core_tests.þ   # headless check of the wasm build
+```
 
 ## License
 
