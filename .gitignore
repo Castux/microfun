@@ -7,3 +7,4 @@ microfun.bench.exe
 microfun.oracle.exe
 microfun
 etc/experiment/*.exe
+_site/

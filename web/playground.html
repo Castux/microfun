@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground — microfun</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="playground-page">
+<header class="pg-header">
+  <div class="brand"><a href="index.html">microfun</a> <span class="pg-title">playground</span></div>
+  <div class="pg-controls">
+    <select id="example-select" title="Load an example">
+      <option value="">Examples…</option>
+    </select>
+    <select id="dump-select" title="What to produce">
+      <option value="">Run</option>
+      <option value="ast">Dump AST</option>
+      <option value="core">Dump Core IR</option>
+      <option value="bytecode">Dump bytecode</option>
+    </select>
+    <button id="run-btn" title="Ctrl+Enter">Run ▶</button>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="share-btn" title="Copy a link to this program">Share</button>
+    <a class="doc-link" href="index.html?page=language">Language reference</a>
+  </div>
+</header>
+<div class="pg-main">
+  <div class="pg-editor" id="editor"></div>
+  <div class="pg-right">
+    <pre id="output" class="pg-output"></pre>
+    <details class="pg-stdin">
+      <summary>stdin</summary>
+      <textarea id="stdin" rows="4" spellcheck="false" placeholder="Text fed to the program's stdin stream"></textarea>
+    </details>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="microfun-mode.js"></script>
+<script src="runner.js"></script>
+<script src="playground.js"></script>
+</body>
+</html>

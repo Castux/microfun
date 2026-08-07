@@ -27,7 +27,7 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 
 ## Usage
 
-```
+```sh
 microfun <path>
 ```
 
@@ -38,7 +38,7 @@ reported with source locations; runtime errors include a reduction trace.
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:
 
-```
+```sh
 microfun --dump-ast       <path>   # the parsed AST
 microfun --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
 microfun --dump-bytecode  <path>   # the compiled flat bytecode
@@ -109,6 +109,33 @@ Key things illustrated:
 | [docs/5.Bytecode and Compiler.md](docs/5.Bytecode%20and%20Compiler.md) | Flat bytecode and the syntax-directed compiler |
 | [docs/6.The G-machine.md](docs/6.The%20G-machine.md) | Runtime values, the push/enter reducer, builtins, errors |
 | [docs/IMPROVEMENTS.md](docs/IMPROVEMENTS.md) | Proposals for future optimization |
+
+## Try it in the browser
+
+The compiler and runtime also build to WebAssembly (`main_wasm.go`), powering a
+static documentation site with a playground: every microfun code snippet in the
+docs is editable and runnable in place, and the playground offers a full editor
+with example programs, stdin, stage dumps (AST / Core IR / bytecode), and
+shareable URLs.
+
+The site is deployed to GitHub Pages by `.github/workflows/pages.yml`. One-time
+setup on the GitHub repository:
+
+1. **Settings → Pages → Build and deployment → Source: "GitHub Actions"**
+   (not "Deploy from a branch").
+2. Adjust the `branches:` trigger at the top of the workflow if the main
+   development branch changes (it currently deploys on pushes to `v1-rewrite`);
+   the *Run workflow* button (workflow_dispatch) deploys manually from any state.
+
+The workflow builds the wasm binary with the pinned Go version, assembles the
+site, smoke-tests the wasm build under Node against `examples/core_tests.mf`,
+and publishes. To build and preview locally:
+
+```sh
+web/build.sh            # assembles the site (incl. the wasm build) into _site/
+python -m http.server -d _site
+node web/smoke.mjs _site examples/core_tests.mf   # headless check of the wasm build
+```
 
 ## License
 

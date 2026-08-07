@@ -1,7 +1,8 @@
+//go:build !js
+
 package main
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -14,9 +15,6 @@ import (
 	"microfun/internal/source"
 	"microfun/internal/syntax"
 )
-
-//go:embed core
-var coreFS embed.FS
 
 func LoadProgram(path string) *syntax.Program {
 	tokens := syntax.Lex(path)
