@@ -170,9 +170,32 @@ Output: `2`
 
 ---
 
+## Using the standard library: `import`
+
+The examples from here on use functions like `map`, `filter` and `sort`. These
+are not builtins — they live in the standard library, which is **not imported
+automatically**. To reach them, put an import clause in front of your
+expression:
+
+```
+import list in
+  [3; 1; 4; 1; 5; 9] > sort > show
+```
+
+`import list in <expression>` makes the `list` module's names available for the
+whole expression, both qualified as `list.sort` and unqualified as `sort`. You
+can import several modules at once: `import list, math in …`. The library
+modules are `core`, `list`, `math`, `text`, `maybe`, `table`, `hashmap`, `comb`
+and `heap`; Chapter 8 tours them, and Chapter 9 covers writing your own.
+
+That is all you need for now — an import clause at the top, and the names are
+in scope.
+
+---
+
 ## Looking ahead
 
-Once you reach the chapters on lists (Chapter 6), pipes become indispensable. A pipeline like:
+Once you reach the chapter on lists (Chapter 6), pipes become indispensable. A pipeline like:
 
 ```
 import list in

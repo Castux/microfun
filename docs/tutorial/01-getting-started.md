@@ -44,6 +44,10 @@ show 42
 
 `show` always returns its argument, which means you can thread it through larger expressions for debugging without changing the result. For now, just put it at the outermost level.
 
+There is also `peek`, which prints the same way but stops after 100 elements —
+useful once your values get large, and the only safe choice for the infinite
+structures of Chapter 7. Everything below works with either.
+
 ---
 
 ## Numbers and arithmetic
