@@ -31,31 +31,39 @@ func EvalStructuralBuiltin(op PrimOp, args []Value) Value {
 		return FullNormalForm(args[0], make(map[*Thunk]bool))
 
 	case PrimPeek:
-		fmt.Println(ShowValue(args[0]))
-		return args[0]
+		// Output builtins return their argument *forced* (not the raw thunk):
+		// printing already did the work, and returning the unforced argument
+		// would make the caller redo it — a top-level `… > show` used to
+		// reduce the whole program twice.
+		forced := Force(args[0])
+		fmt.Println(ShowValue(forced))
+		return forced
 
 	case PrimShow:
-		fmt.Println(ShowValueFull(args[0]))
-		return args[0]
+		forced := Force(args[0])
+		fmt.Println(ShowValueFull(forced))
+		return forced
 
 	case PrimWrite:
-		walkList(args[0], "write", "list of code points", func(num float64) {
+		forced := Force(args[0])
+		walkList(forced, "write", "list of code points", func(num float64) {
 			if num != math.Trunc(num) || !utf8.ValidRune(rune(num)) {
 				RaiseBuiltinError(fmt.Sprintf("write expects a list of code points, found invalid code point %g", num))
 			}
 			fmt.Printf("%c", rune(num))
 		})
 		fmt.Println()
-		return args[0]
+		return forced
 
 	case PrimBwrite:
-		walkList(args[0], "bwrite", "list of numbers", func(num float64) {
+		forced := Force(args[0])
+		walkList(forced, "bwrite", "list of numbers", func(num float64) {
 			if num != math.Trunc(num) || num < 0 || num > 255 {
 				RaiseBuiltinError(fmt.Sprintf("bwrite expects a list of numbers, found invalid byte value %g", num))
 			}
 			os.Stdout.Write([]byte{byte(num)})
 		})
-		return args[0]
+		return forced
 
 	default:
 		panic("not a structural builtin")

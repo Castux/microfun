@@ -60,10 +60,11 @@ const NoCode PC = -1
 // mutual recursion in a let group resolves because every binding thunk shares the
 // frame, which is fully populated before any binding is forced.
 //
-// Update distinguishes call-by-need from call-by-name, observable because the
-// output builtins return their argument (forcing a side-effecting argument twice
-// must print twice): let, module, and pattern bindings memoise (Update true);
-// anonymous argument, field, and pipe thunks re-run on each force (Update false).
+// Update distinguishes call-by-need from call-by-name (observable through peek
+// nested in a re-forced expression): let, module, and pattern bindings memoise
+// (Update true); anonymous argument, field, and pipe thunks re-run on each
+// force (Update false). The output builtins return their argument forced, so a
+// consumer of a show/write result does not redo the printed work.
 type Thunk struct {
 	Forced   bool
 	Value    Value
