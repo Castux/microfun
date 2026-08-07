@@ -12,6 +12,6 @@ let ack = m -> n -> if (eq 0 m)
   (add 1 n)
   (if (eq 0 n)
     (ack (sub 1 m) 1)
-    (sub 1 n > ack m > ack (sub 1 m))))
+    (sub 1 n > ack m > ack (sub 1 m)))
 in
 [5; 6; 7] > map (ack 3) > sum > show
