@@ -30,7 +30,11 @@ const ThunkyRunner = (() => {
             }
         };
         worker.onerror = event => {
-            if (current) finish({ hostError: event.message || "worker error" });
+            // The worker claims Go's own exit-path throws (see worker.js), so
+            // anything reaching here is a genuine host failure — a missing or
+            // corrupt wasm binary, or a bug in the harness.
+            event.preventDefault();
+            if (current) finish({ hostError: event.message || "the worker stopped unexpectedly" });
         };
     }
 
@@ -38,7 +42,7 @@ const ThunkyRunner = (() => {
         const run = current;
         current = null;
         clearTimeout(run.timer);
-        run.resolve(result);
+        run.resolve({ ...result, elapsedMs: performance.now() - run.startedAt });
     }
 
     function stop(reason) {
@@ -61,6 +65,7 @@ const ThunkyRunner = (() => {
                 id,
                 onOutput: opts.onOutput || (() => {}),
                 resolve,
+                startedAt: performance.now(),
                 timer: setTimeout(() => stop({ timedOut: true }), opts.timeoutMs || TIMEOUT_MS),
             };
             worker.postMessage({

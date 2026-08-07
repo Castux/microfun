@@ -1,8 +1,8 @@
 # Thunky (Þunky)
 
 Thunky (also written Þunky) is a toy programming language built to explore compiler construction,
-pure functional programming, and lazy evaluation. It is minimalistic ("micro")
-and functional ("fun"): a program is a single expression, there is one primitive
+pure functional programming, and lazy evaluation. It is minimalistic
+and functional: a program is a single expression, there is one primitive
 type (number) and one compound type (tuple), functions are pure, and evaluation
 is lazy throughout.
 

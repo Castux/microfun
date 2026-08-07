@@ -56,8 +56,38 @@ function installFS() {
     };
 }
 
+// A program that fails to compile, or that hits a runtime error, calls
+// os.Exit. wasm_exec.js implements that by throwing out of the Go runtime once
+// it has unwound, which surfaces here (and, if left unhandled, as a bare
+// "worker error" on the page). These are normal terminations, not host
+// failures: the located diagnostic has already been printed through writeSync,
+// so they must be reported as a completed run carrying the exit code.
+function isNormalExit(err) {
+    const message = String((err && err.message) || err);
+    return message.includes("Go program has already exited") ||
+        message.includes("exit status") ||
+        err instanceof ExitSignal;
+}
+
+class ExitSignal extends Error {
+    constructor(code) {
+        super("exit status " + code);
+        this.code = code;
+    }
+}
+
 onmessage = async event => {
     const { id, source, path, stdin, dump } = event.data;
+
+    // An uncaught async throw from inside the Go runtime would otherwise reach
+    // worker.onerror as an unlabelled "worker error"; claim it for this run.
+    const onUnhandled = ev => {
+        ev.preventDefault();
+        postMessage({ type: "done", id, exitCode: 1 });
+    };
+    self.addEventListener("unhandledrejection", onUnhandled, { once: true });
+
+    let exitCode = 0;
     try {
         const module = await getModule();
 
@@ -70,15 +100,25 @@ onmessage = async event => {
         globalThis.__thunky_dump = dump || "";
 
         const go = new Go();
-        let exitCode = 0;
-        go.exit = code => { exitCode = code; };
+        go.exit = code => {
+            exitCode = code;
+            // Stop the Go runtime here rather than letting wasm_exec continue
+            // into its "already exited" path.
+            if (code !== 0) throw new ExitSignal(code);
+        };
 
         const instance = await WebAssembly.instantiate(module, go.importObject);
         await go.run(instance);
 
         postMessage({ type: "done", id, exitCode });
     } catch (err) {
-        postMessage({ type: "error", id, message: String((err && err.message) || err) });
+        if (isNormalExit(err)) {
+            postMessage({ type: "done", id, exitCode: exitCode || 1 });
+        } else {
+            postMessage({ type: "error", id, message: String((err && err.message) || err) });
+        }
+    } finally {
+        self.removeEventListener("unhandledrejection", onUnhandled);
     }
 };
 

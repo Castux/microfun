@@ -13,6 +13,8 @@ out="${1:-_site}"
 rm -rf "$out"
 mkdir -p "$out/docs" "$out/examples"
 
+# The site is Thunky-branded; the wasm binary keeps the module name.
+
 # The wasm build of the compiler+runtime, and the Go-version-matched JS shim.
 GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o "$out/thunky.wasm" .
 goroot="$(go env GOROOT)"
@@ -23,13 +25,16 @@ else
 fi
 
 # Static assets.
-cp web/index.html web/playground.html web/style.css \
+cp web/index.html web/playground.html web/style.css web/favicon.svg \
    web/site.js web/playground.js web/runner.js web/worker.js web/thunky-mode.js \
    "$out/"
 
 # The markdown the site renders, and the example programs the playground loads.
+mkdir -p "$out/docs/tutorial" "$out/docs/implementation"
 cp README.md LICENSE.md "$out/"
 cp docs/*.md "$out/docs/"
+cp docs/tutorial/*.md "$out/docs/tutorial/"
+cp docs/implementation/*.md "$out/docs/implementation/"
 cp examples/*.þ "$out/examples/"
 
 echo "site assembled in $out/"

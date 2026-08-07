@@ -7,8 +7,10 @@
     --border: #d8dee4;
     --accent: #6f42c1;
     --code-bg: #f6f8fa;
-    --output-bg: #23262e;
-    --output-fg: #d5d9e0;
+    --output-bg: #1b1e24;
+    --output-fg: #f2f4f8;
+    --ok: #2ea043;
+    --fail: #f85149;
     --keyword: #d73a49;
     --string: #032f62;
     --number: #005cc5;
@@ -25,7 +27,9 @@
         --accent: #b392f0;
         --code-bg: #1d2026;
         --output-bg: #0d0f12;
-        --output-fg: #c9d1d9;
+        --output-fg: #eaf0f6;
+        --ok: #3fb950;
+        --fail: #ff7b72;
         --keyword: #ff7b72;
         --string: #a5d6ff;
         --number: #79c0ff;
@@ -80,6 +84,16 @@ a:hover { text-decoration: underline; }
     font-weight: 600;
 }
 
+#sidebar .nav-group {
+    margin: 1.1rem 0 0.3rem;
+    padding: 0 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
 #sidebar ul { list-style: none; padding: 0; margin: 0; }
 #sidebar li a {
     display: block;
@@ -102,7 +116,11 @@ a:hover { text-decoration: underline; }
     border-radius: 4px;
     font-size: 0.9em;
 }
-#content pre {
+/* Plain (non-upgraded) markdown code blocks. CodeMirror renders every editor
+   line as its own <pre class="CodeMirror-line">, and the run output is a <pre>
+   too, so this must not reach inside a snippet — otherwise each line of code
+   gets its own box. */
+#content pre:not(.CodeMirror-line):not(.snippet-output) {
     background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -110,6 +128,10 @@ a:hover { text-decoration: underline; }
     overflow-x: auto;
 }
 #content pre code { background: none; padding: 0; }
+
+/* Likewise for inline <code>: CodeMirror does not use it, but the reset keeps
+   snippet internals free of the documentation styling. */
+#content .snippet code { background: none; padding: 0; }
 #content table { border-collapse: collapse; }
 #content th, #content td { border: 1px solid var(--border); padding: 0.35rem 0.7rem; }
 #content blockquote { border-left: 4px solid var(--border); margin-left: 0; padding-left: 1rem; color: var(--muted); }
@@ -174,7 +196,7 @@ select {
     color: var(--fg);
 }
 
-/* --- CodeMirror theme "mf" --- */
+/* --- CodeMirror theme "thunky" --- */
 
 .CodeMirror {
     height: auto;
@@ -182,14 +204,25 @@ select {
     color: var(--fg);
     font: 0.9rem/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
 }
-.cm-s-mf .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
-.cm-s-mf .CodeMirror-linenumber { color: var(--muted); }
-.cm-s-mf .CodeMirror-cursor { border-left: 2px solid var(--fg); }
-.cm-s-mf span.cm-keyword { color: var(--keyword); font-weight: 600; }
-.cm-s-mf span.cm-string { color: var(--string); }
-.cm-s-mf span.cm-number { color: var(--number); }
-.cm-s-mf span.cm-comment { color: var(--comment); font-style: italic; }
-.cm-s-mf span.cm-operator { color: var(--operator); }
+/* Undo the documentation <pre> styling on CodeMirror's per-line elements. */
+.CodeMirror pre.CodeMirror-line,
+.CodeMirror pre.CodeMirror-line-like {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0 4px;
+    margin: 0;
+    overflow: visible;
+}
+.cm-s-thunky .CodeMirror-gutters { background: var(--code-bg); border-right: 1px solid var(--border); }
+.cm-s-thunky .CodeMirror-linenumber { color: var(--muted); }
+.cm-s-thunky .CodeMirror-cursor { border-left: 2px solid var(--fg); }
+.cm-s-thunky span.cm-keyword { color: var(--keyword); font-weight: 600; }
+.cm-s-thunky span.cm-string { color: var(--string); }
+.cm-s-thunky span.cm-number { color: var(--number); }
+.cm-s-thunky span.cm-comment { color: var(--comment); font-style: italic; }
+.cm-s-thunky span.cm-operator { color: var(--operator); }
+.cm-s-thunky span.cm-builtin { color: var(--accent); }
 .CodeMirror-selected { background: rgba(111, 66, 193, 0.18) !important; }
 
 /* --- playground --- */
@@ -232,6 +265,21 @@ select {
 }
 
 .pg-output { flex: 1; overflow-y: auto; }
+
+.pg-outbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--code-bg);
+    font-size: 0.78rem;
+}
+.pg-outlabel { color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.pg-status { font-variant-numeric: tabular-nums; color: var(--muted); }
+.pg-status.ok { color: var(--ok); }
+.pg-status.failed { color: var(--fail); }
+.pg-status.running { color: var(--muted); }
 
 .pg-stdin { border-top: 1px solid var(--border); padding: 0.4rem 0.8rem; }
 .pg-stdin summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }

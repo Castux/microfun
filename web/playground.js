@@ -6,24 +6,22 @@
 const DEFAULT_PROGRAM = `import list, math, core in
 
 let
+\t-- Primality test: n is prime when no divisor exists in [2, sqrt n]
+\tdivides = d -> n -> eq 0 (mod n d),
+\tisPrime = n -> rangeIncl 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
+\tprimes  = upFrom 2 > filter isPrime,    -- lazy infinite stream of primes
 
-  -- Primality test: n is prime when no divisor exists in [2, sqrt n]
-  divides = d -> n -> eq 0 (mod n d),
-  isPrime = n -> range 2 (floor (sqrt n)) > none (divides n) > and (gte 2 n),
-  primes  = upFrom 2 > filter isPrime,    -- lazy infinite stream of primes
-
-  -- Fibonacci as a self-referential lazy stream
-  fibs = concat [1;1] (zipWith add fibs (tail fibs))
-
+\t-- Fibonacci as a self-referential lazy stream
+\tfibs = prepend [1;1] (zipWith add fibs (tail fibs))
 in
 
 show [
-  take 10 primes,
-  take 10 fibs
+\ttake 10 primes,
+\ttake 10 fibs
 ]
 `;
 
-const EXAMPLES = ["examples.þ", "countdown.þ", "core_tests.þ"];
+const EXAMPLES = ["examples.þ", "countdown.þ", "sudoku.þ", "random-chisquare.þ", "core_tests.þ"];
 
 const output = document.getElementById("output");
 const runBtn = document.getElementById("run-btn");
@@ -32,14 +30,24 @@ const shareBtn = document.getElementById("share-btn");
 const dumpSelect = document.getElementById("dump-select");
 const exampleSelect = document.getElementById("example-select");
 const stdinBox = document.getElementById("stdin");
+const status = document.getElementById("status");
 
+// Thunky sources are indented with tabs, shown four columns wide.
 const editor = CodeMirror(document.getElementById("editor"), {
     value: initialProgram(),
     mode: "thunky",
-    theme: "mf",
+    theme: "thunky",
     lineNumbers: true,
     lineWrapping: true,
-    extraKeys: { "Ctrl-Enter": run, "Cmd-Enter": run },
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: true,
+    extraKeys: {
+        "Ctrl-Enter": run,
+        "Cmd-Enter": run,
+        Tab: cm => cm.execCommand(cm.somethingSelected() ? "indentMore" : "insertTab"),
+        "Shift-Tab": cm => cm.execCommand("indentLess"),
+    },
 });
 
 function initialProgram() {
@@ -72,10 +80,18 @@ exampleSelect.addEventListener("change", async () => {
     exampleSelect.value = "";
 });
 
+function formatElapsed(ms) {
+    if (ms < 1000) return Math.round(ms) + " ms";
+    return (ms / 1000).toFixed(2) + " s";
+}
+
 async function run() {
     runBtn.disabled = true;
     stopBtn.disabled = false;
     output.textContent = "";
+    status.textContent = "running…";
+    status.className = "pg-status running";
+
     let got = "";
     const result = await ThunkyRunner.run(editor.getValue(), {
         stdin: stdinBox.value,
@@ -83,15 +99,34 @@ async function run() {
         timeoutMs: 60000,
         onOutput: text => { got += text; output.textContent = got; },
     });
+
     runBtn.disabled = false;
     stopBtn.disabled = true;
-    if (result.cancelled) return;
+    if (result.cancelled) {
+        status.textContent = "stopped";
+        status.className = "pg-status failed";
+        return;
+    }
+
+    // The compiler and runtime print their own located diagnostics, which the
+    // worker forwards to `got`; the status line only summarises the outcome.
+    const elapsed = formatElapsed(result.elapsedMs);
     if (result.timedOut) {
-        output.textContent = got + "\n[stopped: exceeded 60s time limit]";
+        output.textContent = got + (got ? "\n" : "") + "[stopped: exceeded the 60 s time limit]";
+        status.textContent = "timed out after " + elapsed;
+        status.className = "pg-status failed";
     } else if (result.hostError) {
-        output.textContent = got + "\n[host error: " + result.hostError + "]";
-    } else if (got === "") {
-        output.textContent = "(no output — use show, peek or write to print)";
+        output.textContent = got + (got ? "\n" : "") + "[could not run: " + result.hostError + "]";
+        status.textContent = "host error";
+        status.className = "pg-status failed";
+    } else if (result.exitCode) {
+        if (got === "") output.textContent = "[exited with status " + result.exitCode + "]";
+        status.textContent = "failed (status " + result.exitCode + ") in " + elapsed;
+        status.className = "pg-status failed";
+    } else {
+        if (got === "") output.textContent = "(no output — use show, peek or write to print)";
+        status.textContent = "finished in " + elapsed;
+        status.className = "pg-status ok";
     }
 }
 
