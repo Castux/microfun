@@ -407,7 +407,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			n := len(subjects)
 			subject := subjects[n-1]
 			subjects = subjects[:n-1]
-			forced := WHNF(subject)
+			forced := forceSubject(subject, &arg)
 			if forced.Tag != value.NumberTag || forced.Num != m.Prog.Consts[in.A].Num {
 				pc = PC(in.B) // jump to fail target
 			}
@@ -416,7 +416,7 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 			n := len(subjects)
 			subject := subjects[n-1]
 			subjects = subjects[:n-1]
-			forced := WHNF(subject)
+			forced := forceSubject(subject, &arg)
 			arity := int(in.A)
 			if arity == 2 {
 				if forced.Tag == value.ConsTag {
@@ -578,6 +578,31 @@ func (m *Machine) runMatch(entryPC PC, locals, upvalues []value.Value, arg value
 }
 
 // --- helpers ---
+
+// forceSubject forces a match subject to WHNF exactly once per application.
+// Without it a call-by-name subject (an argument or pipe thunk, or an Apply
+// from a composition) is re-evaluated by every case that inspects it — up to
+// once per literal clause — because Case resets the subject stack to the raw
+// argument. Two write-backs make the first force stick:
+//
+//   - a call-by-name thunk is memoised in place (deliberately: the matcher has
+//     demanded the value, so re-matching must not redo the work);
+//   - when the subject is the closure's own argument (compared by identity),
+//     *argSlot is replaced with the WHNF, so the next Case pushes the forced
+//     value — this also covers Apply nodes, which have no thunk to memoise.
+func forceSubject(subject value.Value, argSlot *value.Value) value.Value {
+	forced := WHNF(subject)
+	if subject.Tag == value.ThunkTag {
+		if t := subject.Thunk(); !t.Forced {
+			t.Value = forced
+			t.Forced = true
+		}
+	}
+	if subject == *argSlot {
+		*argSlot = forced
+	}
+	return forced
+}
 
 func (m *Machine) captureEnv(captures []Capture, locals, upvalues []value.Value) []value.Value {
 	if len(captures) == 0 {
