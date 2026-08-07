@@ -159,7 +159,7 @@ module
 take = n -> xs -> ...     -- your custom version
 ```
 
-This replaces the built-in `list` module for that run. Useful for experimentation, debugging, or providing an optimized version.
+This replaces the built-in `list` module for that run — it does not extend it, so anything your file does not define is simply gone. Useful for experimentation, debugging, or providing an optimized version. Exercise 9.4 walks through what that looks like in practice.
 
 ---
 
@@ -375,55 +375,112 @@ write (roman.toRoman 2024)    -- MMXXIV
 
 ---
 
-### Exercise 9.3 — Mutual module dependency
+### Exercise 9.3 — Extend a library module
 
-Create two modules that depend on each other:
+Write `listx.þ`, a module that imports `list` and adds three functions the standard library does not have:
 
-- `even_odd.þ` exports `isEven` and `isOdd`.
-- `classify.þ` imports `even_odd` and exports `classify`, which takes a number and returns the string `"even"`, `"odd"`, or `"zero"`.
+- `sumSquares xs` — the sum of the squares of `xs`.
+- `average xs` — the arithmetic mean.
+- `chunk n xs` — split `xs` into consecutive lists of at most `n` elements.
 
-Write a program that imports `classify` and tests it on several numbers.
+Then write a program that uses them. Start with this one, which looks reasonable but does not compile — read the diagnostic and fix it:
+
+```thunky-static
+-- main.þ
+import listx in
+  show (listx.sumSquares (list.range 1 4))
+```
 
 <details>
 <summary>Solution</summary>
 
-`even_odd.þ`:
+`listx.þ`:
 
 ```thunky-static
-module
-
-isEven = { 0 -> 1, n -> isOdd (sub 1 n) },
-isOdd  = { 0 -> 0, n -> isEven (sub 1 n) }
-```
-
-`classify.þ`:
-
-```thunky-static
-import even_odd, core in
+-- listx.þ
+import list in
 
 module
 
-classify = {
-  0 -> "zero",
-  n -> core.if (even_odd.isEven n) "even" "odd"
+sumSquares = xs -> xs > list.map (x -> mul x x) > list.sum,
+average    = xs -> fdiv (list.length xs) (list.sum xs),
+chunk      = n -> {
+  [] -> [],
+  xs -> [list.take n xs, chunk n (list.drop n xs)]
 }
 ```
 
-`main.þ`:
+The program above fails, and it is worth seeing exactly how:
 
-```thunky-static
-import classify, list in
-
-list.map classify.classify [0; 1; 2; 3; 4; 7; 10] > list.map write > eval
+```text
+main.þ:2:27: module list was not imported
+  show (listx.sumSquares (list.range 1 4))
+                          ^^^^
+Analyzer found 1 errors
 ```
 
-(We use `eval` to force all the writes; `map write` returns a lazy list of write results.)
+`listx` imports `list`, but that import belongs to `listx` alone — it is not re-exported to whoever imports `listx`. The `listx.sumSquares` call is fine; it is the `list.range` in *your* file that has nothing to refer to. Import `list` yourself:
+
+```thunky-static
+-- main.þ
+import list, listx in
+  show [
+    listx.sumSquares (list.range 1 4),
+    listx.average [2; 4; 9],
+    listx.chunk 3 (list.rangeIncl 1 8)
+  ]
+```
+
+Output: `[14, 5, [[1; 2; 3]; [4; 5; 6]; [7; 8]]]`
+
+Note `average`: `fdiv a b` is `b / a`, so `fdiv (list.length xs) (list.sum xs)` is sum ÷ length.
 
 </details>
 
 ---
 
-### Exercise 9.4 — Final project: mini interpreter
+### Exercise 9.4 — Shadow the standard library on purpose
+
+The runtime searches the current directory before the embedded stdlib, so a local `list.þ` *replaces* the built-in `list` — it does not extend it. Demonstrate this: write a `list.þ` that exports a single, deliberately wrong `length`, then a program that calls `list.length [1; 2; 3]`. What happens if you then try to call `list.map`?
+
+<details>
+<summary>Solution</summary>
+
+`list.þ`:
+
+```thunky-static
+-- list.þ
+module
+
+length = xs -> 999
+```
+
+`main.þ`:
+
+```thunky-static
+-- main.þ
+import list in
+  show (list.length [1; 2; 3])
+```
+
+Output: `999`
+
+Adding a call to `list.map` fails at analysis time:
+
+```text
+main.þ:2:9: no definition for map in module list
+  show (list.map (add 1) [1; 2; 3])
+        ^^^^
+Analyzer found 1 errors
+```
+
+Shadowing is total: the local file *is* the `list` module for this run, and everything the real one exported is gone. That makes it a sharp tool — good for swapping in an instrumented or optimized version of a module you control, risky for a module whose full surface you are relying on. Delete `list.þ` and the built-in comes back with no other change.
+
+</details>
+
+---
+
+### Exercise 9.5 — Final project: mini interpreter
 
 Write a `calc.þ` module that evaluates simple arithmetic expressions represented as tagged tuples:
 

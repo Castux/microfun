@@ -594,61 +594,53 @@ Note: `core.on gt second` compares pairs by their second element (the count), de
 
 ---
 
-### Exercise 8.3 — Table operations
+### Exercise 8.3 — Parse and filter in one pass
 
-Build a simple phonebook as a table and write functions to look up and update entries.
+The string `"12,,7,abc,30,4x,0"` is a comma-separated field list in which some fields are not numbers: one is empty, one is letters, one is a number with a letter stuck to it. Split it, and in a single pass keep only the fields that are entirely digits, converted to numbers. Then sum them.
+
+Write a `toNumber` that returns a `maybe` — `maybe.some` for a valid field, `maybe.none` otherwise — and let `list.mapFilter` do the filtering. Note that `0` is a perfectly good value, so a sentinel like `-1` or `0` would not work here; the `maybe` is what makes "no value" distinct from "the value zero".
 
 <details>
 <summary>Solution</summary>
 
 ```
-import table, maybe in
-
+import list, text, maybe in
 let
-  phonebook = table.empty
-    > table.set "Alice" "555-1234"
-    > table.set "Bob"   "555-5678"
-    > table.set "Carol" "555-9012",
-
-  lookup = name -> table.get name phonebook > maybe.default "not found"
+  toNumber = s -> {
+      1 -> maybe.some (text.stringToInt s),
+      0 -> maybe.none
+    } (mul (gt 0 (list.length s)) (list.allMatch text.isDigit s)),
+  fields = text.split "," "12,,7,abc,30,4x,0"
 in
-  show [
-    lookup "Alice",
-    lookup "Dave",
-    table.keys phonebook
-  ]
+  show [fields > list.mapFilter toNumber, fields > list.mapFilter toNumber > list.sum]
 ```
+
+Output: `[[12; 7; 30; 0], 49]`
+
+A field is valid when it is non-empty (`gt 0 (list.length s)`, i.e. `length s > 0`) *and* every character is a digit; `mul` on two 0/1 values is logical and. The matcher `{ 1 -> …, 0 -> … }` is applied to that flag, which is why the validity test appears after the branches rather than before.
 
 </details>
 
 ---
 
-### Exercise 8.4 — Heap-based median finder
+### Exercise 8.4 — Top-k without sorting
 
-Given a list of numbers, use two heaps (a max-heap for the lower half, a min-heap for the upper half) to find the median.
+Write `topK k xs` returning the `k` largest elements of `xs` in descending order, using `heap` rather than `list.sort`. Test it with `topK 3 [5; 17; 2; 99; 4; 42; 8]`.
 
-This is a classic streaming algorithm. For simplicity: insert all elements first, then extract in order.
+Remember the comparator convention: `cmp a b = 1` means `a` wins the root, so `lt` builds a *max*-heap.
 
 <details>
 <summary>Solution</summary>
 
-For a simpler solution, just sort and take the middle:
-
 ```
 import list, heap in
-let
-  median = xs ->
-    let
-      sorted = heap.sortAsc xs,
-      n = list.length sorted,
-      mid = div 2 n
-    in
-      list.nth mid sorted
-in
-  show [median [3; 1; 4; 1; 5; 9; 2; 6], median [3; 1; 4; 1; 5]]
+let topK = k -> xs -> xs > heap.fromList lt > (h -> list.take k (heap.toList lt h)) in
+  show (topK 3 [5; 17; 2; 99; 4; 42; 8])
 ```
 
-For an odd-length list, this gives the exact median. For even-length, it gives the lower middle element.
+Output: `[99; 42; 17]`
+
+`heap.toList` is lazy — it is defined as `[top h, toList cmp (pop cmp h)]`, one cons cell per pop — so `list.take k` performs exactly `k` pops and the remaining `n - k` elements are never ordered at all. With `lt` as the comparator the root is the largest element, so the pops come out descending and no reversal is needed.
 
 </details>
 
@@ -692,7 +684,40 @@ Output: `1,234,567`
 
 ---
 
-### Exercise 8.6 — Word frequency with `hashmap`
+### Exercise 8.6 — Aligned columns with `string`
+
+`string n` renders a number as a string (a list of code points), which is what lets you feed numbers to the `text` formatting functions. Use it with `text.padRight` and `text.padLeft` to print `[["alice", 42]; ["bob", 7]; ["carolyn", 1234]]` as a two-column table: names left-aligned in a field of 8, scores right-aligned in a field of 5.
+
+<details>
+<summary>Solution</summary>
+
+```
+import list, text in
+let
+  row = [name, score] -> flatten [
+    text.padRight 8 text.space name;
+    text.padLeft 5 text.space (string score)
+  ],
+  rows = [["alice", 42]; ["bob", 7]; ["carolyn", 1234]]
+in
+  rows > list.map row > list.map write > eval
+```
+
+Output:
+
+```text
+alice      42
+bob         7
+carolyn  1234
+```
+
+Since a string *is* a list of code points, concatenating two padded fields is just `flatten` over a list of them. `list.map write` builds a lazy list of write actions and `eval` forces it, which is what actually performs the output.
+
+</details>
+
+---
+
+### Exercise 8.7 — Word frequency with `hashmap`
 
 Rewrite the word-frequency counter from Exercise 8.2 using `hashmap` instead of `table`. Then display the five most frequent words, sorted by frequency descending.
 
@@ -715,5 +740,31 @@ in
 Output: `[["the", 5]; ["cat", 3]; ["mat", 2]; ["sat", 2]; ["on", 2]]`
 
 `hashmap.updateOr w (add 1) 1 m` increments `w`'s count if present, inserts 1 if not. `core.on gt core.second` compares pairs by their second element (the count) in descending order.
+
+</details>
+
+---
+
+### Exercise 8.8 — Combinatorics: Pythagorean triples
+
+Use `comb.choose 3` to enumerate every 3-element subset of `[1 … 20]`, then keep the ones `[a; b; c]` satisfying `a² + b² = c²`. Display the triples and how many there are.
+
+`comb.choose k xs` yields subsets in the order the elements appear in `xs`, so within each subset `a < b < c` already — you do not need to sort or to consider permutations.
+
+<details>
+<summary>Solution</summary>
+
+```
+import list, comb in
+let triples =
+  comb.choose 3 (list.rangeIncl 1 20)
+    > list.filter ([a; b; c] -> eq (add (mul a a) (mul b b)) (mul c c))
+in
+  show [triples, list.length triples]
+```
+
+Output: `[[[3; 4; 5]; [5; 12; 13]; [6; 8; 10]; [8; 15; 17]; [9; 12; 15]; [12; 16; 20]], 6]`
+
+There are `C(20,3) = 1140` subsets, which is small enough to enumerate outright. `comb` counts grow explosively, though — `choose 3` of 200 elements is over a million subsets — so for larger inputs pair it with `list.take`, or narrow the search before you generate.
 
 </details>

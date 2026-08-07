@@ -207,6 +207,17 @@ let someLongComputation = peek "never printed" in
 
 Calling `eval x` or `show x` on an infinite structure will loop forever (or exhaust memory). Only force as much as you need.
 
+### `peek`: the bounded counterpart of `show`
+
+`peek` prints like `show`, but it stops after 100 elements and 50 levels of nesting, marking the cut with `…`. That makes it safe to point at an infinite or enormous structure — it only ever forces the part it is about to print. It also *returns its argument unchanged*, so you can splice it into the middle of a pipeline to see what is flowing through without altering the result:
+
+```
+import list in
+  list.iterate (mul 2) 1 > list.map (add 1) > peek > list.take 3 > show
+```
+
+The `peek` prints the first 100 elements of the infinite stream `[2; 3; 5; 9; 17; …]` and then hands the same stream on; `take 3 > show` prints `[2; 3; 5]`. Swap `peek` for `show` there and the program never terminates.
+
 ### Watch out: accumulated unevaluated thunks
 
 In some patterns — particularly left folds over large lists — you can build up a large chain of unevaluated thunks. For example:
@@ -243,7 +254,92 @@ As a rule: use `foldr` for building a list (it works on infinite lists when the 
 
 ## Exercises
 
-### Exercise 7.1 — Custom infinite stream
+### Exercise 7.1 — How far does forcing go?
+
+Let `xs = list.map show [1; 2; 3]` — a list whose every element, when forced, prints a number as a side effect. Nothing is printed yet, because nothing has been forced.
+
+Write two programs. The first forces `xs` only to **weak head normal form** with `seq xs 999` and then displays `999`. (`seq a b` forces `a` to WHNF, discards it, and returns `b`.) The second forces `xs` completely with `eval`, then displays its length.
+
+Before running them: how many numbers does each print?
+
+<details>
+<summary>Solution</summary>
+
+```
+import list in
+let xs = list.map show [1; 2; 3] in
+  seq xs 999 > show
+```
+
+Output: `999`
+
+```
+import list in
+let xs = list.map show [1; 2; 3] in
+  eval xs > list.length > show
+```
+
+Output:
+
+```text
+1
+2
+3
+3
+```
+
+**Weak head normal form** means the outermost constructor is known and nothing more. Forcing `list.map show [1; 2; 3]` to WHNF produces the cons cell `[show 1, <thunk>]` — the shape is now known, but the head `show 1` is still an unevaluated thunk, so no printing happens. **Normal form** means forced all the way down, which is what `eval` and `show` do: all three `show` calls run, then `list.length` reports `3`.
+
+</details>
+
+---
+
+### Exercise 7.2 — Sharing is per binding, not per call
+
+Memoization caches the value of a *thunk*, and each occurrence of an expression in your source is its own thunk. Writing `slow 200000` twice therefore creates two independent thunks and does the work twice; binding it to a name once and using the name twice does the work once.
+
+Given `slow = n -> list.range 0 n > list.sum`, write both versions — one displaying `[slow 200000, slow 200000]`, the other binding `v = slow 200000` and displaying `[v, v]` — and time them.
+
+<details>
+<summary>Solution</summary>
+
+Two calls, two thunks, two traversals:
+
+```
+import list in
+let slow = n -> list.range 0 n > list.sum in
+  show [slow 200000, slow 200000]
+```
+
+Output: `[19999900000, 19999900000]`
+
+One binding, one thunk, forced once and cached:
+
+```
+import list in
+let
+  slow = n -> list.range 0 n > list.sum,
+  v    = slow 200000
+in
+  show [v, v]
+```
+
+Output: `[19999900000, 19999900000]`
+
+Measured on the reference build:
+
+```text
+two calls   2.8 s
+one binding 1.5 s
+```
+
+Memoization is not a cache keyed on `slow` and its argument — there is no such cache. It is a per-thunk "already evaluated" flag. If you want a result shared, give it a name.
+
+</details>
+
+---
+
+### Exercise 7.3 — Custom infinite stream
 
 Write a function `powersOf` that takes a base `b` and returns the infinite list `[1; b; b²; b³; ...]`. Use `list.iterate` and partial application. Display the first 10 powers of 3.
 
@@ -262,7 +358,7 @@ Output: `[1; 3; 9; 27; 81; 243; 729; 2187; 6561; 19683]`
 
 ---
 
-### Exercise 7.2 — Triangular numbers
+### Exercise 7.4 — Triangular numbers
 
 The n-th triangular number is `1 + 2 + ... + n`. Define the infinite list of triangular numbers using `list.zipWith add` and cumulative sums.
 
@@ -299,7 +395,7 @@ in
 
 ---
 
-### Exercise 7.3 — Lazy filtering
+### Exercise 7.5 — Lazy filtering
 
 Without evaluating more than necessary, find the first number in the infinite list `[1; 2; 3; ...]` that is both divisible by 7 and divisible by 11.
 
@@ -323,7 +419,7 @@ Only the elements up to 77 are evaluated.
 
 ---
 
-### Exercise 7.4 — Collatz stream
+### Exercise 7.6 — Collatz stream
 
 In Exercise 5.3 you wrote `collatz` as a recursive function. Rewrite it as a lazy stream using `list.iterate` and a step function.
 
@@ -356,7 +452,7 @@ in
 
 ---
 
-### Exercise 7.5 — Memoization in action
+### Exercise 7.7 — Memoization in action
 
 Define the Fibonacci stream using the self-referential definition shown in this chapter. Then compute `list.nth 35 fibonacci` (the 36th Fibonacci number, zero-indexed). Compare the time to compute this vs. the naive recursive definition from Exercise 5.1.
 
@@ -385,5 +481,44 @@ let fib = { 1 -> 1, 2 -> 1, n -> add (fib (sub 1 n)) (fib (sub 2 n)) } in
 Output: `832040`
 
 The lazy version is vastly faster because each Fibonacci number is computed exactly once and memoized. The naive version recomputes every sub-problem many times.
+
+</details>
+
+---
+
+### Exercise 7.8 — Strict folds
+
+Sum `list.range 0 200000` two ways: with `list.foldl add 0` and with `list.foldlStrict add 0`. Both print the same number. Time them, and explain the difference — then say what you expect to happen as the list grows to millions of elements.
+
+<details>
+<summary>Solution</summary>
+
+```
+import list in
+  list.range 0 200000 > list.foldl add 0 > show
+```
+
+Output: `19999900000`
+
+```
+import list in
+  list.range 0 200000 > list.foldlStrict add 0 > show
+```
+
+Output: `19999900000`
+
+`foldl add 0` never adds anything while it walks the list. It returns `add (add (add 0 0) 1) 2 …` — a chain of 200000 nested thunks — and only `show` at the very end collapses it. Every link in that chain is live at once, so the cost is not just time but memory and evaluation depth. `foldlStrict` forces the accumulator at each step (with `seq`), so exactly one number is live at any moment.
+
+Measured on the reference build:
+
+```text
+elements    foldl     foldlStrict
+   200000     2.7 s        0.9 s
+  1000000     8.1 s        4.3 s
+  2000000    16.5 s        8.6 s
+  5000000    over 3 min   22.6 s
+```
+
+The gap widens rather than staying a constant factor: the thunk chain that `foldl` builds grows with the list, and the machine spends progressively more of its time managing it. Reach for `foldlStrict` whenever a left fold reduces a long list to a single strict value.
 
 </details>

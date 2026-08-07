@@ -177,49 +177,30 @@ Thunky identifiers can contain letters, digits, and underscores, and must start 
 
 ## Exercises
 
-### Exercise 2.1 — Partial application
+### Exercise 2.1 — Undoing threshold-first
 
-Define a function `square` that squares a number using `mul` and partial application (not `x -> mul x x`).
-
-<details>
-<summary>Solution</summary>
-
-Squaring requires applying `mul` to the same value twice (`mul x x`), so there is no way to express it purely through partial application — the argument `x` would need to appear in two places. The standard form is:
-
-```
-let square = x -> mul x x in
-  show (square 7)    -- 49
-```
-
-The builtin `pow 2` gives the same result without a lambda:
-
-```
-show (pow 2 7)    -- 49
-```
-
-</details>
-
----
-
-### Exercise 2.2 — Higher-order functions
-
-Write a function `applyTwice` that takes a function `f` and a value `x`, and applies `f` to `x` twice. Test it with `add 1` on the value `10` (expected: `12`) and `mul 2` on `3` (expected: `12`).
+Threshold-first ordering makes `sub 1` mean "decrement", but it also makes "subtract from 100" awkward. Write `myFlip`, which takes a two-argument function and returns the same function with its arguments swapped, and use it to build `subtractFrom100`.
 
 <details>
 <summary>Solution</summary>
 
 ```
-let applyTwice = f -> x -> f (f x) in
-  show [applyTwice (add 1) 10, applyTwice (mul 2) 3]
+let
+  myFlip          = f -> x -> y -> f y x,
+  subtractFrom100 = myFlip sub 100
+in
+  show [subtractFrom100 7, subtractFrom100 40, sub 7 100]
 ```
 
-Output: `[12, 12]`
+Output: `[93, 60, 93]`
+
+`myFlip sub 100 7` reduces to `sub 7 100`, i.e. `100 - 7`, so `myFlip sub 100` reads as "100 minus the argument" — the order `sub` deliberately does not give you. Nothing about `sub` changed; `myFlip` only re-orders the currying.
 
 </details>
 
 ---
 
-### Exercise 2.3 — Composing transformations
+### Exercise 2.2 — Composing transformations
 
 Write a function `celsiusToFahrenheit` that converts a Celsius temperature to Fahrenheit. The formula is `F = C * 9/5 + 32`. Use `fdiv` for the division.
 
@@ -237,7 +218,7 @@ Output: `[32, 212, 98.6]`
 
 ---
 
-### Exercise 2.4 — Predicate factories
+### Exercise 2.3 — Predicate factories
 
 Write a function `between` that takes a lower bound `lo`, an upper bound `hi`, and a number `x`, and returns `1` if `lo ≤ x ≤ hi`, `0` otherwise. Use `mul` to combine the two comparisons (since `1 * 1 = 1` and anything times `0` is `0`).
 
@@ -257,20 +238,43 @@ Note: `gte lo x` tests `x ≥ lo` (threshold-first), and `lte hi x` tests `x ≤
 
 ---
 
-### Exercise 2.5 — Thinking about currying
+### Exercise 2.4 — Fan-out
 
-What does `add` evaluate to when applied to just one argument? Write an expression that captures `add 100` as a named function, then applies it to three different values and displays the results as a tuple.
+Write `applyBoth f g x`, which returns the tuple `[f x, g x]` — one input, two functions, both results. Then use it to build `divMod d n`, which returns the quotient and the remainder of `n` by `d` in one call. Test it on `divMod 2 7` and `divMod 10 1234`.
 
 <details>
 <summary>Solution</summary>
 
-`add 100` is a function that adds 100 to its argument. It is a partially-applied builtin — a first-class function value.
+```
+let
+  applyBoth = f -> g -> x -> [f x, g x],
+  divMod    = d -> applyBoth (div d) (mod d)
+in
+  show [divMod 2 7, divMod 10 1234]
+```
+
+Output: `[[3, 1], [123, 4]]`
+
+`divMod` never mentions its second argument: partially applying `applyBoth` to `div d` and `mod d` already produces a function waiting for `n`.
+
+</details>
+
+---
+
+### Exercise 2.5 — An argument that is never used
+
+Write `myConst`, which takes two arguments and returns the first, ignoring the second. Then apply it to `5` and to `show 99`, and count how many lines the program prints.
+
+<details>
+<summary>Solution</summary>
 
 ```
-let addHundred = add 100 in
-  show [addHundred 1, addHundred 42, addHundred 900]
+let myConst = c -> x -> c in
+  show (myConst 5 (show 99))
 ```
 
-Output: `[101, 142, 1000]`
+Output: `5`
+
+One line. `show 99` is passed to `myConst` as an *unevaluated* argument, and since `x` never appears in the body it is never forced, so it never prints. This is your first observable proof that Thunky is lazy: in a strict language the argument would be evaluated at the call site and `99` would appear.
 
 </details>

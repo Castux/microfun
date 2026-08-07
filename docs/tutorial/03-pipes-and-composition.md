@@ -285,60 +285,69 @@ show (5 > mul 2 > add 10)
 
 ---
 
-### Exercise 3.4 — Left pipe for cleanup
+### Exercise 3.4 — Go point-free
 
-Rewrite using `<` to eliminate the outermost parentheses:
-
-```
-show (mul 6 7)
-```
-
-```
-show (add 100 (mul 6 7))
-```
+The lambda `x -> add 1 (mul 2 (sub 3 x))` names its argument only to thread it through three stages. Rewrite it with `*>` so the argument disappears entirely, and check the two versions agree on `10` and on `0`.
 
 <details>
 <summary>Solution</summary>
 
 ```
-show < mul 6 7
+let
+  pointful  = x -> add 1 (mul 2 (sub 3 x)),
+  pointfree = sub 3 *> mul 2 *> add 1
+in
+  show [pointful 10, pointfree 10, pointful 0, pointfree 0]
 ```
 
-```
-show < add 100 (mul 6 7)
-```
+Output: `[15, 15, -5, -5]`
 
-The inner `(mul 6 7)` still needs parentheses in the second line since `add` takes two arguments. Or use `>` for that part too:
-
-```thunky-static
-show < mul 6 7 > add 100    -- ERROR: can't mix < and >
-show (mul 6 7 > add 100)    -- OK
-```
-
-Or cleanly:
-
-```
-7 > mul 6 > add 100 > show
-```
+Reading the nested version inside-out gives `sub 3`, `mul 2`, `add 1` — exactly the left-to-right order of the `*>` chain. A lambda whose argument is used once, at the innermost position, is always a composition in disguise.
 
 </details>
 
 ---
 
-### Exercise 3.5 — Composing predicates
+### Exercise 3.5 — The two composes are the same function
 
-Write a function `inRange` that returns `1` if a number is between 10 and 99 inclusive, `0` otherwise. Use `gte 10` (≥ 10) and `lte 99` (≤ 99) and `mul` to combine the two conditions.
+`f *> g` and `g <* f` should describe the same function. Verify it: with `f = mul 3` and `g = add 4`, check that both agree on `0`, `1`, `5` and `100`. (Use `list.map` and `equal`.)
 
 <details>
 <summary>Solution</summary>
 
 ```
-let inRange = x -> mul (x > gte 10) (x > lte 99) in
-  show [inRange 5, inRange 10, inRange 50, inRange 99, inRange 100]
+import list in
+let
+  f   = mul 3,
+  g   = add 4,
+  fwd = f *> g,
+  bwd = g <* f
+in
+  show (list.map (x -> equal (fwd x) (bwd x)) [0; 1; 5; 100])
 ```
 
-Output: `[0, 1, 1, 1, 0]`
+Output: `[1; 1; 1; 1]`
 
-The expression `x > gte 10` pipes `x` into `gte 10`, giving 1 if `x ≥ 10`. Similarly `x > lte 99` gives 1 if `x ≤ 99`. Multiplying the two results gives 1 only when both hold.
+Functions cannot be compared directly: `equal fwd bwd` is `0`, because equality on functions is identity, not behaviour. "Same function" therefore has to be tested pointwise, by applying both to a sample of inputs. The result prints with semicolons because `list.map` returns a list, not a tuple.
+
+</details>
+
+---
+
+### Exercise 3.6 — Invert a pipeline
+
+This chapter built `celsiusToFahrenheit = mul 9 *> fdiv 5 *> add 32`. Write `toCelsius`, its inverse, also as a `*>` chain. Check it on `32`, `212` and `98.6`.
+
+<details>
+<summary>Solution</summary>
+
+```
+let toCelsius = sub 32 *> mul 5 *> fdiv 9 in
+  show [toCelsius 32, toCelsius 212, toCelsius 98.6]
+```
+
+Output: `[0, 100, 37]`
+
+Inverting a pipeline means reversing the stage order *and* inverting each stage: `add 32` becomes `sub 32`, `fdiv 5` becomes `mul 5`, `mul 9` becomes `fdiv 9`. Threshold-first ordering pays off here — every inverse is still a one-token partial application.
 
 </details>

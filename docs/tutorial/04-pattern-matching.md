@@ -205,6 +205,7 @@ The standard library's `zip` and `zipWith` are written this way.
 
 - **Name pattern** (`x`): matches anything, binds the value.
 - **Number pattern** (`0`, `42`): matches only that specific number.
+- **String pattern** (`"inc"`): matches only that exact string.
 - **Tuple pattern** (`[a, b]`, `[]`): matches a tuple of that length.
 - **List pattern** (`[a; b]`): matches a proper list of exactly that length.
 - Multi-case lambdas: `{ p1 -> e1, p2 -> e2, … }`, tried in order.
@@ -286,24 +287,30 @@ The pipe `[divBy 3 n, divBy 5 n] > { ... }` applies the multi-case lambda to the
 
 ---
 
-### Exercise 4.4 — List head and tail
+### Exercise 4.4 — Order matters
 
-Without using the standard library, write `myHead` and `myTail`.
+Consider `let bad = { n -> "any", 0 -> "zero" } in bad 0 > write`. Predict what it prints before running it. Then reorder the cases so that `0` reports `zero` and everything else reports `any`.
 
 <details>
 <summary>Solution</summary>
 
 ```
-let
-  myHead = [h, t] -> h,
-  myTail = [h, t] -> t
-in
-  show [myHead [10; 20; 30], myTail [10; 20; 30]]
+let bad = { n -> "any", 0 -> "zero" } in
+  bad 0 > write
 ```
 
-Output: `[10, [20; 30]]`
+Output: `any`
 
-Both crash on an empty list — `[]` is a 0-element tuple, which does not match `[h, t]`.
+The name pattern `n` matches every value, so the `0` case below it is unreachable — it can never be selected. Thunky does not warn about this. Put the specific case first:
+
+```
+let good = { 0 -> "zero", n -> "any" } in
+  good 0 > write
+```
+
+Output: `zero`
+
+Rule: order cases from most specific to most general, and keep the catch-all name pattern last.
 
 </details>
 
@@ -324,5 +331,62 @@ let thirdElement = [a, [b, [x, rest]]] -> x in
 ```
 
 Output: `30`
+
+</details>
+
+---
+
+### Exercise 4.6 — String patterns as a dispatch table
+
+A string literal works as a pattern too: `"inc" -> ...` matches only that exact string. Since strings are lists of code points, this is really a nested list pattern, but you write it as a literal.
+
+Build a tiny command interpreter. `step` maps a command name to a function on numbers — `"inc"`, `"dec"`, `"double"` — with any unrecognised command acting as the identity. Then write `runAll cmds n` that applies every command in `cmds` to the starting value `n`, left to right, with `list.foldl`.
+
+<details>
+<summary>Solution</summary>
+
+```
+import list in
+let
+  step = { "inc" -> add 1, "dec" -> sub 1, "double" -> mul 2, other -> x -> x },
+  runAll = cmds -> n -> list.foldl (acc -> c -> step c acc) n cmds
+in
+  show (runAll ["inc"; "inc"; "double"; "dec"; "nope"] 5)
+```
+
+Output: `13`
+
+Each case returns a *function*, so `step c` is the operation to run and `step c acc` applies it. `5 → 6 → 7 → 14 → 13 → 13`. The final `other` case is the catch-all that makes an unknown command harmless.
+
+</details>
+
+---
+
+### Exercise 4.7 — List pattern vs tuple pattern
+
+`[a; b]` and `[a, b]` look almost the same but constrain different things. Write a `shape` function that returns `1` for a 2-element list, `2` for a 2-tuple, and `0` for anything else, and use it to find out which of `[1; 2]`, `[1, 2]`, `7` and `[1; 2; 3]` fall into which case. Then swap the first two cases and explain the result.
+
+<details>
+<summary>Solution</summary>
+
+```
+let shape = { [a; b] -> 1, [a, b] -> 2, x -> 0 } in
+  show [shape [1; 2], shape [1, 2], shape 7, shape [1; 2; 3]]
+```
+
+Output: `[1, 2, 0, 2]`
+
+`[1; 2]` is `[1, [2, []]]`, so it matches the narrow list pattern first. `[1; 2; 3]` is also a 2-tuple at the top level (`[1, [2; 3]]`), so it lands in the tuple case — a list pattern pins the length, a tuple pattern does not.
+
+Swapping the order makes the list case unreachable, because every 2-element list is also a 2-tuple:
+
+```
+let shape = { [a, b] -> 2, [a; b] -> 1 } in
+  show [shape [1; 2], shape [1, 2]]
+```
+
+Output: `[2, 2]`
+
+`[a; b]` is strictly narrower than `[a, b]`: it matches a subset of the same values, so it must come first.
 
 </details>

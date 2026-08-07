@@ -102,6 +102,8 @@ let x = 10 in
 
 The outer `x` is not modified. The inner `let` creates a new binding that shadows it within the inner scope.
 
+Shadowing covers the *body* of the inner `let`, and also its own right-hand sides — so `let x = ... x ...` refers to the new `x`, not the outer one. Exercise 5.6 shows why that matters.
+
 ---
 
 ## Recursive data structures
@@ -273,22 +275,45 @@ The Collatz sequence from 27 has 112 elements.
 
 ---
 
-### Exercise 5.4 — Mutual recursion
+### Exercise 5.4 — Two ways to carry state
 
-Write mutually recursive `myEven` and `myOdd` for non-negative integers.
+Part 1. Write `scan depth s` that returns `1` if the string `s` has balanced parentheses and `0` otherwise. The current nesting depth is carried as an argument: `(` increases it, `)` decreases it, and a `)` at depth `0` is an immediate failure. At the end of the string the input is balanced exactly when the depth is back to `0`. Test it on `"(a(b)c)"`, `"(()"`, `")("` and `"abc"`.
+
+Part 2. State does not have to live in an argument — it can live in *which function is running*. Write `outside` and `inside`, mutually recursive, that between them delete every parenthesised section of a string: `"ab(xx)cd(yyy)e"` becomes `"abcde"`.
 
 <details>
 <summary>Solution</summary>
 
 ```
-let
-  myEven = { 0 -> 1, n -> sub 1 n > myOdd },
-  myOdd  = { 0 -> 0, n -> sub 1 n > myEven }
-in
-  show [myEven 0, myEven 1, myEven 4, myOdd 3, myOdd 7]
+import core, text in
+let scan = depth -> {
+  [] -> eq 0 depth,
+  [c, t] -> core.case
+    (eq (text.char "(") c) (scan (add 1 depth) t)
+    (eq (text.char ")") c) (core.if (eq 0 depth) 0 (scan (sub 1 depth) t))
+    core.else                (scan depth t)
+} in
+  show [scan 0 "(a(b)c)", scan 0 "(()", scan 0 ")(", scan 0 "abc"]
 ```
 
-Output: `[1, 0, 1, 1, 1]`
+Output: `[1, 0, 0, 1]`
+
+The recursion walks the string one code point at a time while the argument `depth` carries the state. `"(()"` ends at depth `1`, so the base case reports `0`; `")("` fails early on the leading `)`.
+
+Part 2 — the same information, held in the call graph instead:
+
+```
+import core, text in
+let
+  outside = { [] -> [], [c, t] -> core.if (eq (text.char "(") c) (inside t) [c, outside t] },
+  inside  = { [] -> [], [c, t] -> core.if (eq (text.char ")") c) (outside t) (inside t) }
+in
+  outside "ab(xx)cd(yyy)e" > write
+```
+
+Output: `abcde`
+
+There is no flag argument: `outside` copies characters and `inside` drops them, and each hands control to the other on the delimiter. Two states, two functions — this is what mutual recursion is for.
 
 </details>
 
@@ -313,5 +338,62 @@ in
 ```
 
 Output: `15`
+
+</details>
+
+---
+
+### Exercise 5.6 — The shadowing that isn't
+
+Earlier in this chapter, `let x = 10 in let x = 20 in show x` printed `20`: the inner binding shadows the outer one. Now predict `let x = 1 in let x = add 1 x in show x`. Does it print `2`?
+
+Do not run this one on the playground until you have read the answer.
+
+<details>
+<summary>Solution</summary>
+
+It prints nothing. It hangs forever, with no error:
+
+```thunky-static
+let x = 1 in let x = add 1 x in show x
+```
+
+The right-hand side of a binding is evaluated in the scope that *includes* the binding itself — that is exactly the rule that makes recursion work. So the `x` inside `add 1 x` is the new `x`, not the outer one, and the definition reads `x = add 1 x`. Forcing it forces itself, forever. Thunky cannot report this as an error because a self-referential binding is legal and useful (`let ones = [1, ones]`).
+
+Shadowing only takes effect for the *body* of the `let`, never for its own right-hand sides. If you want the outer value, use a different name:
+
+```
+let x = 1 in
+  let y = add 1 x in
+    show y
+```
+
+Output: `2`
+
+</details>
+
+---
+
+### Exercise 5.7 — Recursion off the list
+
+Recursion is not a list technique; it follows whatever shape the data has. Represent a binary tree as either `[]` (empty) or a 3-tuple `[value, left, right]`, and write `size` (number of nodes), `total` (sum of the values) and `depth` (longest path from the root). Run all three on the tree with root `5`, left subtree `3`, and right subtree `8` with children `1` and `9`.
+
+<details>
+<summary>Solution</summary>
+
+```
+import core in
+let
+  tree = [5, [3, [], []], [8, [1, [], []], [9, [], []]]],
+  size  = { [] -> 0, [v, l, r] -> add 1 (add (size l) (size r)) },
+  total = { [] -> 0, [v, l, r] -> add v (add (total l) (total r)) },
+  depth = { [] -> 0, [v, l, r] -> add 1 (core.if (gt (depth r) (depth l)) (depth l) (depth r)) }
+in
+  show [size tree, total tree, depth tree]
+```
+
+Output: `[5, 26, 3]`
+
+All three have the same skeleton: one base case for `[]`, one recursive case that pattern-matches the node and combines the results of both subtrees. `gt (depth r) (depth l)` is threshold-first, so it asks "is `depth l` greater than `depth r`?" — making the `core.if` a maximum.
 
 </details>

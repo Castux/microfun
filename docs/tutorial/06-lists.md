@@ -92,6 +92,25 @@ import text in
 
 ---
 
+## Comparing values: `eq` vs `equal`
+
+`eq` is arithmetic. It compares two **numbers** and returns `1` or `0`; handing it anything else — a string, a tuple, a list — is a runtime error (`argument to eq is not a number`), so `eq "ab" "ab"` does not work. `equal` is the structural comparison: it walks both values and returns `1` only if they have the same shape with the same numbers at every leaf. Because a string is a list, `equal` is what you compare text with, and because list literals are only sugar, `equal` sees straight through them.
+
+```
+show [
+  equal "cat" "cat",
+  equal "cat" "cot",
+  equal [1; 2; 3] [1, [2, [3, []]]],
+  eq 3 3
+]
+```
+
+Output: `[1, 0, 1, 1]`
+
+Use `eq` on numbers — it is the cheaper primitive — and `equal` on everything else.
+
+---
+
 ## Common list operations
 
 Import `list` to use the standard library. All the functions below are in `list`.
@@ -310,6 +329,7 @@ Returns a `maybe` value. The `table` module (Chapter 8) adds higher-level operat
 - `[a; b; c]` is sugar for `[a, [b, [c, []]]]`.
 - `[a;]` is a single-element list; `[a]` is a single-element tuple.
 - Strings are lists of Unicode code points; use `write` to print them as text.
+- `eq` compares numbers only; use `equal` for structural comparison, including strings.
 - Import `list` for the standard library.
 - Pipelines with `>` let list transformations read in execution order.
 
@@ -317,48 +337,65 @@ Returns a `maybe` value. The `table` module (Chapter 8) adds higher-level operat
 
 ## Exercises
 
-### Exercise 6.1 — Manual list building
+### Exercise 6.1 — The `[x;]` trap, diagnosed
 
-Build the list `[1; 2; 3]` by writing out the cons cells explicitly and verify it matches the sugar form.
+Write one program that calls `list.length` on a one-element list, `list.length` on a two-element list, and `list.sum` on `[1; 2]`. Then change the one-element list from `[5;]` to `[5]` and run it again. Read the error message carefully: where does it point, and why is that misleading?
 
 <details>
 <summary>Solution</summary>
 
+The working version — note the trailing semicolon in `[5;]`:
+
 ```
-equal [1, [2, [3, []]]] [1; 2; 3] > show    -- 1
+import list in
+  show [list.length [5;], list.length [5; 6], list.sum [1; 2]]
 ```
 
-Both forms are identical values.
+Output: `[1, 2, 3]`
+
+Written as `[5]`, that argument is a **1-tuple**, not a list, and the program fails at runtime:
+
+```thunky-static
+import list in
+  show (list.length [5])
+```
+
+```text
+core/list.þ:23:2: no pattern matched value [5]
+	[] -> 0,
+	^^^^^^^^
+```
+
+The lesson is in the location: `core/list.þ`. The blame lands on the standard library, inside `length`'s own `[] -> 0` case, because that is where the mismatch is actually detected — `[5]` is neither `[]` nor a cons cell `[h, t]`, so no case matches. Your code, which is where the mistake is, is not mentioned at all. Whenever an error points into `core/`, suspect the shape of the value you passed in, and check your one-element lists first.
 
 </details>
 
 ---
 
-### Exercise 6.2 — My own map and filter
+### Exercise 6.2 — Everything from `foldr`
 
-Write `myMap` and `myFilter` without importing `list`. Use pipes where you can.
+`foldr` is not just another list function; it is the general shape of list recursion, and most of the rest of the module is a special case of it. Write `myFoldr` from scratch, then define `myMap`, `myFilter`, `myLength`, `mySum`, `myAppend` and `myReverse` in terms of it, with no explicit recursion of their own.
 
 <details>
 <summary>Solution</summary>
 
 ```
+import core in
 let
-  myMap = f -> {
-    []     -> [],
-    [h, t] -> [f h, myMap f t]
-  },
-  myFilter = p -> {
-    []     -> [],
-    [h, t] -> p h > { 1 -> [h, myFilter p t], 0 -> myFilter p t }
-  }
+  myFoldr   = f -> z -> { [] -> z, [h, t] -> f h (myFoldr f z t) },
+  myMap     = f -> myFoldr (h -> acc -> [f h, acc]) [],
+  myFilter  = p -> myFoldr (h -> acc -> core.if (p h) [h, acc] acc) [],
+  myLength  = myFoldr (h -> add 1) 0,
+  mySum     = myFoldr add 0,
+  myAppend  = ys -> myFoldr (h -> acc -> [h, acc]) ys,
+  myReverse = myFoldr (h -> acc -> myAppend [h;] acc) []
 in
-  show [
-    myMap (mul 3) [1; 2; 3; 4],
-    myFilter (gt 2) [1; 2; 3; 4; 5]
-  ]
+  show [myMap (mul 2) [1; 2; 3], myFilter (gt 2) [1; 2; 3; 4], myLength [1; 2; 3; 4; 5], mySum [1; 2; 3; 4; 5], myReverse [1; 2; 3]]
 ```
 
-Output: `[[3; 6; 9; 12], [3; 4; 5]]`
+Output: `[[2; 4; 6], [3; 4], 5, 15, [3; 2; 1]]`
+
+`myFoldr f z` replaces every cons cell `[h, t]` with `f h` applied to the folded tail, and the final `[]` with `z`. Rebuilding cons cells unchanged (`myAppend`) or transformed (`myMap`) gives back a list; collapsing them to a number (`myLength`, `mySum`) gives an aggregate. `myLength`'s function ignores its element with `h -> add 1`. Note that `myReverse` is quadratic — the accumulator version from Chapter 5 is the one to use in practice.
 
 </details>
 
@@ -436,5 +473,36 @@ import list in
 Odd numbers: 1, 3, 5, 7, 9. Squares: 1, 9, 25, 49, 81. Sum: 165.
 
 Output: `165`
+
+</details>
+
+---
+
+### Exercise 6.6 — Split into words without `text.split`
+
+`text.split " "` breaks on every single space, so runs of spaces produce empty words. Write `words` that splits a string on *runs* of whitespace and drops the empty pieces, using `list.groupBy` and `text.isSpace`. `groupBy p xs` cuts `xs` into runs of adjacent elements for which `p a b` holds. Test it on `"  the quick   brown fox "`, where naive splitting would yield several empty words.
+
+<details>
+<summary>Solution</summary>
+
+```
+import list, text in
+let words = s ->
+  s > list.groupBy (a -> b -> eq (text.isSpace a) (text.isSpace b))
+    > list.filter (g -> eq 0 (text.isSpace (list.head g)))
+in
+  words "  the quick   brown fox " > list.map write > eval
+```
+
+Output:
+
+```text
+the
+quick
+brown
+fox
+```
+
+Grouping on "are these two characters the same kind?" turns the string into alternating runs of whitespace and non-whitespace; the `filter` then throws away the whitespace runs by inspecting the first character of each. `list.map write > eval` prints each string on its own line — `show` on a list of strings would render them as code points.
 
 </details>

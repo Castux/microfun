@@ -263,7 +263,26 @@ Output: `[2, 2]`
 
 ---
 
-### Exercise 1.4 — Thinking about order
+### Exercise 1.4 — Digits without a loop
+
+The tens digit of `1234` is `3`. Extract it using nothing but `div` and `mod`. Thunky has no loops and no strings, so there is no other way in.
+
+<details>
+<summary>Solution</summary>
+
+```
+show (mod 10 (div 10 1234))
+```
+
+Output: `3`
+
+`div 10 1234` is `1234 ÷ 10 = 123`, truncating the ones digit away; `mod 10 123` then keeps the new last digit. Dividing shifts digits off the right, taking the remainder reads the rightmost one.
+
+</details>
+
+---
+
+### Exercise 1.5 — Thinking about order
 
 Without running anything, predict the output of:
 
@@ -279,5 +298,66 @@ Then verify by running it.
 `sub 3 20` = `20 - 3` = `17`. Then `sub 10 17` = `17 - 10` = `7`.
 
 Output: `7`
+
+</details>
+
+---
+
+### Exercise 1.6 — There are no negative numbers
+
+There is no unary minus in Thunky, and `-` is not part of a number token, so this does not even lex:
+
+```thunky-static
+show -273.15
+```
+
+Produce the tuple `[-273.15, -3, 3]` anyway.
+
+<details>
+<summary>Solution</summary>
+
+```
+show [sub 273.15 0, sub 3 0, 3]
+```
+
+Output: `[-273.15, -3, 3]`
+
+`sub a b` is `b - a`, so `sub 273.15 0` is `0 - 273.15`. Negative *values* are perfectly ordinary; it is only the negative *literal* that is missing. (`import math in ...` also gives you `math.negate`.)
+
+</details>
+
+---
+
+### Exercise 1.7 — How many lines?
+
+Count the lines each of these prints, before running it: first `show (show 3)`, then `show (add (show 3) (show 3))`.
+
+<details>
+<summary>Solution</summary>
+
+```
+show (show 3)
+```
+
+Output:
+
+```text
+3
+3
+```
+
+```
+show (add (show 3) (show 3))
+```
+
+Output:
+
+```text
+3
+3
+6
+```
+
+Every `show` prints, and it also hands its argument on, so a nested `show` prints twice: once from the inside, once from the outside. In the second program the two inner `show`s each print their own `3` and the outer one prints the sum.
 
 </details>
