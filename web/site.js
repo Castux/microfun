@@ -235,8 +235,7 @@ function upgradeCodeBlocks(root) {
         const langMatch = (code.className || "").match(/language-([\w-]+)/);
         const lang = langMatch ? langMatch[1] : "";
         if (STATIC_LANGS.has(lang)) continue;
-        const runnable = lang !== "mf-static";
-        makeSnippet(pre, code, runnable);
+        makeSnippet(pre, code, lang !== "thunky-static");
     }
 }
 
