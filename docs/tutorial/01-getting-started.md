@@ -26,7 +26,7 @@ In most languages a program is a sequence of statements: declarations, assignmen
 
 The simplest possible program:
 
-```
+```thunky-raw
 42
 ```
 
@@ -214,7 +214,7 @@ Output: `5`
 
 ### Exercise 1.2 — Printing a table
 
-Display all three values on separate lines by nesting three `show` calls. Print: `1`, `4`, `9` (the squares of 1, 2, 3).
+Print the squares of 1, 2 and 3 — `1`, `4`, `9`. First display them together as one tuple; then get them onto three separate lines. (For the second part you need a way to run three `show` calls in one program: remember a program is a single expression.)
 
 <details>
 <summary>Solution</summary>

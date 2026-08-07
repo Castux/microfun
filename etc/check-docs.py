@@ -31,8 +31,10 @@ STATIC = {"text", "txt", "output", "ebnf", "bnf", "sh", "bash", "console",
 OUTPUT_BUILTINS = re.compile(r"\b(show|peek|write|bwrite)\b")
 
 
-def auto_show(src):
+def auto_show(src, raw=False):
     """Mirror site.js autoShow: wrap a bare expression so it prints."""
+    if raw:
+        return src
     stripped = re.sub(r"--[^\n]*", "", re.sub(r"('[^']*'|\"[^\"]*\")", "''", src))
     if OUTPUT_BUILTINS.search(stripped) or re.search(r"\bmodule\b", stripped):
         return src
@@ -76,12 +78,15 @@ def main():
             ran += 1
             with tempfile.NamedTemporaryFile("w", suffix=".th", delete=False,
                                              encoding="utf-8") as fh:
-                fh.write(auto_show(body))
+                fh.write(auto_show(body, info == "thunky-raw"))
                 tmp = fh.name
             try:
+                # Empty stdin, like a documentation snippet on the site: a
+                # program reading `stdin` must see EOF rather than block on
+                # whatever stdin this script inherited.
                 proc = subprocess.run([BINARY, tmp], capture_output=True,
                                       text=True, timeout=20, encoding="utf-8",
-                                      errors="replace")
+                                      errors="replace", stdin=subprocess.DEVNULL)
                 out = (proc.stdout or "") + (proc.stderr or "")
                 ok = proc.returncode == 0
             except subprocess.TimeoutExpired:

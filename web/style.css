@@ -161,6 +161,19 @@ a:hover { text-decoration: underline; }
 
 .snippet-note { color: var(--muted); font-size: 0.8rem; margin-left: auto; }
 
+/* The blank "try it yourself" editor placed before each folded solution. */
+.snippet-scratch { border-style: dashed; }
+.snippet-scratch .CodeMirror { min-height: 4.5rem; }
+.snippet-label {
+    padding: 0.3rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--code-bg);
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
 .snippet-output, .pg-output {
     margin: 0;
     padding: 0.7rem 1rem;

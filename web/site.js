@@ -135,7 +135,11 @@ const OUTPUT_BUILTINS = /\b(show|peek|write|bwrite)\b/;
 // comments. Running it verbatim would print nothing, so when a program never
 // mentions an output builtin we run `show (<program>)` instead (keeping any
 // import clause in front).
-function autoShow(src) {
+//
+// `raw` opts out: a block tagged ```thunky-raw runs exactly as written, for
+// the examples whose point is that they print nothing.
+function autoShow(src, raw) {
+    if (raw) return { src, wrapped: false };
     const stripped = src.replace(/('[^']*'|"[^"]*")/g, "''").replace(/--[^\n]*/g, "");
     if (OUTPUT_BUILTINS.test(stripped)) return { src, wrapped: false };
     if (/^\s*module\b|\bmodule\b/.test(stripped)) return { src, wrapped: false };
@@ -147,11 +151,21 @@ function autoShow(src) {
     return { src: "show (\n" + src + "\n)", wrapped: true };
 }
 
-function makeSnippet(pre, code, runnable) {
-    const original = code.textContent.replace(/\n$/, "");
-    const box = document.createElement("div");
-    box.className = "snippet";
-    pre.replaceWith(box);
+// buildSnippet renders one editor box into `box`. opts:
+//   value    initial source
+//   runnable false for a read-only fragment (no Run button)
+//   raw      run verbatim, without the show(...) wrapper
+//   scratch  an empty try-it-yourself box: no Reset, a placeholder label
+function buildSnippet(box, opts) {
+    const original = opts.value;
+    box.className = "snippet" + (opts.scratch ? " snippet-scratch" : "");
+
+    if (opts.scratch) {
+        const label = document.createElement("div");
+        label.className = "snippet-label";
+        label.textContent = "Try it yourself";
+        box.appendChild(label);
+    }
 
     const editorHost = document.createElement("div");
     editorHost.className = "snippet-editor";
@@ -161,23 +175,32 @@ function makeSnippet(pre, code, runnable) {
         value: original,
         mode: "thunky",
         theme: "thunky",
-        readOnly: !runnable,
+        readOnly: !opts.runnable,
         viewportMargin: Infinity,
         lineWrapping: true,
         ...EDITOR_INDENT,
     });
 
-    if (!runnable) return;
+    if (!opts.runnable) return;
 
     const bar = document.createElement("div");
     bar.className = "snippet-bar";
     const runBtn = document.createElement("button");
     runBtn.textContent = "Run";
-    const resetBtn = document.createElement("button");
-    resetBtn.textContent = "Reset";
+    bar.appendChild(runBtn);
+    if (!opts.scratch) {
+        const resetBtn = document.createElement("button");
+        resetBtn.textContent = "Reset";
+        resetBtn.addEventListener("click", () => {
+            editor.setValue(original);
+            output.hidden = true;
+            note.textContent = "";
+        });
+        bar.appendChild(resetBtn);
+    }
     const note = document.createElement("span");
     note.className = "snippet-note";
-    bar.append(runBtn, resetBtn, note);
+    bar.appendChild(note);
     box.appendChild(bar);
 
     const output = document.createElement("pre");
@@ -185,14 +208,9 @@ function makeSnippet(pre, code, runnable) {
     output.hidden = true;
     box.appendChild(output);
 
-    resetBtn.addEventListener("click", () => {
-        editor.setValue(original);
-        output.hidden = true;
-        note.textContent = "";
-    });
-
     runBtn.addEventListener("click", async () => {
-        const { src, wrapped } = autoShow(editor.getValue());
+        if (editor.getValue().trim() === "") return;
+        const { src, wrapped } = autoShow(editor.getValue(), opts.raw);
         note.textContent = wrapped ? "showing final value" : "";
         output.hidden = false;
         output.textContent = "";
@@ -240,7 +258,25 @@ function upgradeCodeBlocks(root) {
         const langMatch = (code.className || "").match(/language-([\w-]+)/);
         const lang = langMatch ? langMatch[1] : "";
         if (STATIC_LANGS.has(lang)) continue;
-        makeSnippet(pre, code, lang !== "thunky-static");
+        const box = document.createElement("div");
+        pre.replaceWith(box);
+        buildSnippet(box, {
+            value: code.textContent.replace(/\n$/, ""),
+            runnable: lang !== "thunky-static",
+            raw: lang === "thunky-raw",
+        });
+    }
+}
+
+// Give every exercise a blank editor to attempt it in, placed just before the
+// folded solution so the reader writes an answer before revealing one. The
+// markdown stays free of empty code blocks, which would render as noise on
+// GitHub.
+function addScratchEditors(root) {
+    for (const details of [...root.querySelectorAll("details")]) {
+        const box = document.createElement("div");
+        details.parentNode.insertBefore(box, details);
+        buildSnippet(box, { value: "", runnable: true, scratch: true });
     }
 }
 
@@ -264,6 +300,7 @@ async function main() {
     addHeadingIds(content);
     rewriteLinks(content, page.file);
     upgradeCodeBlocks(content);
+    addScratchEditors(content);
 
     if (location.hash) {
         const target = document.getElementById(location.hash.slice(1));
