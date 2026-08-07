@@ -924,7 +924,7 @@ show [
 
 #### `heap` — purely functional priority queues (leftist heaps)
 
-Provides $O(\log n)$ insertion, merging, and popping.
+Provides O(log n) insertion, merging, and popping.
 
 **Comparator semantics:** `cmp a b = 1` means `a` beats `b` (goes to root).
 - `cmp = lt` → **max-heap** (largest at root): `lt a b = 1` when `b < a`, so `a` wins when `a > b`.
@@ -937,11 +937,11 @@ Use `sortAsc` / `sortDesc` for sorting without reasoning about the comparator.
 | `emptyHeap` | the empty heap |
 | `isEmpty h` | `1` if `h` is empty |
 | `singleton x` | a heap containing only `x` |
-| `merge cmp h1 h2` | merge two heaps ($O(\log n)$) |
-| `insert cmp x h` | insert `x` into `h` ($O(\log n)$) |
+| `merge cmp h1 h2` | merge two heaps (O(log n)) |
+| `insert cmp x h` | insert `x` into `h` (O(log n)) |
 | `top h` | return the root element; crashes on empty heap |
 | `topSafe h` | return `some` root or `none` if empty |
-| `pop cmp h` | remove the root and return the new heap; crashes on empty ($O(\log n)$) |
+| `pop cmp h` | remove the root and return the new heap; crashes on empty (O(log n)) |
 | `popSafe cmp h` | return `some` (new heap) or `none` if empty |
 | `fromList cmp l` | build a heap from a list |
 | `toList cmp h` | extract elements in comparator order (largest-first for `lt`, smallest-first for `gt`) |

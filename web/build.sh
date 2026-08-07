@@ -30,11 +30,11 @@ cp web/index.html web/playground.html web/style.css web/favicon.svg \
    "$out/"
 
 # The markdown the site renders, and the example programs the playground loads.
-mkdir -p "$out/docs/tutorial" "$out/docs/implementation"
+# docs/implementation/ is intentionally excluded — see the note in web/site.js.
+mkdir -p "$out/docs/tutorial"
 cp README.md LICENSE.md "$out/"
 cp docs/*.md "$out/docs/"
 cp docs/tutorial/*.md "$out/docs/tutorial/"
-cp docs/implementation/*.md "$out/docs/implementation/"
 cp examples/*.þ "$out/examples/"
 
 echo "site assembled in $out/"

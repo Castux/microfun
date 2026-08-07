@@ -20,16 +20,11 @@ const PAGES = [
     { id: "tut7", title: "7. Lazy evaluation", file: "docs/tutorial/07-lazy-evaluation.md", group: "Tutorial" },
     { id: "tut8", title: "8. Standard library", file: "docs/tutorial/08-standard-library.md", group: "Tutorial" },
     { id: "tut9", title: "9. Modules", file: "docs/tutorial/09-modules.md", group: "Tutorial" },
-
-    { id: "impl0", title: "0. Overview", file: "docs/implementation/0.Overview.md", group: "Implementation" },
-    { id: "impl1", title: "1. Lexer", file: "docs/implementation/1.Lexer.md", group: "Implementation" },
-    { id: "impl2", title: "2. Parser", file: "docs/implementation/2.Parser.md", group: "Implementation" },
-    { id: "impl3", title: "3. Resolver", file: "docs/implementation/3.Resolver.md", group: "Implementation" },
-    { id: "impl4", title: "4. Core IR & lowering", file: "docs/implementation/4.Core IR and Lowering.md", group: "Implementation" },
-    { id: "impl5", title: "5. Bytecode & compiler", file: "docs/implementation/5.Bytecode and Compiler.md", group: "Implementation" },
-    { id: "impl6", title: "6. The G-machine", file: "docs/implementation/6.The G-machine.md", group: "Implementation" },
-    { id: "improvements", title: "Future improvements", file: "docs/implementation/IMPROVEMENTS.md", group: "Implementation" },
 ];
+
+// The implementation notes (docs/implementation/) are deliberately not part of
+// the site: they document the compiler rather than the language, and are read
+// alongside the source on GitHub.
 
 // Fenced-block info strings that stay as plain, non-interactive code. Anything
 // else (untagged, `thunky`, `th`) becomes an editable, runnable snippet;
@@ -82,10 +77,15 @@ function addHeadingIds(root) {
     }
 }
 
+// Where to send repository links the site does not host itself — the
+// implementation notes, LICENSE, and any source file referenced from prose.
+const REPO_BLOB = "https://github.com/Castux/microfun/blob/v1/";
+
 // Rewrite relative links between the markdown files to ?page= URLs. Links are
 // resolved against the linking page's own directory, so `../LANGUAGE.md` from a
 // tutorial chapter and `docs/LANGUAGE.md` from the README both find the same
-// page. A link with no matching page is left alone.
+// page. A repo-relative link the site does not host goes to GitHub rather than
+// 404ing.
 function rewriteLinks(root, fromFile) {
     const baseDir = fromFile.includes("/") ? fromFile.replace(/\/[^/]*$/, "") : "";
     for (const a of root.querySelectorAll("a[href]")) {
@@ -106,6 +106,11 @@ function rewriteLinks(root, fromFile) {
         const target = PAGES.find(p => p.file === resolved);
         if (target) {
             a.setAttribute("href", "index.html?page=" + target.id + (fragment ? "#" + fragment : ""));
+        } else if (resolved) {
+            a.setAttribute("href", REPO_BLOB + resolved.split("/").map(encodeURIComponent).join("/") +
+                (fragment ? "#" + fragment : ""));
+            a.setAttribute("target", "_blank");
+            a.setAttribute("rel", "noopener");
         }
     }
 }
