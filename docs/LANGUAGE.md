@@ -202,8 +202,8 @@ At run time a value is one of:
 ### Truth values
 
 There is no boolean type. By convention **0 is false and 1 is true**. The
-comparison builtins (`eq`, `lt`) and the `math` module's logical functions return
-`0` or `1`, and `math.if` matches its condition against exactly `1` or `0`
+comparison builtins (`eq`, `lt`) and the `core` module's logical functions return
+`0` or `1`, and `core.if` matches its condition against exactly `1` or `0`
 (any other value is a non-exhaustive-match error).
 
 ## 7. Expressions

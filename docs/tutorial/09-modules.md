@@ -75,7 +75,7 @@ normalize = v -> let l = length v in scale (fdiv l 1) v
 
 Now `vadd` does not shadow anything, and `add` inside `vadd`'s body refers to the builtin.
 
-Note: `length` here shadows the builtin `length` (there is none — `length` is in `list`, not a builtin). If you import `list` alongside `vec2`, the unqualified `length` will refer to whichever was imported last; use `vec2.length` and `list.length` to be explicit.
+Note: `length` is not a builtin — it lives in `list` — so there is nothing to shadow here. But if you import `list` alongside `vec2`, the unqualified `length` refers to whichever was imported last; use `vec2.length` and `list.length` to be explicit.
 
 ---
 
