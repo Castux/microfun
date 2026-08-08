@@ -21,6 +21,16 @@ show [
 ]
 `;
 
+// The ceiling on a single run. It is a backstop against a runaway program, not
+// a budget: the examples menu ships programs that legitimately run for minutes
+// under wasm (sudoku ~90 s, countdown ~60 s, random-chisquare ~200 s on a 2024
+// laptop, and slower hardware in proportion), and the Stop button is always
+// available, so the limit is set well above the slowest of them.
+const TIMEOUT_MS = 300000;
+const TIMEOUT_LABEL = TIMEOUT_MS >= 60000
+    ? TIMEOUT_MS / 60000 + " min"
+    : TIMEOUT_MS / 1000 + " s";
+
 const EXAMPLES = [
     "examples.þ", "streams.þ", "wordfreq.þ", "dijkstra.þ", "huffman.þ",
     "countdown.þ", "sudoku.þ", "random-chisquare.þ", "core_tests.þ",
@@ -99,7 +109,7 @@ async function run() {
     const result = await ThunkyRunner.run(editor.getValue(), {
         stdin: stdinBox.value,
         dump: dumpSelect.value,
-        timeoutMs: 60000,
+        timeoutMs: TIMEOUT_MS,
         onOutput: text => { got += text; output.textContent = got; },
     });
 
@@ -115,7 +125,7 @@ async function run() {
     // worker forwards to `got`; the status line only summarises the outcome.
     const elapsed = formatElapsed(result.elapsedMs);
     if (result.timedOut) {
-        output.textContent = got + (got ? "\n" : "") + "[stopped: exceeded the 60 s time limit]";
+        output.textContent = got + (got ? "\n" : "") + "[stopped: exceeded the " + TIMEOUT_LABEL + " time limit]";
         status.textContent = "timed out after " + elapsed;
         status.className = "pg-status failed";
     } else if (result.hostError) {
