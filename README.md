@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.svg" alt="Thunky" width="112" height="112">
+</p>
+
 # Thunky (Þunky)
 
 Thunky (also written Þunky) is a toy programming language built to explore compiler construction,

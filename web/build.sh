@@ -24,10 +24,13 @@ else
     cp "$goroot/misc/wasm/wasm_exec.js" "$out/"   # Go < 1.24 layout
 fi
 
-# Static assets.
-cp web/index.html web/playground.html web/style.css web/favicon.svg \
+# Static assets. logo.svg lives at the repository root rather than in web/ so
+# that the same relative path works from README.md on GitHub and from the
+# rendered README at the root of this site; it is both the favicon and the mark
+# at the top of the overview page.
+cp web/index.html web/playground.html web/style.css \
    web/site.js web/playground.js web/runner.js web/worker.js web/thunky-mode.js \
-   "$out/"
+   logo.svg "$out/"
 
 # The markdown the site renders, and the example programs the playground loads.
 # docs/implementation/ is intentionally excluded — see the note in web/site.js.
