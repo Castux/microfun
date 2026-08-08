@@ -256,7 +256,19 @@ select {
     border-bottom: 1px solid var(--border);
 }
 
-.pg-header .brand a { font-weight: 700; font-size: 1.1rem; color: var(--fg); }
+.pg-header .brand a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--fg);
+}
+
+/* Sized in em so the mark tracks the brand text. At 1.5em it sits inside the
+   1.6 line box the text already occupies, so the header line does not grow.
+   alt is empty on purpose: the word "Thunky" follows it inside the same link. */
+.pg-header .brand-logo { width: 1.5em; height: 1.5em; display: block; }
 .pg-title { color: var(--muted); }
 .pg-controls { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .doc-link { font-size: 0.85rem; margin-left: 0.5rem; }
