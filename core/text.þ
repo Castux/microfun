@@ -1,5 +1,5 @@
 -- text.þ: string formatting, parsing, and value rendering.
--- Strings in microfun are lists of Unicode code points, so all list operations
+-- Strings in Thunky are lists of Unicode code points, so all list operations
 -- work on them directly. This module adds higher-level formatting utilities.
 import list, math, core, maybe in
 
@@ -16,7 +16,7 @@ cr        = 13,  -- \r  carriage return
 esc       = 27,  -- \e  escape
 space     = 32,  --     space
 dquote    = 34,  -- \"  double quote
-quote     = 39,  -- \'  single quote (string delimiter in microfun)
+quote     = 39,  -- \'  single quote (string delimiter in Thunky)
 backslash = 92,  -- \\  backslash
 
 -- join separator strings: intercalate separator between each string in the list

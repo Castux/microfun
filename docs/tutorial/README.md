@@ -35,7 +35,7 @@ Go through the chapters in order — each one builds on the previous. Pipes are 
 
 Chapters 1–8 are the core language: after them you can write real programs. Chapters 9–11 are about *thinking* in the language rather than new syntax, and 12–14 are about the library, code organisation, and putting it all together.
 
-The exercises at the end of each chapter are worth doing; they are not just repetition but apply the ideas to new problems. On the [documentation site](https://castux.github.io/microfun/) each one comes with an editor you can type your answer into and run in place.
+The exercises at the end of each chapter are worth doing; they are not just repetition but apply the ideas to new problems. On the [documentation site](https://castux.github.io/thunky/) each one comes with an editor you can type your answer into and run in place.
 
 If you get stuck on an exercise, check the solution, understand why it works, then close it and rewrite it from scratch. Reading solutions without coding them in does not help.
 

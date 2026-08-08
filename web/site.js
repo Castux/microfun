@@ -84,7 +84,7 @@ function addHeadingIds(root) {
 
 // Where to send repository links the site does not host itself — the
 // implementation notes, LICENSE, and any source file referenced from prose.
-const REPO_BLOB = "https://github.com/Castux/microfun/blob/v1/";
+const REPO_BLOB = "https://github.com/Castux/thunky/blob/master/";
 
 // Rewrite relative links between the markdown files to ?page= URLs. Links are
 // resolved against the linking page's own directory, so `../LANGUAGE.md` from a
