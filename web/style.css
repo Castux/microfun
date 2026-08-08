@@ -256,6 +256,17 @@ select {
     border-bottom: 1px solid var(--border);
 }
 
+/* The brand is a flex row rather than a line of inline boxes: an inline-flex
+   link takes its baseline from its first flex item, which is the mark, so
+   "playground" would align to the bottom of the image instead of to the
+   baseline of "Thunky". Centring both children sidesteps baselines entirely.
+   The gap replaces the literal space in the markup, which flex drops. */
+.pg-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 .pg-header .brand a {
     display: inline-flex;
     align-items: center;
