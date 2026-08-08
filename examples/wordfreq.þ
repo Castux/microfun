@@ -1,0 +1,91 @@
+-- wordfreq.þ
+--
+-- A word-frequency report over standard input.
+--
+--   thunky examples/wordfreq.þ < README.md
+--
+-- (In the playground, type or paste the text into the stdin box.)
+--
+-- `stdin` is not a function and not a string: it is a *value*, the input
+-- presented as a lazy list of code points. Every list function therefore
+-- applies to it directly, and nothing here mentions reading, buffering, or end
+-- of file — `map`, `filter` and `splitWith` see a list, and the list happens to
+-- be produced by the operating system as it is forced. A program that only
+-- needed the first line would read only the first line.
+--
+-- The one thing worth care is the counting fold. `foldl` would build a chain of
+-- N pending map updates and force it all at the end; `foldlStrict` forces the
+-- accumulator at each step, but only to weak head normal form — the *counts*
+-- inside the map would still be unforced `succ` chains. Forcing the one count
+-- just updated (the `seq` in `bump`) fixes that without the cost of forcing the
+-- whole map, which is what `examples/random-chisquare.þ` does with `eval` and is
+-- O(size of map) per step. Compare the two.
+
+import core, list, math, maybe, text, hashmap in
+
+let
+	topN     = 20,
+	barWidth = 36,
+
+	input = stdin,
+
+	-- Tokenising: lowercase, cut on every run of non-alphanumeric characters,
+	-- drop the empty sections `splitWith` leaves at the boundaries.
+
+	words = input
+		> map toLower
+		> splitWith (isAlphaNum *> not)
+		> filter (isEmpty *> not),
+
+	-- Counting: one hashmap update per word, with that word's count forced.
+
+	bump = counts -> word ->
+		let updated = hashmap.updateOr word succ 1 counts in
+			seq (hashmap.getOr 0 word updated) updated,
+
+	counts = foldlStrict bump hashmap.empty words,
+
+	-- Ranking: by count descending, ties broken by the word ascending.
+	-- `sortWith f` calls `f pivot element`, and `f` answers "does element come
+	-- before pivot?", so the comparison reads pivot-first.
+
+	byCount = [word1, count1] -> [word2, count2] -> case
+		(neq count1 count2) (gt count1 count2)
+		else                (ltString word1 word2),
+
+	ranked = counts > hashmap.keyValues > sortWith byCount,
+	top    = take topN ranked,
+
+	-- Reporting -------------------------------------------------------------
+
+	maxCount = top > { [] -> 1, [[word, count], rest] -> count },
+
+	bar = count -> replicate (mul barWidth count > div maxCount > max 1) (char '#'),
+
+	row = index -> [word, count] -> flatten [
+		padLeft 3 space (string (succ index)); ". ";
+		padRight 18 space word;
+		padLeft 6 space (string count); "  ";
+		bar count
+	],
+
+	charCount = length input,
+	lineCount = input > count (eq lf),
+	wordCount = length words,
+
+	stat = name -> value -> flatten [padRight 18 space name; string value],
+
+	report = case
+		(eq wordCount 0) ["(no words on standard input)";]
+		else (flatten [
+			[stat "characters" charCount;
+			 stat "lines" lineCount;
+			 stat "words" wordCount;
+			 stat "distinct words" (length ranked);
+			 ""];
+			[flatten ["top "; string (length top); ":"];];
+			mapIndex row top
+		])
+
+in
+	report > map write > eval

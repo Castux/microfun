@@ -1,0 +1,139 @@
+-- streams.þ
+--
+-- Infinite lists as an everyday tool.
+--
+-- Every list here is unbounded. None of them is "generated"; each is *defined*,
+-- often in terms of itself, and the runtime computes exactly the prefix that
+-- the report at the bottom forces. Three distinct idioms appear:
+--
+--   * transformation of an existing stream — `filter`, `map`, `zipWith` applied
+--     to an infinite list stay infinite and stay lazy (the sieve);
+--   * `iterate f x` — the orbit of a function, when each element depends only
+--     on the previous one (Pascal's triangle, look-and-say, Newton's method);
+--   * self-reference — a stream defined in terms of itself. This works only
+--     because of laziness *and* memoization: each cell is computed once and
+--     shared, so `fibonacci` and `hamming` below are linear, not exponential.
+--
+-- The last of those is the one worth internalising: `hamming` is its own
+-- definition, three scaled copies of itself merged together, and it is an
+-- efficient program.
+
+import core, list, math, maybe, text in
+
+let
+	-- Primes by lazy sieve --------------------------------------------------
+	--
+	-- Take the head, then sieve the rest with the multiples of that head
+	-- removed. Each `filter` layer survives for the whole run, so this is the
+	-- textbook "unfaithful sieve" — elegant, not fast: reaching the nth prime
+	-- costs a division by every prime before it. It never decides in advance
+	-- how many primes to produce, which is the point; a few hundred of them is
+	-- where the cost starts to show (the 300th below is ~0.3 s, the 1000th ~2 s).
+
+	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
+	primes = sieve (upFrom 2),
+
+	-- Fibonacci by self-reference -------------------------------------------
+	--
+	-- The definition mentions the list it is defining. Sharing is what makes it
+	-- linear: `fibonacci` and `tail fibonacci` are the same cells, read twice.
+
+	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
+
+	-- Hamming numbers -------------------------------------------------------
+	--
+	-- The numbers whose only prime factors are 2, 3 and 5, in order. Same trick,
+	-- one level up: the stream is the ordered merge of its own multiples.
+
+	mergeUniq = xs -> ys -> xs > { [a, as] -> ys > { [b, bs] -> case
+		(lt b a) [a, mergeUniq as ys]         -- a < b : a comes first
+		(lt a b) [b, mergeUniq xs bs]         -- b < a : b comes first
+		else     [a, mergeUniq as bs]         -- equal : emit once, drop both
+	} },
+
+	hamming = [1, mergeUniq
+		(map (mul 2) hamming)
+		(mergeUniq (map (mul 3) hamming) (map (mul 5) hamming))],
+
+	-- Pascal's triangle -----------------------------------------------------
+	--
+	-- Each row from the previous one: shift left, shift right, add. `iterate`
+	-- makes the infinite triangle out of that single step.
+
+	pascal = iterate (row -> zipWith add (prepend [0;] row) (append [0;] row)) [1;],
+
+	-- Look-and-say ----------------------------------------------------------
+	--
+	-- "one 1" -> "two 1s" -> "one 2, one 1" … Grouping equal neighbours and
+	-- replacing each run by its length and its digit is the whole rule.
+
+	lookAndSay = iterate (groupBy equal *> flatMap (run -> [length run; head run])) [1;],
+	digitsToString = map intToDigit,
+
+	-- Newton's method as a stream -------------------------------------------
+	--
+	-- Separate the approximation from the stopping rule: `newtonSqrt` is an
+	-- infinite sequence of ever-better guesses, `within` decides when to stop.
+	-- Neither knows about the other, and no iteration count is ever chosen.
+
+	newtonSqrt = a -> iterate (x -> fdiv 2 (add x (fdiv x a))) a,
+	within = eps -> { [a, [b, rest]] ->
+		if (lt eps (abs (sub a b))) b (within eps [b, rest]) },
+
+	-- Collatz records -------------------------------------------------------
+	--
+	-- The trajectory of one number is `iterate` cut short by `takeWhile`; the
+	-- records are an infinite filter over an infinite map, with the best value
+	-- so far carried in the recursion.
+
+	collatz = n -> iterate (x -> if (even x) (div 2 x) (add 1 (mul 3 x))) n
+		> takeWhile (neq 1)
+		> append [1;],
+
+	records = best -> { [[n, len], rest] ->
+		if (gt best len)
+			[[n, len], records len rest]
+			(records best rest) },
+
+	collatzRecords = upFrom 1 > map (n -> [n, length (collatz n)]) > records 0,
+
+	-- Reporting -------------------------------------------------------------
+
+	row = name -> value -> flatten [text.padRight 18 text.space name; value],
+	line = name -> value -> row name (string value),
+
+	report = [
+		"-- primes";
+		line "first 12"        (take 12 primes);
+		line "below 60"        (takeWhile (lt 60) primes);
+		line "300th"           (nth 299 primes);
+
+		"";
+		"-- self-referential";
+		line "fibonacci 15"    (take 15 fibonacci);
+		line "hamming 20"      (take 20 hamming);
+		line "hamming 500th"   (nth 499 hamming);
+
+		"";
+		"-- iterate";
+		row  "pascal 8"        (pascal > take 8 > map string > text.join " ");
+		row  "look-and-say 8"  (lookAndSay > take 8 > map digitsToString > text.join " ");
+		row  "collatz 27"      (take 12 (collatz 27) > map string > text.join " " > append " … (1)");
+
+		"";
+		"-- limits and records";
+		line "sqrt 2"          (newtonSqrt 2 > within 0.0000001);
+		line "sqrt 1000"       (newtonSqrt 1000 > within 0.0000001);
+		row  "collatz records" (collatzRecords > take 10
+			> map ([n, len] -> flatten [string n; "/"; string len])
+			> text.join " ");
+
+		"";
+		"-- other unbounded lists";
+		line "cycle"           (take 7 (cycle [1; 2; 3]));
+		row  "repeat"          (take 4 (repeat "ha") > flatten);
+		line "downFrom"        (take 5 (downFrom 0))
+	]
+
+in
+	report > map write > eval

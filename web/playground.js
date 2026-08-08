@@ -21,7 +21,10 @@ show [
 ]
 `;
 
-const EXAMPLES = ["examples.þ", "countdown.þ", "sudoku.þ", "random-chisquare.þ", "core_tests.þ"];
+const EXAMPLES = [
+    "examples.þ", "streams.þ", "wordfreq.þ", "dijkstra.þ", "huffman.þ",
+    "countdown.þ", "sudoku.þ", "random-chisquare.þ", "core_tests.þ",
+];
 
 const output = document.getElementById("output");
 const runBtn = document.getElementById("run-btn");

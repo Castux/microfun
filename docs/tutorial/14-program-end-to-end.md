@@ -331,6 +331,16 @@ You have the whole language now. The tutorial ends here; the reference does not.
 
 The **`examples/`** directory in the repository holds programs written to be read, each pushing on something this tutorial only introduced:
 
+- **`examples/examples.þ`** — a tour of the whole language in one runnable file: application, the four operators, pattern matching, recursion, laziness, the tuple/list distinction, strings, and a pass over the standard library. Every section prints what it computes, so the output read next to the source is the explanation. Start here if you want a single page to refresh from.
+
+- **`examples/streams.þ`** — infinite lists as an everyday tool. A lazy prime sieve, self-referential `fibonacci` and `hamming` (the latter defined as the merge of its own multiples), Pascal's triangle and look-and-say via `iterate`, Newton's method as a stream terminated by a separate `within` predicate, and the Collatz record-holders as an infinite filter over an infinite map. The clearest demonstration that laziness plus memoization make self-reference an *efficient* construction, not just a legal one (Chapters 9 and 10).
+
+- **`examples/wordfreq.þ`** — a word-frequency report over `stdin`, with a bar chart. Shows the input as what it is — a lazy list of code points that ordinary list functions consume — and refines the strictness lesson of `random-chisquare.þ`: `foldlStrict` forces the accumulator's spine, and a single `seq` on the count just updated forces the value, without the O(size of map) cost of forcing the entire map at every step.
+
+- **`examples/dijkstra.þ`** — shortest paths with a purely functional priority queue. No mutable distance array and no decrease-key: stale entries are simply re-inserted and skipped when they surface. The settled nodes are produced as a lazy list in distance order, so `find` over it stops the search as soon as the target is reached.
+
+- **`examples/huffman.þ`** — optimal prefix coding, where the `heap` *is* the algorithm: two pops and an insert per step. The tree carries no tag field — a leaf is a 1-tuple and an internal node a 2-tuple, so a two-case lambda tells them apart by arity, which is the usual way to encode a sum type when the only constructor is the tuple. Encodes, decodes, packs to bytes, and reports the compression.
+
 - **`examples/countdown.þ`** — a solver for the Countdown numbers game. It builds every legal expression tree over a set of source numbers, and it is fast because of laziness and sharing: subsets are processed smallest-first, each subset's results are bound to a name so the interpreter shares them, and every larger subset reads them back instead of rebuilding. It is the best worked example of memoization-by-sharing in the repository (Chapter 10).
 
 - **`examples/sudoku.þ`** — constraint propagation. A board is a `hashmap` from cell index to value, peer lists are precomputed once at startup, and the search is a lazy list of solutions produced by `flatten`-ing recursive branches — so asking for the first solution never explores the rest of the tree.

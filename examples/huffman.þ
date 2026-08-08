@@ -1,0 +1,139 @@
+-- huffman.þ
+--
+-- Huffman coding: build an optimal prefix code for a piece of text, encode it,
+-- decode it back, and report the compression achieved.
+--
+-- The heap is the whole algorithm. Huffman's construction is "repeatedly take
+-- the two lightest subtrees and merge them", which is exactly two pops and one
+-- insert on a min-priority queue — `on gt first` over [weight, tree] pairs
+-- (`cmp a b = 1` means a reaches the root, and `gt a b = 1` when b > a, so the
+-- smaller weight wins).
+--
+-- The tree needs no tag field: a leaf is the 1-tuple [codePoint] and an
+-- internal node is the 2-tuple [left, right], so a two-case lambda tells them
+-- apart by arity alone. That is the usual way to encode a sum type in a
+-- language whose only constructor is the tuple.
+--
+-- Caveat, deliberately not handled: text with a single distinct character
+-- produces a bare leaf, for which the empty code is the only code. Real
+-- implementations special-case it; this one would loop.
+
+import core, list, math, maybe, text, heap, table in
+
+let
+	sample = "the quick brown fox jumps over the lazy dog, and the dog barks back",
+
+	-- Frequencies -----------------------------------------------------------
+	--
+	-- Sorting brings equal code points together, `groupBy equal` turns runs of
+	-- them into sublists, and each run's length is its count. O(n log n) and
+	-- three combinators — no mutable counter anywhere.
+
+	counts = sample > sort > groupBy equal > map (run -> [head run, length run]),
+
+	byWeight = on gt first,           -- min-heap on the weight of a [weight, tree] pair
+
+	-- Construction ----------------------------------------------------------
+
+	initial = counts > map ([c, n] -> [n, [c]]) > heap.fromList byWeight,
+
+	build = h ->
+		let rest = heap.pop byWeight h in rest > {
+			[] -> heap.top h > second,             -- one subtree left: it is the tree
+			_  -> let
+					a     = heap.top h,
+					b     = heap.top rest,
+					rest2 = heap.pop byWeight rest,
+					node  = [add (first a) (first b), [second a, second b]]
+				in
+					build (heap.insert byWeight node rest2)
+		},
+
+	tree = build initial,
+
+	-- Codes -----------------------------------------------------------------
+	--
+	-- One walk of the tree yields the whole code table: going left appends '0',
+	-- going right '1'. Bits are accumulated in reverse (a cons is cheap, an
+	-- append is not) and reversed once at each leaf.
+
+	codesFrom = prefix -> {
+		[c]    -> [[c, reverse prefix];],
+		[l, r] -> prepend (codesFrom [char '0', prefix] l) (codesFrom [char '1', prefix] r)
+	},
+
+	codes = codesFrom [] tree,
+
+	-- Encoding and decoding -------------------------------------------------
+
+	encoded = sample > flatMap (c -> table.getOr "" c codes),
+
+	-- Decoding walks the tree bit by bit; reaching a leaf emits its character
+	-- and restarts from the root. The result is lazy: `take 10 (decode bits)`
+	-- consumes only the bits those ten characters needed.
+
+	decode = bits ->
+		let walk = node -> bs -> node > {
+				[c]    -> [c, bs > { [] -> [], more -> walk tree more }],
+				[l, r] -> bs > { [b, more] -> walk (if (eq b (char '0')) l r) more }
+			}
+		in
+			bits > { [] -> [], _ -> walk tree bits },
+
+	-- Packing ---------------------------------------------------------------
+	--
+	-- The encoded form above is a string of '0'/'1' characters, which is what
+	-- makes it readable. Packing it into bytes is a fold per 8-bit group; those
+	-- bytes are what `bwrite` would emit as a real compressed file.
+
+	-- Bits needed to reach a whole number of bytes. (`sub a b` is b - a, so the
+	-- 8-minus-remainder is `sub remainder 8` — the wrong order here silently
+	-- yields a negative count, and `replicate` of a negative count never ends.)
+	padding = let remainder = mod 8 (length encoded) in
+		if (eq remainder 0) 0 (sub remainder 8),
+
+	packed  = encoded
+		> append (replicate padding (char '0'))
+		> map digitToInt
+		> splitEqual 8
+		> map (foldl (acc -> bit -> add bit (mul 2 acc)) 0),
+
+	-- Reporting -------------------------------------------------------------
+
+	charLabel = c -> case
+		(eq c text.space) "' '"
+		else [c;],
+
+	byLengthThenChar = [c1, code1] -> [c2, code2] ->
+		let n1 = length code1, n2 = length code2 in case
+			(neq n1 n2) (lt n1 n2)
+			else (lt c1 c2),
+
+	codeRow = [c, code] -> flatten [
+		text.padRight 5 text.space (charLabel c);
+		text.padLeft 4 text.space (string (table.getOr 0 c counts));
+		"  ";
+		code
+	],
+
+	round2      = x -> mul 100 x > round > fdiv 100,
+	plainBits   = mul 8 (length sample),
+	codedBits   = length encoded,
+	bitsPerChar = fdiv (length sample) codedBits > round2,
+
+	report = flatten [
+		["sample:"; sample];
+		[flatten [string (length sample); " characters, ";
+			string (length counts); " distinct"];];
+		[""; "char count  code"];
+		codes > sortWith byLengthThenChar > map codeRow;
+		[""; flatten ["encoded: "; take 64 encoded; " … ("; string codedBits; " bits)"]];
+		[flatten ["packed:  "; string (take 8 packed); " … ("; string (length packed); " bytes)"];];
+		[flatten [string plainBits; " bits at 8 per character -> "; string codedBits;
+			" bits, "; string bitsPerChar; " per character"];];
+		[flatten ["encoded / original = "; string (fdiv plainBits codedBits > round2)];];
+		[flatten ["round trip: "; case (equal (decode encoded) sample) "ok" else "FAILED"];]
+	]
+
+in
+	report > map write > eval

@@ -1,74 +1,169 @@
-import core, list, math, text in
+-- examples.þ
+--
+-- A tour of the language in one runnable program. Every section prints what it
+-- computes, so the output next to the source is the explanation.
+--
+-- Read it top to bottom, or jump to the section you want:
+--
+--   1. application and partial application
+--   2. the four operators
+--   3. pattern matching
+--   4. let, recursion, mutual recursion
+--   5. laziness, self-reference, sharing
+--   6. lists are tuples (the ',' / ';' distinction)
+--   7. strings are lists of code points
+--   8. the standard library
+--
+-- Import order matters when modules export the same name: a later import
+-- shadows an earlier one's unqualified names. `heap` and `table` both export
+-- `singleton`, `fromList` and `toList`, so they come first and are used
+-- qualified; `list` comes last, so plain `singleton`/`isEmpty` are its own.
 
--- Some arithmetics
+import heap, table, core, maybe, math, comb, text, list in
 
 let
+	-- Output helpers. `string` is the pure counterpart of `show`: it returns the
+	-- representation instead of printing it, which is what makes a report like
+	-- this one composable.
 
-divides = n -> x -> n > mod x > eq 0,
-divisors = n -> rangeIncl 1 n > filter (divides n),
-digisdfts = reverse <* map (mod 10) <* takeWhile (gt 0) <* iterate (div 10),
+	row  = name -> text  -> flatten [padRight 22 space name; text],
+	line = name -> value -> row name (string value),
+	-- `write` ends each line for us, so a leading line feed gives a blank line
+	-- before a section title. String literals have no escapes; `text.lf` is 10.
+	head_ = title -> prepend [lf;] title,
 
-isPrime = n -> rangeIncl 2 (sqrt n) > noneMatch (divides n) > and (gte 2 n),
-primes = upFrom 1 > filter isPrime,
-primeDivisors = {
-	1 -> [],
-	n -> let
-		k = head < drop 1 < divisors n
-	in
-		[k, n > div k > primeDivisors]
-},
+	-- 1. Application and partial application --------------------------------
 
-primes2 =
-	let
-		isPrime = n -> primes2 > takeWhile (lte (sqrt n)) > noneMatch (divides n),
-		primesUpFrom = n -> if (isPrime n)
-			[n, primesUpFrom (add 2 n)]
-			(primesUpFrom (add 2 n))
-	in
-		[2, primesUpFrom 3],
+	add3 = x -> y -> z -> add x (add y z),
+	addFive = add 5,                       -- a builtin, partially applied
 
-fibonacci = prepend [1;1] (zipWith add fibonacci (tail fibonacci)),
+	-- 2. Pattern matching ---------------------------------------------------
+	--
+	-- Clauses are tried in order and the first structural match wins, which is
+	-- why "hello" must come before [a, b]: a string is a list, a list is nested
+	-- 2-tuples, so the tuple pattern would swallow it.
 
-fact = {
-	1 -> 1,
-	n -> mul n (fact < pred n)
-},
+	classify = {
+		0        -> "zero",
+		"hello"  -> "the greeting",
+		[]       -> "empty",
+		[a, b]   -> "a pair or a non-empty list",
+		n        -> "something else"
+	},
 
-pow = exp -> n -> if (gte 1 exp)
-	(mul n < pow (pred exp) n)
-	1,
+	-- Patterns nest to any depth and mix matching with binding at each level.
+	corners = [[a, b], [c, d]] -> add (mul a d) (mul b c),
 
-pairWith = f -> {
-	[] -> b -> [],
-	[x,xs] -> {
-		[] -> [],
-		b -> prepend (map (f x) b) (pairWith f xs b)
-	}
-},
+	-- 3. Recursion and mutual recursion -------------------------------------
+	--
+	-- Bindings in one `let` are mutually visible, so recursion needs no keyword
+	-- and mutual recursion needs no forward declaration.
 
-randomNext = add 1013904223 <* mul 1664525,
-randomFromSeed = iterate randomNext,
+	factorial = { 0 -> 1, n -> mul n (factorial (pred n)) },
 
-countIf = p -> length <* filter p,
+	isEven = { 0 -> 1, n -> isOdd  (pred n) },
+	isOdd  = { 0 -> 0, n -> isEven (pred n) },
 
-span = f -> {
-	[] -> [[],[]],
-	[x,xs] -> if (f x)
-		(span f xs > ([left,right] -> [[x,left], right]) )
-		[[],[x,xs]]
-}
+	-- 4. Laziness -----------------------------------------------------------
+
+	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
+	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
+	primes = sieve (upFrom 2),
+
+	-- 5. Higher-order style -------------------------------------------------
+	--
+	-- Composition builds the function first and applies it later; the pipe
+	-- threads a value through the same steps. Both read left to right.
+
+	sumOfEvenSquares = filter even *> map (pow 2) *> sum,
+
+	-- 6. A worked example ---------------------------------------------------
+	--
+	-- Run-length encoding: group equal neighbours, describe each run.
+
+	encodeRuns = groupBy equal *> map (run -> [head run, length run]),
+	decodeRuns = flatMap ([value, n] -> replicate n value),
+
+	sample = "aaabccddddbbb",
+
+	inventory = table.empty
+		> table.set "apples" 12
+		> table.set "pears" 3
+		> table.set "apples" 20      -- upsert: the later value wins
 
 in
 
-let
+let report = [
+	head_ "-- 1. application";
+	line "add3 10 20 30"      (add3 10 20 30);
+	line "addFive 10"         (addFive 10);
+	line "map addFive"        (map addFive [1; 2; 3]);
+	line "map (add3 1 2)"     (map (add3 1 2) [10; 20]);
 
-numbers = take 10000 < map (mod 20) < randomFromSeed 1,
-counts =  map (flip countIf numbers <* eq) < rangeIncl 0 19,
+	head_ "-- 2. operators";
+	line "5 > add 1 > mul 2"  (5 > add 1 > mul 2);
+	line "mul 2 < add 1 < 5"  (mul 2 < add 1 < 5);
+	line "(add 1 *> mul 2) 5" ((add 1 *> mul 2) 5);
+	line "(add 1 <* mul 2) 5" ((add 1 <* mul 2) 5);
 
-list = head -> tail -> [head,tail],
+	head_ "-- 3. pattern matching";
+	row  "classify 0"         (classify 0);
+	row  "classify 'hello'"   (classify "hello");
+	row  "classify []"        (classify []);
+	row  "classify [1, 2]"    (classify [1, 2]);
+	row  "classify 42"        (classify 42);
+	line "nested pattern"     (corners [[1, 2], [3, 4]]);
 
-add3 = a -> b -> c -> sum [a;b;c]
+	head_ "-- 4. recursion";
+	line "factorial 10"       (factorial 10);
+	line "isEven 10, isOdd 10" [isEven 10, isOdd 10];
 
-in
+	head_ "-- 5. laziness";
+	line "take 10 fibonacci"  (take 10 fibonacci);
+	line "30th fibonacci"     (nth 29 fibonacci);
+	line "primes below 40"    (takeWhile (lt 40) primes);
+	line "take 5 (upFrom 1)"  (take 5 (upFrom 1));
 
-"-334534.25" > stringToFloat > show
+	head_ "-- 6. lists are tuples";
+	line "[1, 2] (2-tuple)"   [1, 2];
+	line "[1; 2] (2-list)"    [1; 2];
+	line "[42] (1-tuple)"     [42];
+	line "[42;] (1-list)"     [42;];
+	line "[1, [2, []]]"       [1, [2, []]];
+	line "isList of both"     [isList [1, 2, 3], isList [1; 2; 3]];
+
+	head_ "-- 7. strings";
+	row  "stringToUpper"      (stringToUpper "hello");
+	row  "join"               (join ", " ["one"; "two"; "three"]);
+	row  "split"              (split "," "a,b,c" > join " | ");
+	line "stringToInt"        (stringToInt "-1234");
+	line "'hi' is a list"     "hi";
+	row  "padLeft"            (flatten [padLeft 8 (char '.') "42"; "|"]);
+
+	head_ "-- 8. standard library";
+	line "sort, nub"          (sort [3; 1; 4; 1; 5] > nub);
+	line "zip"                (zip [1; 2; 3] "abc");
+	line "transpose"          (transpose [[1; 2]; [3; 4]; [5; 6]]);
+	line "splitEqual 3"       (splitEqual 3 (rangeIncl 1 7));
+	line "foldl, foldr"       [foldl sub 0 [1; 2; 3], foldr sub 0 [1; 2; 3]];
+	line "scanl"              (scanl add 0 [1; 2; 3; 4]);
+	line "sumOfEvenSquares"   (sumOfEvenSquares (rangeIncl 1 10));
+	line "comb.choose 2"      (comb.choose 2 [1; 2; 3; 4]);
+	line "comb.permutations"  (comb.permutations [1; 2; 3] > length);
+	line "heap.sortDesc"      (heap.sortDesc [3; 1; 4; 1; 5]);
+	line "find (lt 3) : some" (find (lt 3) [5; 1; 2]);
+	line "find (lt 0) : none" (find (lt 0) [5; 1; 2]);
+	line "maybe.default"      (find (lt 0) [5; 1; 2] > maybe.default 0);
+	line "table.get apples"   (table.get "apples" inventory);
+	line "table.get plums"    (table.get "plums" inventory);
+	row  "table.keys"         (table.keys inventory > join ", ");
+
+	head_ "-- 9. run-length encoding";
+	row  "input"              sample;
+	row  "encoded"            (encodeRuns sample
+		> map ([c, n] -> flatten [[c;]; string n])
+		> join " ");
+	row  "decoded"            (encodeRuns sample > decodeRuns);
+	line "round trip"         (equal (encodeRuns sample > decodeRuns) sample)
+] in
+	report > map write > eval
