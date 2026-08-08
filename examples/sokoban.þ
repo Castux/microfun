@@ -1,0 +1,180 @@
+-- sokoban.þ
+--
+-- Push the boxes onto the targets. An interactive terminal program.
+--
+--   thunky examples/sokoban.þ
+--
+-- Type a command and press Enter: w a s d to move, u to undo, r to reset,
+-- q to quit. Terminal only — it redraws with ANSI escapes, and it waits for
+-- input, which the playground's one-shot stdin box cannot provide.
+--
+-- Three things this shows that the other examples do not.
+--
+-- **Interaction without an IO type.** `stdin` is a lazy list of code points, so
+-- reading a line is `span (neq lf)` — it forces the list until a line feed
+-- arrives, and forcing a cell that has not been typed yet blocks. The loop is
+-- an ordinary recursive function that takes the *rest* of the input as an
+-- argument, so nothing is ever consumed twice.
+--
+-- **Ordering effects with `seq`.** Laziness means an expression runs when its
+-- value is needed, which is not what a prompt wants: the prompt must appear
+-- before the read blocks. `seq a b` forces `a`, then returns `b`, and that is
+-- the whole sequencing mechanism — `seq (bwrite prompt) (read the line)` puts
+-- them in order. `bwrite` rather than `write` because `write` would add a
+-- newline and the prompt has to stay on the input line.
+--
+-- **Undo is free.** A move does not modify the board, it builds a new one; the
+-- old board is still a perfectly good value. So the undo stack is just a list
+-- of previous states, pushed on each move, and `u` pops it. No copying, no
+-- snapshots, no command objects to invert — that is what immutability buys.
+
+import core, list, math, maybe, text in
+
+let
+	-- The level. '#' wall, '.' target, '$' box, '*' box on a target,
+	-- '@' player, '+' player on a target, space floor.
+
+	level = [
+		"##########";
+		"#        #";
+		"#  .  .  #";
+		"#  $  $  #";
+		"#  @     #";
+		"#        #";
+		"##########"
+	],
+
+	-- Parsing ---------------------------------------------------------------
+	--
+	-- Index every character by its coordinates, then read the four sets off the
+	-- resulting [[x, y], character] table. Positions are 2-tuples throughout and
+	-- compare with `equal`, so `contains` is all the membership testing needed.
+
+	charAt = level
+		> mapIndex (y -> row -> mapIndex (x -> c -> [[x, y], c]) row)
+		> flatten,
+
+	isAnyOf = chars -> c -> contains c chars,
+
+	positionsOf = chars -> charAt > filter (second *> isAnyOf chars) > map first,
+
+	walls   = positionsOf "#",
+	targets = positionsOf ".*+",
+	boxes0  = positionsOf "$*",
+	player0 = positionsOf "@+" > head,
+
+	initial = [player0, boxes0],
+
+	-- Rules -----------------------------------------------------------------
+
+	shift = [dx, dy] -> [x, y] -> [add x dx, add y dy],
+
+	isWall = position -> contains position walls,
+
+	-- A move walks into the next cell. If a box is there, it moves one further,
+	-- but only if that cell is free. Anything blocked leaves the state alone,
+	-- which is why every branch returns a state rather than mutating one.
+
+	move = direction -> [player, boxes] ->
+		let
+			ahead  = shift direction player,
+			beyond = shift direction ahead
+		in case
+			(isWall ahead)          [player, boxes]
+			(contains ahead boxes)  (if (or (isWall beyond) (contains beyond boxes))
+										[player, boxes]
+										[ahead, replace ahead beyond boxes])
+			else                    [ahead, boxes],
+
+	solved = [player, boxes] -> boxes > allMatch (box -> contains box targets),
+
+	directionOf = {
+		"w" -> some [0, negate 1],  "up"    -> some [0, negate 1],
+		"s" -> some [0, 1],         "down"  -> some [0, 1],
+		"a" -> some [negate 1, 0],  "left"  -> some [negate 1, 0],
+		"d" -> some [1, 0],         "right" -> some [1, 0],
+		other -> none
+	},
+
+	-- Rendering -------------------------------------------------------------
+
+	csi   = flatten [[esc;]; "["],
+	sgr   = n -> flatten [csi; string n; "m"],
+	clear = flatten [csi; "2J"; csi; "H"],
+
+	grey = sgr 90, red = sgr 31, yellow = sgr 33,
+	green = sgr 32, white = sgr 97, plain = sgr 0,
+
+	-- Every cell is two columns wide so the board is roughly square on screen.
+	cellAt = [player, boxes] -> position -> case
+		(isWall position)                                    (prepend grey   "██")
+		(equal position player)                              (prepend white  " @")
+		(and (contains position boxes) (contains position targets)) (prepend green  "▓▓")
+		(contains position boxes)                            (prepend yellow "▓▓")
+		(contains position targets)                          (prepend red    " ·")
+		else                                                 "  ",
+
+	width  = level > map length > maximum,
+	height = length level,
+
+	boardText = state -> range 0 height
+		> map (y -> range 0 width > map (x -> cellAt state [x, y]) > flatten),
+
+	status = moves -> state -> flatten [
+		plain; "moves "; string moves; "   boxes on target ";
+		string (state > second > count (box -> contains box targets));
+		"/"; string (length boxes0)
+	],
+
+	help = flatten [grey; "w a s d move   u undo   r reset   q quit"; plain],
+
+	draw = moves -> state -> note -> seq (bwrite clear)
+		(flatten [
+			boardText state;
+			[status moves state; help; flatten [red; note; plain]]
+		] > map write > eval),
+
+	-- The loop --------------------------------------------------------------
+	--
+	-- `turn` draws, prompts, and blocks on a line; `dispatch` interprets it and
+	-- calls `turn` again with the rest of the input. The two are mutually
+	-- recursive, which needs no forward declaration: bindings in one `let` are
+	-- mutually visible.
+
+	prompt = flatten [white; "> "; plain],
+
+	readLine = input -> span (neq lf) input > ([line, rest] -> [line, rest > {
+		[] -> [],                 -- end of input with no final newline
+		[nl, more] -> more
+	}]),
+
+	turn = moves -> history -> state -> note -> input ->
+		seq (draw moves state note)
+			(if (solved state)
+				(write (flatten [green; "solved in "; string moves; " moves"; plain]))
+				(seq (bwrite prompt)
+					(input > {
+						[] -> write (flatten [plain; "end of input"]),
+						more -> readLine more > ([line, rest] ->
+							dispatch moves history state (trim (map toLower line)) rest)
+					}))),
+
+	isOneOf = words -> command -> contains command words,
+
+	dispatch = moves -> history -> state -> command -> input -> case
+		(isOneOf ["q"; "quit"; "exit"] command) (write (flatten [plain; "bye"]))
+		(isOneOf ["r"; "reset"] command)        (turn 0 [] initial "" input)
+		(isOneOf ["u"; "undo"] command)         (history > {
+			[] -> turn moves [] state "nothing to undo" input,
+			[previous, older] -> turn (pred moves) older previous "" input
+		})
+		(equal command "")                      (turn moves history state "" input)
+		else (directionOf command > maybe.mapDefault
+			(turn moves history state (prepend "not a command: " command) input)
+			(direction -> let next = move direction state in
+				if (equal next state)
+					(turn moves history state "blocked" input)
+					(turn (succ moves) [state, history] next "" input)))
+
+in
+	turn 0 [] initial "" stdin

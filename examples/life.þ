@@ -1,0 +1,136 @@
+-- life.þ
+--
+-- Conway's Life, animated in the terminal.
+--
+--   thunky examples/life.þ
+--
+-- Terminal only: it drives the cursor with ANSI escape sequences, so it needs a
+-- real terminal (at least 80x26) and not the playground's output pane. Stop it
+-- early with Ctrl-C.
+--
+-- Two things are worth reading here.
+--
+-- **The simulation is a stream.** `iterate step soup` is the infinite sequence
+-- of generations; nothing decides in advance how many to compute, and the
+-- animation loop simply consumes one cell of it per frame. The board is never
+-- mutated — each generation is a new value built from the previous one, and the
+-- old one stays available, which is what lets the renderer colour a cell by
+-- comparing it against the frame before.
+--
+-- **The step function never indexes the grid.** Counting neighbours by looking
+-- up cell [x±1, y±1] would be O(n) per lookup on a cons list and hopeless.
+-- Instead each generation is computed by *shifting whole rows*: the 3x3
+-- neighbourhood sum is a horizontal `zipWith3` of every row against its two
+-- rotations, then a vertical `zipWith3` of that grid against its two rotations.
+-- Nine additions per cell, no indexing, and the rotations give a torus for free.
+-- Then the rule needs no subtraction: the 3x3 sum includes the cell itself, so a
+-- cell lives iff the sum is 3, or the sum is 4 and it was already alive.
+--
+-- **There is no clock.** The language has no sleep and no way to observe time,
+-- so the frame rate comes from `spin`, a counted loop that does nothing. It is
+-- calibrated by machine speed, not by seconds: lower `frameDelay` if the
+-- animation crawls, raise it if it blurs. Computing and drawing a frame already
+-- costs around 60 ms, so the delay is a top-up rather than the whole budget.
+
+import core, list, math, text in
+
+let
+	width      = 40,          -- cells; each is drawn two columns wide
+	height     = 24,
+	frames     = 300,
+	frameDelay = 30000,       -- ~20 ms on a 2024 laptop, on top of ~60 ms of work
+	density    = 32,          -- percentage of cells alive in the initial soup
+	seed       = "thunky",
+
+	-- ANSI control ----------------------------------------------------------
+	--
+	-- Escape sequences are plain text: ESC, '[', parameters, a final letter.
+	-- `bwrite` emits them without the newline `write` would add.
+
+	-- The cursor is deliberately *not* hidden. A pure program has no signal
+	-- handler and no exit hook, so anything it switches on may never be switched
+	-- off: Ctrl-C during the animation would leave the terminal with an
+	-- invisible cursor. Only escapes that are harmless to abandon are used here.
+
+	csi        = flatten [[esc;]; "["],
+	sgr        = n -> flatten [csi; string n; "m"],
+	home       = flatten [csi; "H"],
+	clear      = flatten [csi; "2J"],
+
+	born       = sgr 96,      -- bright cyan: alive now, dead in the previous frame
+	survivor   = sgr 32,      -- green: alive in both
+	plain      = sgr 0,
+
+	-- The initial soup ------------------------------------------------------
+	--
+	-- `hash` iterated on itself is the same cheap pseudorandom stream that
+	-- examples/random-chisquare.þ tests; here it only has to look disordered.
+
+	soup = iterate hash (hash seed)
+		> map (n -> if (lt density (mod 100 n)) 1 0)
+		> take (mul width height)
+		> splitEqual width,
+
+	-- One generation --------------------------------------------------------
+
+	rotateLeft  = l -> append [head l;] (tail l),      -- [a; b; c] -> [b; c; a]
+	rotateRight = l -> prepend [last l;] (init l),     -- [a; b; c] -> [c; a; b]
+
+	sum3 = a -> b -> c -> add a (add b c),
+
+	-- Sum of each cell and its left/right neighbours, then of each row and the
+	-- rows above and below: the full 3x3 sum, including the cell itself.
+	horizontal    = row  -> zipWith3 sum3 (rotateLeft row) row (rotateRight row),
+	neighbourhood = rows -> let sums = map horizontal rows in
+		zipWith3 (zipWith3 sum3) (rotateLeft sums) sums (rotateRight sums),
+
+	rule = alive -> total -> case
+		(eq total 3)              1        -- three neighbours: birth or survival
+		(and (eq total 4) alive)  1        -- two neighbours and already alive
+		else                      0,
+
+	step = rows -> zipWith (zipWith rule) rows (neighbourhood rows),
+
+	-- Rendering -------------------------------------------------------------
+	--
+	-- A cell is coloured by comparing the frame with the one before it, which is
+	-- possible only because the previous generation is still an ordinary value.
+
+	cell = previous -> current -> case
+		(and current (not previous)) (prepend born     "██")
+		(and current previous)       (prepend survivor "██")
+		else                         "  ",
+
+	rowText = previousRow -> currentRow -> zipWith cell previousRow currentRow > flatten,
+
+	header = generation -> grid -> flatten [
+		plain; "Life  ";
+		string width; "x"; string height; " torus  ";
+		"generation "; padLeft 4 space (string generation); "/"; string frames;
+		"  "; padLeft 4 space (string (grid > map sum > sum)); " alive"
+	],
+
+	-- `home` puts the cursor back at the top left instead of clearing, so the
+	-- new frame overwrites the old one in place and the screen does not flash.
+	draw = generation -> previous -> current ->
+		seq (bwrite home)
+			(prepend [header generation current;] (zipWith rowText previous current)
+				> map write > eval),
+
+	-- The frame delay: a loop that computes nothing, forced by `seq`.
+	spin = { 0 -> 0, n -> spin (sub 1 n) },
+
+	play = remaining -> previous -> { [current, rest] ->
+		if (eq remaining 0)
+			(seq (bwrite plain) (write "done"))
+			(seq (draw (sub remaining frames) previous current)
+				(seq (spin frameDelay)
+					(play (pred remaining) current rest))) }
+
+in
+	-- `iterate step soup` is passed straight into the loop rather than bound to
+	-- a name. A name would be a root the whole run: every generation ever
+	-- computed would stay reachable and memoized, and the animation would slow
+	-- down as it went (it does — try it). Unnamed, each cell is consumed once
+	-- and collected, and the run holds two boards at a time.
+	seq (bwrite clear) (play frames soup (iterate step soup))
