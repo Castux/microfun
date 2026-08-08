@@ -235,9 +235,16 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 
 		switch frame.Kind {
 		case updateFrame:
-			// Write back the WHNF result into the thunk.
+			// Write back the WHNF result into the thunk, and drop the environment
+			// that produced it. Nothing reads Locals/Upvalues once Forced is set
+			// (the check above short-circuits before the Code path), and keeping
+			// them alive keeps every value the body captured alive with them —
+			// for a value derived from its predecessor, that retains the whole
+			// ancestry and turns an iterative program into a space leak.
 			frame.Thunk.Value = control
 			frame.Thunk.Forced = true
+			frame.Thunk.Locals = nil
+			frame.Thunk.Upvalues = nil
 			stack = stack[:len(stack)-1]
 
 		case runFrame:
