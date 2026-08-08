@@ -15,10 +15,7 @@ let
 \tfibs = prepend [1;1] (zipWith add fibs (tail fibs))
 in
 
-show [
-\ttake 10 primes,
-\ttake 10 fibs
-]
+[take 10 primes; take 10 fibs] > map show > eval
 `;
 
 // The ceiling on a single run. It is a backstop against a runaway program, not
